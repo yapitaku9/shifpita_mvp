@@ -213,13 +213,16 @@ class ShiftGenerator:
         for emp in employees:
             role_id = emp["role_id"]
 
-            # 勤務日数 = 全日数 - 休み日数
-            work_days = pulp.lpSum([1 - x[emp["id"], d, self.SHIFT_KYU] for d in date_strs])
+            # 勤務日数 = 全日数 - 休み日数 - 明け日数
+            work_days = pulp.lpSum(
+                [1 - x[emp["id"], d, self.SHIFT_KYU] - x[emp["id"], d, self.SHIFT_MING] for d in date_strs]
+            )
 
-            if role_id == self.ROLE_KAIGO:
-                # 介護員: 月21日勤務厳守
+            if role_id in [self.ROLE_KAIGO, self.ROLE_LEADER, self.ROLE_SUPPORT]:
+                # 介護員, 責任者, サポート: 月21日勤務厳守
                 prob += work_days == 21
 
+            if role_id == self.ROLE_KAIGO:
                 # 介護員: 夜勤回数 月10回厳守
                 night_count = pulp.lpSum([x[emp["id"], d, s] for d in date_strs for s in self.GROUP_NIGHT])
                 prob += night_count == 10
@@ -232,9 +235,13 @@ class ShiftGenerator:
         non_part_time_ids = [e["id"] for e in employees if e["role_id"] in non_part_time_roles]
 
         for p_id in part_time_ids:
-            p_work = pulp.lpSum([1 - x[p_id, d, self.SHIFT_KYU] for d in date_strs])
+            p_work = pulp.lpSum(
+                [1 - x[p_id, d, self.SHIFT_KYU] - x[p_id, d, self.SHIFT_MING] for d in date_strs]
+            )
             for n_id in non_part_time_ids:
-                n_work = pulp.lpSum([1 - x[n_id, d, self.SHIFT_KYU] for d in date_strs])
+                n_work = pulp.lpSum(
+                    [1 - x[n_id, d, self.SHIFT_KYU] - x[n_id, d, self.SHIFT_MING] for d in date_strs]
+                )
                 prob += p_work <= n_work
 
         # --- ソフト制約 (目的関数) ---
@@ -263,7 +270,9 @@ class ShiftGenerator:
             if emp["role_id"] == self.ROLE_PART3:
                 late_count = pulp.lpSum([x[emp["id"], d, s] for d in date_strs for s in self.GROUP_LATE])
                 # それ以外 = 全勤務 - 遅番
-                total_work = pulp.lpSum([1 - x[emp["id"], d, self.SHIFT_KYU] for d in date_strs])
+                total_work = pulp.lpSum(
+                        [1 - x[emp["id"], d, self.SHIFT_KYU] - x[emp["id"], d, self.SHIFT_MING] for d in date_strs]
+                    )
                 other_count = total_work - late_count
 
                 diff_p3 = pulp.LpVariable(f"diff_p3_{emp['id']}", 0, 31)
@@ -275,6 +284,16 @@ class ShiftGenerator:
         # 早番優先 & 同日勤務回避
         leader = next((e for e in employees if e["role_id"] == self.ROLE_LEADER), None)
         support = next((e for e in employees if e["role_id"] == self.ROLE_SUPPORT), None)
+
+        # 新規ソフト制約: 責任者とサポートの夜勤回数は同程度 (Medium)
+        if leader and support:
+            leader_night = pulp.lpSum([x[leader["id"], d, s] for d in date_strs for s in self.GROUP_NIGHT])
+            support_night = pulp.lpSum([x[support["id"], d, s] for d in date_strs for s in self.GROUP_NIGHT])
+
+            diff_ls_night = pulp.LpVariable("diff_ls_night", 0, 31)
+            prob += diff_ls_night >= leader_night - support_night
+            prob += diff_ls_night >= support_night - leader_night
+            penalties.append(10 * diff_ls_night)
 
         if leader:
             early_count = pulp.lpSum([x[leader["id"], d, s] for d in date_strs for s in self.GROUP_EARLY])

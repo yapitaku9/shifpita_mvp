@@ -316,7 +316,7 @@ function generateRandomDayOffs() {
 
   state.employees.forEach(emp => {
     const isPartTime = partTimeRoles.includes(emp.role_id);
-    const count = isPartTime ? 15 : 2;
+    const count = isPartTime ? 17 : 2;
     const requests = new Set();
     while (requests.size < count) {
       const d = Math.floor(Math.random() * daysInMonth) + 1;
