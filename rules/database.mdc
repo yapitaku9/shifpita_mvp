@@ -1,0 +1,147 @@
+---
+alwaysApply: false
+---
+
+# ShifPita MVP Database Design
+
+このドキュメントは、ShifPita MVPにおけるデータベース設計とORM (PeeWee) の実装ガイドラインを提供します。
+
+- **DBMS**: SQLite (開発環境)
+- **ORM**: PeeWee
+
+## 1. モデル定義 (PeeWee Models)
+
+### Base Model & Setup
+
+```python
+from peewee import *
+from playhouse.sqlite_ext import JSONField
+import datetime
+
+# データベース接続設定
+db = SqliteDatabase('shifpita.db', pragmas={'foreign_keys': 1})
+
+class BaseModel(Model):
+    class Meta:
+        database = db
+```
+
+### 1.1. マスタデータ (Master Data)
+
+#### Role (役割マスタ)
+
+```python
+class Role(BaseModel):
+    role_id = AutoField()
+    name = CharField(unique=True, max_length=50)
+    can_night_shift = BooleanField(default=False)
+    monthly_work_days_rule = IntegerField(null=True)
+
+    class Meta:
+        table_name = 'roles'
+```
+
+#### ShiftType (シフト区分マスタ)
+
+```python
+class ShiftType(BaseModel):
+    shift_type_id = AutoField()
+    name = CharField(unique=True, max_length=20)
+    start_time = TimeField()
+    end_time = TimeField()
+
+    class Meta:
+        table_name = 'shift_types'
+```
+
+#### ConstraintRule (制約ルールマスタ)
+
+```python
+class ConstraintRule(BaseModel):
+    rule_id = AutoField()
+    type = CharField(max_length=20)  # 'HARD' or 'SOFT'
+    parameters = JSONField()  # playhouse.sqlite_ext.JSONField
+
+    class Meta:
+        table_name = 'constraint_rules'
+```
+
+### 1.2. トランザクションデータ (Transaction Data)
+
+#### ShiftContext (シフト作成コンテキスト)
+
+```python
+class ShiftContext(BaseModel):
+    context_id = AutoField()
+    year = IntegerField()
+    month = IntegerField()
+    created_at = DateTimeField(default=datetime.datetime.now)
+
+    class Meta:
+        table_name = 'shift_contexts'
+```
+
+#### Employee (従業員)
+
+```python
+class Employee(BaseModel):
+    employee_id = AutoField()
+    context = ForeignKeyField(ShiftContext, backref='employees', on_delete='CASCADE')
+    role = ForeignKeyField(Role, backref='employees')
+    name = CharField(max_length=100)
+
+    class Meta:
+        table_name = 'employees'
+        indexes = (
+            (('context',), False),  # idx_employee_context
+        )
+```
+
+#### DayOffRequest (希望休)
+
+```python
+class DayOffRequest(BaseModel):
+    request_id = AutoField()
+    employee = ForeignKeyField(Employee, backref='day_off_requests', on_delete='CASCADE')
+    date = DateField()
+
+    class Meta:
+        table_name = 'day_off_requests'
+        indexes = (
+            (('employee', 'date'), True),  # Unique constraint
+        )
+```
+
+#### SpecialDay (特別日)
+
+```python
+class SpecialDay(BaseModel):
+    special_day_id = AutoField()
+    context = ForeignKeyField(ShiftContext, backref='special_days', on_delete='CASCADE')
+    date = DateField()
+    additional_staff_count = IntegerField(default=0)
+
+    class Meta:
+        table_name = 'special_days'
+        indexes = (
+            (('context', 'date'), True),  # Unique constraint
+        )
+```
+
+#### ShiftAssignment (シフト割当結果)
+
+```python
+class ShiftAssignment(BaseModel):
+    assignment_id = AutoField()
+    context = ForeignKeyField(ShiftContext, backref='assignments', on_delete='CASCADE')
+    employee = ForeignKeyField(Employee, backref='assignments', on_delete='CASCADE')
+    shift_type = ForeignKeyField(ShiftType, backref='assignments')
+    date = DateField()
+
+    class Meta:
+        table_name = 'shift_assignments'
+        indexes = (
+            (('employee', 'date'), True),  # Unique constraint
+            (('context',), False),  # idx_assignment_context
+        )
+```

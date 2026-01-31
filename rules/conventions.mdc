@@ -1,0 +1,47 @@
+---
+alwaysApply: true
+---
+
+# Flask Project Conventions
+
+このプロジェクトにおけるコーディング規約とファイル構成ルールを定義します。
+
+## 命名規則 (Naming Conventions)
+
+- **変数名**: `snake_case`
+- **関数名**: `snake_case`
+- **クラス名**: `PascalCase`
+- **定数名**: `UPPER_SNAKE_CASE`
+- **ファイル名**: `snake_case`
+
+## ファイル構成ルール (File Structure Rules)
+
+- `models/` : モデルファイル（models.py など）
+- `routes/` : ルートファイル（auth.py, posts.py など）
+- `forms/` : フォームファイル（auth_forms.py, post_forms.py など）
+- `templates/` : テンプレートファイル（機能ごとにサブディレクトリ）
+- `static/` : 静的ファイル（css/, js/, uploads/）
+- `utils/` : ユーティリティファイル
+- `seeds/` : シーダーファイル
+
+## インポート順序 (Import Order)
+
+インポートは以下の順序で記述し、各セクションの間には空行を入れます。
+
+1. **標準ライブラリ**
+2. **サードパーティライブラリ**
+3. **ローカルモジュール**
+
+## コメント規則 (Comment Rules)
+
+- **Docstring**: すべての関数とクラスにはdocstringを記述してください。
+- **インラインコメント**: 複雑なロジックには説明コメントを追加してください。
+- **TODO**: 実装待ちや修正が必要な箇所には以下の形式で記述してください。
+  - `# TODO: 説明`
+
+## その他の規約 (Other Conventions)
+
+- **PEP 8**: 基本的にPEP 8スタイルガイドに準拠します。
+- **行の長さ**: 1行の最大文字数は **120文字** とします。
+- **インデント**: スペース **4つ** を使用します。
+- **文字列**: 文字列リテラルには **シングルクォート** (`'`) を優先して使用します。
