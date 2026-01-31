@@ -32,6 +32,7 @@ let state = {
 document.addEventListener('DOMContentLoaded', () => {
   console.log('ShifPita MVP loaded.');
   generateRandomDayOffs(); // テスト用：初期希望休設定
+  generateRandomAvailableShifts(); // テスト用：初期勤務可能シフト設定
   renderEmployeeTable();
   updateEmployeeSelect();
   renderCalendar();
@@ -53,6 +54,24 @@ function renderEmployeeTable() {
   tbody.innerHTML = '';
 
   state.employees.forEach((emp, index) => {
+    let shiftSelectionHtml = '-';
+    if (emp.role_id == 5) { // Part 4
+      shiftSelectionHtml = '<div class="d-flex flex-wrap gap-1">';
+      ['1', '2', '3', '4', '5', '6', '7', '8'].forEach(shift => {
+        // available_shiftsが未定義の場合は全選択とみなす
+        const isChecked = !emp.available_shifts || emp.available_shifts.includes(shift);
+        shiftSelectionHtml += `
+                <div class="form-check form-check-inline m-0">
+                    <input class="form-check-input" type="checkbox" id="shift_${emp.id}_${shift}" 
+                        ${isChecked ? 'checked' : ''} 
+                        onchange="updateAvailableShifts(${emp.id}, '${shift}', this.checked)">
+                    <label class="form-check-label small" for="shift_${emp.id}_${shift}">${shift}</label>
+                </div>
+            `;
+      });
+      shiftSelectionHtml += '</div>';
+    }
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
             <td><input type="text" class="form-control form-control-sm" value="${emp.name}" onchange="updateEmployeeName(${emp.id}, this.value)"></td>
@@ -67,6 +86,7 @@ function renderEmployeeTable() {
                     <option value="7" ${emp.role_id == 7 ? 'selected' : ''}>サポート</option>
                 </select>
             </td>
+            <td>${shiftSelectionHtml}</td>
             <td><button class="btn btn-sm btn-danger" onclick="removeEmployee(${emp.id})">削除</button></td>
         `;
     tbody.appendChild(tr);
@@ -96,7 +116,14 @@ function updateEmployeeName(id, name) {
 
 function updateEmployeeRole(id, roleId) {
   const emp = state.employees.find(e => e.id === id);
-  if (emp) emp.role_id = parseInt(roleId);
+  if (emp) {
+    emp.role_id = parseInt(roleId);
+    // パート4に変更された場合、未設定ならランダム生成
+    if (emp.role_id === 5 && !emp.available_shifts) {
+      randomizeAvailableShifts(emp);
+    }
+    renderEmployeeTable(); // 役割変更に伴いシフト選択欄を更新
+  }
 }
 
 function updateEmployeeSelect() {
@@ -112,6 +139,25 @@ function updateEmployeeSelect() {
   if (currentVal && state.employees.find(e => e.id == currentVal)) {
     select.value = currentVal;
   }
+}
+
+function updateAvailableShifts(id, shift, isChecked) {
+  const emp = state.employees.find(e => e.id === id);
+  if (!emp) return;
+
+  // available_shiftsが未定義の場合は全シフトが有効な状態からスタート
+  if (!emp.available_shifts) {
+    emp.available_shifts = ['1', '2', '3', '4', '5', '6', '7', '8'];
+  }
+
+  if (isChecked) {
+    if (!emp.available_shifts.includes(shift)) {
+      emp.available_shifts.push(shift);
+    }
+  } else {
+    emp.available_shifts = emp.available_shifts.filter(s => s !== shift);
+  }
+  // console.log(`Employee ${id} available shifts:`, emp.available_shifts);
 }
 
 // カレンダー描画
@@ -325,4 +371,25 @@ function generateRandomDayOffs() {
     }
     emp.day_off_requests = Array.from(requests).sort();
   });
+}
+
+// テスト用：ランダム勤務可能シフト生成 (パート4用)
+function generateRandomAvailableShifts() {
+  state.employees.forEach(emp => {
+    if (emp.role_id == 5 && !emp.available_shifts) {
+      randomizeAvailableShifts(emp);
+    }
+  });
+}
+
+function randomizeAvailableShifts(emp) {
+  emp.available_shifts = [];
+  ['1', '2', '3', '4', '5', '6', '7', '8'].forEach(shift => {
+    if (Math.random() < 0.5) emp.available_shifts.push(shift);
+  });
+  // 少なくとも1つは選択状態にする
+  if (emp.available_shifts.length === 0) {
+    const randomShift = String(Math.floor(Math.random() * 8) + 1);
+    emp.available_shifts.push(randomShift);
+  }
 }

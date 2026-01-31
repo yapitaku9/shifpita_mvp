@@ -92,7 +92,13 @@ class ShiftGenerator:
 
             # パート4: 専用シフト + 休 + 明 のみ
             if role_id == self.ROLE_PART4:
-                allowed = self.SHIFTS_PART4 + [self.SHIFT_KYU, self.SHIFT_MING]
+                # 従業員ごとに設定された勤務可能シフトを取得（未設定の場合は全シフト許可）
+                available = emp.get("available_shifts")
+                if available is None:
+                    allowed_shifts = self.SHIFTS_PART4
+                else:
+                    allowed_shifts = [s for s in available if s in self.SHIFTS_PART4]
+                allowed = allowed_shifts + [self.SHIFT_KYU, self.SHIFT_MING]
                 for d in date_strs:
                     for s in self.ALL_SHIFTS:
                         if s not in allowed:
@@ -271,8 +277,11 @@ class ShiftGenerator:
                 late_count = pulp.lpSum([x[emp["id"], d, s] for d in date_strs for s in self.GROUP_LATE])
                 # それ以外 = 全勤務 - 遅番
                 total_work = pulp.lpSum(
-                        [1 - x[emp["id"], d, self.SHIFT_KYU] - x[emp["id"], d, self.SHIFT_MING] for d in date_strs]
-                    )
+                    [
+                        1 - x[emp["id"], d, self.SHIFT_KYU] - x[emp["id"], d, self.SHIFT_MING]
+                        for d in date_strs
+                    ]
+                )
                 other_count = total_work - late_count
 
                 diff_p3 = pulp.LpVariable(f"diff_p3_{emp['id']}", 0, 31)
