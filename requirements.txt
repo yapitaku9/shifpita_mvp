@@ -8,6 +8,6 @@ Flask-WTF==1.2.1
 python-dotenv  # 環境変数管理 (.env)
 
 # Utilities (Image & PDF)
-Pillow==10.1.0
+Pillow>=10.4.0
 reportlab      # PDF生成用 (features_design.md参照)
 pulp           # 数理最適化（シフト生成エンジン用）
