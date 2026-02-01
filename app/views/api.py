@@ -18,9 +18,10 @@ def generate_shifts() -> Response:
     month = int(data.get("month"))
     employees = data.get("employees", [])
     special_days = data.get("special_days", [])
+    enabled_constraints = data.get("enabled_constraints")
 
     generator = ShiftGenerator()
-    assignments = generator.run(year, month, employees, special_days)
+    assignments = generator.run(year, month, employees, special_days, enabled_constraints)
 
     if not assignments:
         return (

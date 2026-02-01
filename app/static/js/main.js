@@ -25,7 +25,25 @@ let state = {
     { id: 18, name: "パート4R", role_id: 5, day_off_requests: [] },
     { id: 19, name: "パート4S", role_id: 5, day_off_requests: [] }
   ],
-  assignments: [] // 生成結果
+  assignments: [], // 生成結果
+  constraints: {
+    // ハード制約
+    hard_role_restrictions: { label: "役割別シフト制限（パート4専用等）", enabled: true },
+    hard_day_off: { label: "希望休の厳守", enabled: true },
+    hard_staff_count: { label: "人員配置基準（各時間帯の必要人数）", enabled: true },
+    hard_night_rules: { label: "夜勤ルール（夜→夜/明、明→休）", enabled: true },
+    hard_consecutive_limit: { label: "連続勤務制限（5連勤以下など）", enabled: true },
+    hard_monthly_work_days: { label: "月間勤務日数固定（正社員等21日）", enabled: true },
+    hard_kaigo_night_count: { label: "介護員夜勤回数固定（10回）", enabled: true },
+    hard_part_time_limit: { label: "パート勤務日数上限（正社員以下）", enabled: true },
+    // ソフト制約
+    soft_part_time_principle: { label: "【中】パート原則勤務（希望休以外）", enabled: true },
+    soft_part1_night: { label: "【中】パート1夜勤優先", enabled: true },
+    soft_part2_late: { label: "【中】パート2遅番優先", enabled: true },
+    soft_part3_balance: { label: "【中】パート3バランス（遅番/他）", enabled: true },
+    soft_leader_support_balance: { label: "【中】責任者・サポート夜勤同程度", enabled: true },
+    soft_leader_support_priority: { label: "【低】責任者・サポート早番優先＆同日回避", enabled: true }
+  }
 };
 
 // 初期化
@@ -36,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderEmployeeTable();
   updateEmployeeSelect();
   renderCalendar();
+  renderConstraints();
 
   // 年月変更イベント
   document.getElementById('yearInput').addEventListener('change', (e) => {
@@ -210,6 +229,47 @@ function toggleDayOff(empId, dateStr) {
   renderCalendar();
 }
 
+// 制約条件描画
+function renderConstraints() {
+  const container = document.getElementById('constraintsArea');
+  container.innerHTML = '';
+
+  const hardConstraints = [];
+  const softConstraints = [];
+
+  Object.entries(state.constraints).forEach(([key, config]) => {
+    if (key.startsWith('hard_')) {
+      hardConstraints.push([key, config]);
+    } else {
+      softConstraints.push([key, config]);
+    }
+  });
+
+  const renderGroup = (title, items, headerClass) => {
+    const headerCol = document.createElement('div');
+    headerCol.className = 'col-12 mt-2';
+    headerCol.innerHTML = `<h6 class="${headerClass} fw-bold border-bottom pb-2">${title}</h6>`;
+    container.appendChild(headerCol);
+
+    items.forEach(([key, config]) => {
+      const col = document.createElement('div');
+      col.className = 'col-md-6';
+      col.innerHTML = `
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="const_${key}" 
+            ${config.enabled ? 'checked' : ''} 
+            onchange="state.constraints['${key}'].enabled = this.checked">
+          <label class="form-check-label" for="const_${key}">${config.label}</label>
+        </div>
+      `;
+      container.appendChild(col);
+    });
+  };
+
+  renderGroup('ハード制約（必須遵守）', hardConstraints, 'text-danger');
+  renderGroup('ソフト制約（推奨・重み付き）', softConstraints, 'text-primary');
+}
+
 // シフト生成 API呼び出し
 async function generateShifts() {
   const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
@@ -223,7 +283,8 @@ async function generateShifts() {
         year: state.year,
         month: state.month,
         employees: state.employees,
-        special_days: [] // 今回は未実装
+        special_days: [], // 今回は未実装
+        enabled_constraints: Object.keys(state.constraints).filter(k => state.constraints[k].enabled)
       })
     });
 
