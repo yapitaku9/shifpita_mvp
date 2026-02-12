@@ -1,11 +1,11 @@
-from peewee import SqliteDatabase, Model
+from peewee import Model, SqliteDatabase
 
-# アプリケーションファクトリで初期化するためにNoneでインスタンス化
+# データベースインスタンス。create_app関数で初期化されます。
 db = SqliteDatabase(None)
 
 
 class BaseModel(Model):
-    """全てのモデルの基底クラス。"""
+    """すべてのモデルの基底クラス。"""
 
     class Meta:
         database = db

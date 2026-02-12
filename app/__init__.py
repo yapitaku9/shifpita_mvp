@@ -30,6 +30,20 @@ def create_app(test_config=None) -> Flask:
     db_path = os.path.join(app.instance_path, "shifpita.db")
     db.init(db_path, pragmas={"foreign_keys": 1})
 
+    # Flask-Loginの初期化
+    from flask_login import LoginManager
+    from app.models.user import User
+
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = "main.login"  # ログインビューのエンドポイント
+    login_manager.login_message = "このページにアクセスするにはログインが必要です。"
+    login_manager.login_message_category = "info"
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.get_or_none(User.id == int(user_id))
+
     @app.before_request
     def before_request():
         if db.is_closed():
@@ -45,5 +59,10 @@ def create_app(test_config=None) -> Flask:
 
     app.register_blueprint(main.bp)
     app.register_blueprint(api.bp)
+
+    # アプリケーションコンテキストでUserモデルを渡す
+    @app.context_processor
+    def inject_user_model():
+        return dict(User=User)
 
     return app

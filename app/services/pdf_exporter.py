@@ -1,6 +1,4 @@
 import io
-import calendar
-import datetime
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -51,72 +49,30 @@ class PDFExporter:
         # assignmentsから日付のユニークなリストを取得してソート
         dates = sorted(list(set(a["date"] for a in assignments)))
         if not dates:
-            last_day = calendar.monthrange(year, month)[1]
-            dates = [f"{year}-{month:02d}-{d:02d}" for d in range(1, last_day + 1)]
+            dates = [f"{year}-{month:02d}-{d:02d}" for d in range(1, 32)]
 
-        # ヘッダー行作成（曜日付き）
-        weekdays_ja = ["月", "火", "水", "木", "金", "土", "日"]
-        header_date_cells = []
-        for d_str in dates:
-            dt = datetime.datetime.strptime(d_str, "%Y-%m-%d")
-            wd = dt.weekday()  # 0:Mon, 6:Sun
-            day_part = d_str.split("-")[-1]
-            header_date_cells.append(f"{day_part}\n({weekdays_ja[wd]})")
+        # 日付ラベル (DD)
+        header_row = ["氏名"] + [d.split("-")[-1] for d in dates]
 
-        header_row = ["氏名"] + header_date_cells + ["出勤日数", "夜勤回数"]
         data = [header_row]
 
-        # データマッピング
+        # 従業員ごとの行データ作成
+        # assignmentsを検索しやすいように辞書化 {(employee_id, date): shift_name}
         assignment_map = {(a["employee_id"], a["date"]): a["shift_type"] for a in assignments}
 
-        # 集計用辞書初期化
-        counts_7_16 = {d: 0 for d in dates}
-        counts_16_20 = {d: 0 for d in dates}
-        counts_20_07 = {d: 0 for d in dates}
-
-        # シフト区分定義（集計用）
-        shifts_7_16 = ["早1", "早2", "日1", "日2", "1", "2", "3", "4", "5", "6", "7", "8"]
-        shifts_16_20 = ["日1", "日2", "遅1", "遅2", "8"]
-        shifts_20_07 = ["夜1", "夜2"]
-
         for emp in employees:
-            work_days_count = 0
-            night_shift_count = 0
-            row_shifts = []
-
+            row = [emp["name"]]
             for d in dates:
                 shift_name = assignment_map.get((emp["id"], d), "")
-                row_shifts.append(shift_name)
-
-                # 勤務日数カウント（休、明以外）
-                if shift_name and shift_name not in ["休", "明"]:
-                    work_days_count += 1
-
-                # 夜勤回数カウント
-                if shift_name in ["夜1", "夜2"]:
-                    night_shift_count += 1
-
-                # 時間帯別人数カウント
-                if shift_name in shifts_7_16:
-                    counts_7_16[d] += 1
-                if shift_name in shifts_16_20:
-                    counts_16_20[d] += 1
-                if shift_name in shifts_20_07:
-                    counts_20_07[d] += 1
-
-            row = [emp["name"]] + row_shifts + [str(work_days_count), str(night_shift_count)]
+                # 表示用に短縮（例: "早1" -> "早" など必要であれば加工）
+                row.append(shift_name)
             data.append(row)
 
-        # 集計行の追加
-        data.append(["7-16時"] + [str(counts_7_16[d]) for d in dates] + ["", ""])
-        data.append(["16-20時"] + [str(counts_16_20[d]) for d in dates] + ["", ""])
-        data.append(["20-翌7時"] + [str(counts_20_07[d]) for d in dates] + ["", ""])
-
         # テーブル作成
+        # 列幅を自動調整（A4横幅 / 列数）
         page_width = landscape(A4)[0] - 60
-        total_units = 2.5 + len(dates) + 1.5 + 1.5
-        unit_width = page_width / total_units
-        col_widths = [unit_width * 2.5] + [unit_width] * len(dates) + [unit_width * 1.5, unit_width * 1.5]
+        col_width = page_width / (len(dates) + 1)
+        col_widths = [col_width * 2] + [col_width] * len(dates)  # 名前列は少し広く
 
         table = Table(data, colWidths=col_widths)
 
@@ -129,28 +85,12 @@ class PDFExporter:
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
                 ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),  # ヘッダー背景
-                ("BACKGROUND", (0, -3), (-1, -1), colors.whitesmoke),  # 集計行背景
             ]
         )
 
-        # 曜日ごとのヘッダー色設定
-        for i, d_str in enumerate(dates):
-            dt = datetime.datetime.strptime(d_str, "%Y-%m-%d")
-            wd = dt.weekday()  # 0:Mon, 6:Sun
-            col_idx = i + 1  # 0番目は氏名なので+1
-            if wd == 6:  # 日曜
-                style.add("TEXTCOLOR", (col_idx, 0), (col_idx, 0), colors.red)
-            elif wd == 5:  # 土曜
-                style.add("TEXTCOLOR", (col_idx, 0), (col_idx, 0), colors.blue)
-
         # シフトタイプに応じた色付け（簡易実装）
-        # データ行のみ対象（ヘッダーとフッターを除く）
-        num_employees = len(employees)
-        for row_idx in range(1, num_employees + 1):
-            row_data = data[row_idx]
-            # シフトデータはインデックス1から len(dates) まで
-            # row_data: [Name, S1, S2, ..., Sn, Total, Night]
-            for col_idx, cell_value in enumerate(row_data[1 : len(dates) + 1], start=1):
+        for row_idx, row_data in enumerate(data[1:], start=1):
+            for col_idx, cell_value in enumerate(row_data[1:], start=1):
                 if "休" in cell_value:
                     style.add("TEXTCOLOR", (col_idx, row_idx), (col_idx, row_idx), colors.red)
                 elif "夜" in cell_value:

@@ -8,41 +8,9 @@ class ShiftGenerator:
     """シフト生成エンジンクラス。"""
 
     def __init__(self):
-        # シフトタイプの定義
-        self.SHIFTS_NORMAL = ["早1", "早2", "日1", "日2", "遅1", "遅2", "夜1", "夜2"]
-        self.SHIFTS_PART4 = ["1", "2", "3", "4", "5", "6", "7", "8"]
-        self.SHIFT_MING = "明"
-        self.SHIFT_KYU = "休"
-
-        # 全シフトリスト
-        self.ALL_SHIFTS = self.SHIFTS_NORMAL + self.SHIFTS_PART4 + [self.SHIFT_MING, self.SHIFT_KYU]
-
-        # グループ定義（人員配置カウント用）
-        # 7-16時: 早番・日勤・パート4
-        self.GROUP_7_16 = ["早1", "早2", "日1", "日2"] + self.SHIFTS_PART4
-
-        # 16-20時: 日勤(後半)・遅番・パート4(8)
-        self.GROUP_16_20 = ["日1", "日2", "遅1", "遅2", "8"]
-
-        # 20-翌7時: 遅番(20-23) + 夜勤(23-07)
-        # この時間帯全体で2人以上必要 -> 遅番2人以上 AND 夜勤2人以上
-        self.GROUP_LATE = ["遅1", "遅2"]
-        self.GROUP_NIGHT = ["夜1", "夜2"]
-
-        # 遅番・夜勤グループ（連勤制限用）
-        self.GROUP_LATE_NIGHT = ["遅1", "遅2", "夜1", "夜2"]
-
-        # 早番グループ（優先割り当て用）
-        self.GROUP_EARLY = ["早1", "早2", "日1", "日2"]
-
-        # 役割ID定義 (DBの初期データに準拠)
-        self.ROLE_KAIGO = 1
-        self.ROLE_PART1 = 2
-        self.ROLE_PART2 = 3
-        self.ROLE_PART3 = 4
-        self.ROLE_PART4 = 5
-        self.ROLE_LEADER = 6
-        self.ROLE_SUPPORT = 7
+        # シフトタイプの定義（簡易版）
+        # 実際はDBから取得するか、引数で受け取る
+        self.shift_types = ["早1", "早2", "日1", "日2", "遅1", "遅2", "夜1", "夜2", "明", "休"]
 
     def run(
         self, year: int, month: int, employees: list, special_days: list, enabled_constraints: list = None
@@ -53,8 +21,12 @@ class ShiftGenerator:
             year (int): 年
             month (int): 月
             employees (list): 従業員リスト [{'id': 1, 'name': '...', 'role_id': 1, 'day_off_requests': ['2026-10-01']}, ...]
+<<<<<<< HEAD
             special_days (list): 特別日リスト [{'date': '2026-10-20', 'additional_staff_count': 1}, ...]
             enabled_constraints (list, optional): 有効にする制約のキーリスト。Noneの場合は全制約を有効化。
+=======
+            special_days (list): 特別日リスト
+>>>>>>> parent of ac489dc (だいぶ良さそうだけど、２１日の勤務日数が守られていないぞ！)
 
         Returns:
             list: 生成されたシフト割当 [{'date': 'YYYY-MM-DD', 'employee_id': 1, 'shift_type': '早1'}, ...]
@@ -65,6 +37,7 @@ class ShiftGenerator:
         dates = [date(year, month, day) for day in range(1, num_days + 1)]
         date_strs = [d.isoformat() for d in dates]
 
+<<<<<<< HEAD
         # 特別日のマッピング {date_str: additional_count}
         special_day_map = {sd["date"]: sd.get("additional_staff_count", 0) for sd in special_days}
 
@@ -87,28 +60,27 @@ class ShiftGenerator:
                 "soft_leader_support_priority",
             ]
 
+=======
+>>>>>>> parent of ac489dc (だいぶ良さそうだけど、２１日の勤務日数が守られていないぞ！)
         # 2. 問題の定義
         prob = pulp.LpProblem("ShiftScheduling", pulp.LpMinimize)
-
-        # 目的関数用のペナルティ項リスト
-        penalties = []
 
         # 3. 変数の定義
         # x[employee_id, date_str, shift_type] = 0 or 1
         x = {}
         for emp in employees:
             for d in date_strs:
-                for s in self.ALL_SHIFTS:
+                for s in self.shift_types:
                     x[emp["id"], d, s] = pulp.LpVariable(f"x_{emp['id']}_{d}_{s}", 0, 1, pulp.LpBinary)
 
         # 4. 制約条件
 
-        # --- 基本制約 ---
+        # (1) 各従業員は1日につき必ず1つのシフト（または休み）が入る
         for emp in employees:
             for d in date_strs:
-                # (1) 各従業員は1日につき必ず1つのシフト（または休み）が入る
-                prob += pulp.lpSum([x[emp["id"], d, s] for s in self.ALL_SHIFTS]) == 1
+                prob += pulp.lpSum([x[emp["id"], d, s] for s in self.shift_types]) == 1
 
+<<<<<<< HEAD
         # --- 役割別シフト制限 (ハード制約) ---
         if "hard_role_restrictions" in enabled_constraints:
             for emp in employees:
@@ -377,20 +349,54 @@ class ShiftGenerator:
         prob += pulp.lpSum(penalties)
 
         # 7. ソルバー実行
+=======
+        # (2) 希望休の反映
+        for emp in employees:
+            requests = emp.get("day_off_requests", [])
+            for req_date in requests:
+                if req_date in date_strs:
+                    # 希望休の日は必ず「休」
+                    if "休" in self.shift_types:
+                        prob += x[emp["id"], req_date, "休"] == 1
+
+        # (3) 必要人数の確保（簡易的なハード制約）
+        # 平日・休日問わず、とりあえず最低限の人数を確保する例
+        # 早番系: 2人以上, 遅番系: 1人以上, 夜勤: 1人以上
+        for d in date_strs:
+            # 早番 (早1, 早2, 日1, 日2)
+            early_shifts = [s for s in self.shift_types if s.startswith("早") or s.startswith("日")]
+            prob += pulp.lpSum([x[emp["id"], d, s] for emp in employees for s in early_shifts]) >= 2
+
+            # 遅番 (遅1, 遅2)
+            late_shifts = [s for s in self.shift_types if s.startswith("遅")]
+            prob += pulp.lpSum([x[emp["id"], d, s] for emp in employees for s in late_shifts]) >= 1
+
+            # 夜勤 (夜1, 夜2)
+            night_shifts = [s for s in self.shift_types if s.startswith("夜")]
+            prob += pulp.lpSum([x[emp["id"], d, s] for emp in employees for s in night_shifts]) >= 1
+
+        # 5. 目的関数
+        # ここでは単純に「休」以外のシフトを均等にするなどの目的が考えられるが、
+        # MVPでは実行可能解を見つけることを優先するため、ダミーの目的関数を設定
+        prob += 0
+
+        # 6. ソルバー実行
+>>>>>>> parent of ac489dc (だいぶ良さそうだけど、２１日の勤務日数が守られていないぞ！)
         # タイムリミットを設定して実行
-        solver = pulp.PULP_CBC_CMD(timeLimit=20, msg=False)
+        solver = pulp.PULP_CBC_CMD(timeLimit=10, msg=False)
         status = prob.solve(solver)
 
         if status != pulp.LpStatusOptimal and status != pulp.LpStatusFeasible:
             # 解が見つからない場合は空リストを返すかエラーにする
+            # ここでは簡易的に空リスト
             print("Infeasible or Unbounded")
             return []
 
-        # 8. 結果の整形
+        # 7. 結果の整形
         assignments = []
         for emp in employees:
             for d in date_strs:
-                for s in self.ALL_SHIFTS:
+                for s in self.shift_types:
                     if pulp.value(x[emp["id"], d, s]) == 1:
                         assignments.append({"date": d, "employee_id": emp["id"], "shift_type": s})
                         break

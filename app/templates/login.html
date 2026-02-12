@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>ログイン</h2>
+<form action="" method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <p>
+        {{ form.user_id.label }}<br>
+        {{ form.user_id(size=32) }}<br>
+        {% for error in form.user_id.errors %}
+        <span style="color: red;">[{{ error }}]</span>
+        {% endfor %}
+    </p>
+    <p>
+        {{ form.password.label }}<br>
+        {{ form.password(size=32) }}<br>
+        {% for error in form.password.errors %}
+        <span style="color: red;">[{{ error }}]</span>
+        {% endfor %}
+    </p>
+    <p>{{ form.submit() }}</p>
+</form>
+{% if User.select().count() == 0 %} {# ユーザーがまだ登録されていない場合のみ表示 #}
+<p>アカウントをお持ちでない場合: <a href="{{ url_for('main.register') }}">新規登録</a></p>
+{% endif %}
+{% endblock %}

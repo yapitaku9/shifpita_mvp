@@ -5,25 +5,9 @@ let state = {
   year: 2026,
   month: 10,
   employees: [
-    { id: 1, name: "責任者A", role_id: 6, day_off_requests: [] },
-    { id: 2, name: "サポートB", role_id: 7, day_off_requests: [] },
-    { id: 3, name: "介護員C", role_id: 1, day_off_requests: [] },
-    { id: 4, name: "介護員D", role_id: 1, day_off_requests: [] },
-    { id: 5, name: "介護員E", role_id: 1, day_off_requests: [] },
-    { id: 6, name: "介護員F", role_id: 1, day_off_requests: [] },
-    { id: 7, name: "介護員G", role_id: 1, day_off_requests: [] },
-    { id: 8, name: "パート1H", role_id: 2, day_off_requests: [] },
-    { id: 9, name: "パート2I", role_id: 3, day_off_requests: [] },
-    { id: 10, name: "パート3J", role_id: 4, day_off_requests: [] },
-    { id: 11, name: "パート4K", role_id: 5, day_off_requests: [] },
-    { id: 12, name: "パート4L", role_id: 5, day_off_requests: [] },
-    { id: 13, name: "パート4M", role_id: 5, day_off_requests: [] },
-    { id: 14, name: "パート4N", role_id: 5, day_off_requests: [] },
-    { id: 15, name: "パート4O", role_id: 5, day_off_requests: [] },
-    { id: 16, name: "パート4P", role_id: 5, day_off_requests: [] },
-    { id: 17, name: "パート4Q", role_id: 5, day_off_requests: [] },
-    { id: 18, name: "パート4R", role_id: 5, day_off_requests: [] },
-    { id: 19, name: "パート4S", role_id: 5, day_off_requests: [] }
+    { id: 1, name: "佐藤", role_id: 1, day_off_requests: [] },
+    { id: 2, name: "鈴木", role_id: 2, day_off_requests: [] },
+    { id: 3, name: "高橋", role_id: 3, day_off_requests: [] }
   ],
   assignments: [], // 生成結果
   constraints: {
@@ -49,8 +33,11 @@ let state = {
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
   console.log('ShifPita MVP loaded.');
+<<<<<<< HEAD
   generateRandomDayOffs(); // テスト用：初期希望休設定
   generateRandomAvailableShifts(); // テスト用：初期勤務可能シフト設定
+=======
+>>>>>>> parent of ac489dc (だいぶ良さそうだけど、２１日の勤務日数が守られていないぞ！)
   renderEmployeeTable();
   updateEmployeeSelect();
   renderCalendar();
@@ -99,10 +86,6 @@ function renderEmployeeTable() {
                     <option value="1" ${emp.role_id == 1 ? 'selected' : ''}>介護員</option>
                     <option value="2" ${emp.role_id == 2 ? 'selected' : ''}>パート1</option>
                     <option value="3" ${emp.role_id == 3 ? 'selected' : ''}>パート2</option>
-                    <option value="4" ${emp.role_id == 4 ? 'selected' : ''}>パート3</option>
-                    <option value="5" ${emp.role_id == 5 ? 'selected' : ''}>パート4</option>
-                    <option value="6" ${emp.role_id == 6 ? 'selected' : ''}>責任者</option>
-                    <option value="7" ${emp.role_id == 7 ? 'selected' : ''}>サポート</option>
                 </select>
             </td>
             <td>${shiftSelectionHtml}</td>
@@ -189,21 +172,6 @@ function renderCalendar() {
   if (!emp) return;
 
   const daysInMonth = new Date(state.year, state.month, 0).getDate();
-  const firstDay = new Date(state.year, state.month - 1, 1).getDay(); // 0:Sun, 1:Mon...
-  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-
-  // 曜日ヘッダー
-  weekdays.forEach((day, index) => {
-    const header = document.createElement('div');
-    header.className = `calendar-header ${index === 0 ? 'text-danger' : index === 6 ? 'text-primary' : ''}`;
-    header.textContent = day;
-    container.appendChild(header);
-  });
-
-  // 月初の空白セル
-  for (let i = 0; i < firstDay; i++) {
-    container.appendChild(document.createElement('div'));
-  }
 
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -314,32 +282,16 @@ function renderPreview() {
   const table = document.getElementById('previewTable');
   table.innerHTML = '';
 
-  const daysInMonth = new Date(state.year, state.month, 0).getDate();
-
-  // 集計用配列
-  const counts7_16 = new Array(daysInMonth).fill(0);
-  const counts16_20 = new Array(daysInMonth).fill(0);
-  const counts20_07 = new Array(daysInMonth).fill(0);
-
-  // シフト定義 (JS側でも定義が必要)
-  const shifts7_16 = ["早1", "早2", "日1", "日2", "1", "2", "3", "4", "5", "6", "7", "8"];
-  const shifts16_20 = ["日1", "日2", "遅1", "遅2", "8"];
-  const shifts20_07 = ["夜1", "夜2"];
-
   // ヘッダー
-  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
   headerRow.innerHTML = '<th>氏名</th>';
-  for (let d = 1; d <= daysInMonth; d++) {
-    const date = new Date(state.year, state.month - 1, d);
-    const dayIndex = date.getDay();
-    const dayName = weekdays[dayIndex];
-    const colorClass = dayIndex === 0 ? 'text-danger' : dayIndex === 6 ? 'text-primary' : '';
 
-    headerRow.innerHTML += `<th class="${colorClass}">${d}<br><small>${dayName}</small></th>`;
+  // 日付列（assignmentsから抽出またはカレンダーから）
+  const daysInMonth = new Date(state.year, state.month, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    headerRow.innerHTML += `<th>${d}</th>`;
   }
-  headerRow.innerHTML += '<th>出勤日数</th><th>夜勤回数</th>';
   thead.appendChild(headerRow);
   table.appendChild(thead);
 
@@ -348,49 +300,14 @@ function renderPreview() {
   state.employees.forEach(emp => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${emp.name}</td>`;
-
-    let workDays = 0;
-    let nightCount = 0;
-
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const assignment = state.assignments.find(a => a.employee_id === emp.id && a.date === dateStr);
-      const shift = assignment ? assignment.shift_type : '';
-
-      tr.innerHTML += `<td>${shift || '-'}</td>`;
-
-      // 集計
-      if (shift && shift !== '休' && shift !== '明') {
-        workDays++;
-      }
-      if (shifts20_07.includes(shift)) {
-        nightCount++;
-      }
-
-      if (shifts7_16.includes(shift)) counts7_16[d - 1]++;
-      if (shifts16_20.includes(shift)) counts16_20[d - 1]++;
-      if (shifts20_07.includes(shift)) counts20_07[d - 1]++;
+      const shift = assignment ? assignment.shift_type : '-';
+      tr.innerHTML += `<td>${shift}</td>`;
     }
-
-    tr.innerHTML += `<td>${workDays}</td><td>${nightCount}</td>`;
     tbody.appendChild(tr);
   });
-
-  // 集計行 (Footer)
-  const addCountRow = (label, counts) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${label}</td>`;
-    counts.forEach(c => {
-      tr.innerHTML += `<td>${c}</td>`;
-    });
-    tr.innerHTML += '<td>-</td><td>-</td>';
-    tbody.appendChild(tr);
-  };
-
-  addCountRow('7-16時', counts7_16);
-  addCountRow('16-20時', counts16_20);
-  addCountRow('20-翌7時', counts20_07);
-
   table.appendChild(tbody);
 }
 
@@ -414,6 +331,7 @@ async function downloadPDF() {
   } else {
     alert('PDF生成に失敗しました。');
   }
+<<<<<<< HEAD
 }
 
 // テスト用：ランダム希望休生成
@@ -453,4 +371,6 @@ function randomizeAvailableShifts(emp) {
     const randomShift = String(Math.floor(Math.random() * 8) + 1);
     emp.available_shifts.push(randomShift);
   }
+=======
+>>>>>>> parent of ac489dc (だいぶ良さそうだけど、２１日の勤務日数が守られていないぞ！)
 }
