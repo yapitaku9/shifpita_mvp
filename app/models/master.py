@@ -1,38 +1,34 @@
-from peewee import CharField, BooleanField, IntegerField, TimeField, AutoField
-from playhouse.sqlite_ext import JSONField
-from app.models.base import BaseModel
+from app import db
 
 
-class Role(BaseModel):
+class Role(db.Model):
     """役割マスタ"""
 
-    role_id = AutoField()
-    name = CharField(unique=True, max_length=50)
-    can_night_shift = BooleanField(default=False)
-    monthly_work_days_rule = IntegerField(null=True)
+    __tablename__ = "roles"
 
-    class Meta:
-        table_name = "roles"
+    role_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    can_night_shift = db.Column(db.Boolean, default=False, nullable=False)
+    monthly_work_days_rule = db.Column(db.Integer, nullable=True)
+
+    users = db.relationship("User", back_populates="role")
+
+    def __repr__(self):
+        return f"<Role {self.name}>"
 
 
-class ShiftType(BaseModel):
+class ShiftType(db.Model):
     """シフト区分マスタ"""
 
-    shift_type_id = AutoField()
-    name = CharField(unique=True, max_length=20)
-    start_time = TimeField()
-    end_time = TimeField()
+    __tablename__ = "shift_types"
 
-    class Meta:
-        table_name = "shift_types"
+    shift_type_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(20), unique=True, nullable=False)
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
 
+    def __repr__(self):
+        return f"<ShiftType {self.name}>"
 
-class ConstraintRule(BaseModel):
-    """制約ルールマスタ"""
-
-    rule_id = AutoField()
-    type = CharField(max_length=20)  # 'HARD' or 'SOFT'
-    parameters = JSONField()  # playhouse.sqlite_ext.JSONField
-
-    class Meta:
-        table_name = "constraint_rules"
+# NOTE: ConstraintRule is not migrated for now to simplify the transition.
+# It can be added later if needed.

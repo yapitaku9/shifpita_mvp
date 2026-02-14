@@ -1,39 +1,77 @@
 # リレーションシップ設計書
 
-本ドキュメントでは、ShifPita MVPにおけるエンティティ間の関係性（リレーションシップ）を定義します。
-本アプリケーションはデータ永続化を行いませんが、メモリ上のデータ構造やJSONデータの整合性を保つための論理的な設計として参照します。
+本ドキュメントでは、`entities.md`で定義されたエンティティ間の関係性（リレーションシップ）を定義します。
 
-## 1. ER図 (概念モデル)
+---
+
+## 1. ER図
 
 ```mermaid
 erDiagram
-    Role ||--o{ Employee : "has"
-    Employee ||--o{ DayOffRequest : "requests"
-    Employee ||--o{ ShiftAssignment : "assigned"
-    ShiftType ||--o{ ShiftAssignment : "is type of"
-    ShiftContext ||--o{ SpecialDay : "contains"
-    ShiftContext ||--o{ Employee : "contains"
+    User {
+        int id PK
+        string username
+        string password_hash
+        string email
+        int role_id FK
+    }
+    Role {
+        int id PK
+        string name
+    }
+    DayOffRequest {
+        int id PK
+        date request_date
+        int user_id FK
+    }
+    Transaction {
+        int id PK
+        int year
+        int month
+        datetime created_at
+    }
+    Shift {
+        int id PK
+        date shift_date
+        int user_id FK
+        int shift_type_id FK
+        int transaction_id FK
+    }
+    ShiftType {
+        int id PK
+        string name
+        time start_time
+        time end_time
+    }
+
+    User ||--o{ DayOffRequest : "requests"
+    User ||--o{ Shift : "assigned to"
+    User }o--|| Role : "has"
+    Transaction ||--o{ Shift : "contains"
+    ShiftType ||--o{ Shift : "is type of"
 ```
+
+---
 
 ## 2. リレーションシップ一覧
 
-各エンティティ間の参照関係、およびデータの整合性を保つための制約定義です。
+| 親エンティティ | 子エンティティ | 関係 | 子の外部キー | 説明 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Role** | **User** | 1:N | `role_id` | 各ユーザーは必ず1つの役割に属します。 |
+| **User** | **DayOffRequest** | 1:N | `user_id` | ユーザーが削除された場合、そのユーザーの希望休申請も削除されます (CASCADE)。 |
+| **User** | **Shift** | 1:N | `user_id` | ユーザーが削除された場合、そのユーザーのシフトも削除されます (CASCADE)。 |
+| **ShiftType** | **Shift** | 1:N | `shift_type_id` | シフトには必ず有効なシフトパターンが必要です。使用中のシフトパターンは削除できません (RESTRICT)。 |
+| **Transaction** | **Shift** | 1:N | `transaction_id` | 生成された各シフトは、どの生成履歴に属するかを示します。履歴が削除されたらシフトも削除されます (CASCADE)。 |
 
-| 親エンティティ (Parent) | 子エンティティ (Child) | 関係 | 外部キー (FK) | 削除制約 (On Delete) | 説明 |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Role** | **Employee** | 1:N | `role_id` | `RESTRICT` | 従業員は必ず1つの役割を持ちます。役割定義が存在しない従業員は作成できません。 |
-| **Employee** | **DayOffRequest** | 1:N | `employee_id` | `CASCADE` | 従業員が削除された場合、その従業員の希望休データも削除されます。 |
-| **Employee** | **ShiftAssignment** | 1:N | `employee_id` | `CASCADE` | 従業員が削除された場合、その従業員のシフト割当結果も削除されます。 |
-| **ShiftType** | **ShiftAssignment** | 1:N | `shift_type_id` | `RESTRICT` | シフト割当には必ず有効なシフト区分が必要です。使用中のシフト区分は削除できません。 |
-| **ShiftContext** | **SpecialDay** | 1:N | `(context_id)` | `CASCADE` | シフト作成コンテキスト（セッション）が破棄されると、設定された特別日も破棄されます。 |
+---
 
 ## 3. ユニーク制約 (Unique Constraints)
 
-データの重複を防ぐための複合ユニーク制約の定義です。
-
 | 対象エンティティ | 対象カラム (複合) | 説明 |
 | :--- | :--- | :--- |
-| **DayOffRequest** | `employee_id`, `date` | 1人の従業員に対して、同じ日に複数の希望休を登録することはできません。 |
-| **ShiftAssignment** | `employee_id`, `date` | 1人の従業員に対して、同じ日に複数のシフトを割り当てることはできません。 |
-| **SpecialDay** | `date` | 同一のシフト作成コンテキスト内で、同じ日付に対する特別日設定は1つのみです。 |
-| **Employee** | `name` | (推奨) 同一のシフト作成コンテキスト内で、従業員名の重複は避けるべきです（ID管理される場合は必須ではありませんが、UI上の混乱を防ぐため）。 |
+| **User** | `username` | ユーザー名はシステム全体で一意である必要があります。 |
+| **Role** | `name` | 役割名は一意である必要があります。 |
+| **ShiftType** | `name` | シフトパターン名は一意である必要があります。 |
+| **DayOffRequest**| `user_id`, `request_date` | 1人のユーザーは、同じ日に複数の希望休を申請できません。 |
+| **Shift** | `user_id`, `shift_date` | 1人のユーザーは、同じ日に複数のシフトを持つことはできません。 |
+

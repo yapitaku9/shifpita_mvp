@@ -1,60 +1,49 @@
 # ER図 (Entity Relationship Diagram)
 
-ShifPita MVPのデータモデルを可視化したER図です。
+ShifPita MVPのデータベースモデルを可視化したER図です。
+各エンティティ間の詳細な関連や制約については、`relationships.md` を参照してください。
 
 ```mermaid
 erDiagram
-    %% マスタデータ
+    User {
+        int id PK
+        string username
+        string password_hash
+        string email
+        int role_id FK
+    }
     Role {
-        int role_id PK
+        int id PK
         string name
-        boolean can_night_shift
-        int monthly_work_days_rule
+    }
+    DayOffRequest {
+        int id PK
+        date request_date
+        int user_id FK
+    }
+    Transaction {
+        int id PK
+        int year
+        int month
+        datetime created_at
+    }
+    Shift {
+        int id PK
+        date shift_date
+        int user_id FK
+        int shift_type_id FK
+        int transaction_id FK
     }
     ShiftType {
-        int shift_type_id PK
+        int id PK
         string name
         time start_time
         time end_time
     }
-    ConstraintRule {
-        int rule_id PK
-        string type
-        json parameters
-    }
 
-    %% トランザクションデータ
-    ShiftContext {
-        int year
-        int month
-    }
-    Employee {
-        int employee_id PK
-        string name
-        int role_id FK
-    }
-    DayOffRequest {
-        int request_id PK
-        int employee_id FK
-        date date
-    }
-    SpecialDay {
-        date date PK
-        int additional_staff_count
-    }
-    ShiftAssignment {
-        int assignment_id PK
-        date date
-        int employee_id FK
-        int shift_type_id FK
-    }
-
-    %% リレーションシップ
-    Role ||--o{ Employee : "has"
-    Employee ||--o{ DayOffRequest : "requests"
-    Employee ||--o{ ShiftAssignment : "assigned"
-    ShiftType ||--o{ ShiftAssignment : "is type of"
-    ShiftContext ||--o{ SpecialDay : "contains"
-    ShiftContext ||--o{ Employee : "contains"
-    ShiftContext ||--o{ ShiftAssignment : "contains"
+    User ||--o{ DayOffRequest : "requests"
+    User ||--o{ Shift : "assigned to"
+    User }o--|| Role : "has"
+    Transaction ||--o{ Shift : "contains"
+    ShiftType ||--o{ Shift : "is type of"
 ```

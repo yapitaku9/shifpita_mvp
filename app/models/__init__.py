@@ -1,21 +1,8 @@
-from app.models.base import db
-from app.models.master import Role, ShiftType, ConstraintRule
-from app.models.transaction import ShiftContext, Employee, DayOffRequest, SpecialDay, ShiftAssignment
+# flake8: noqa
+# This file imports the SQLAlchemy models to make them accessible,
+# for example for Flask-Migrate and the Flask shell.
 
-
-def create_tables():
-    """定義されたモデルのテーブルを作成します。"""
-    with db:
-        db.create_tables(
-            [
-                Role,
-                ShiftType,
-                ConstraintRule,
-                ShiftContext,
-                Employee,
-                DayOffRequest,
-                SpecialDay,
-                ShiftAssignment,
-            ],
-            safe=True,
-        )
+from .user import User
+from .master import Role, ShiftType
+from .day_off_request import DayOffRequest
+from .shift import ShiftAssignment
