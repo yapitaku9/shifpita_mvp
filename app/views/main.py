@@ -12,13 +12,11 @@ bp = Blueprint("main", __name__)
 @bp.route("/index")
 @login_required
 def index():
-    """ログイン後のメインダッシュボード。ユーザーの役割に応じて表示を振り分ける。"""
+    """ログイン後のメインページ。ユーザーの役割に応じて適切なダッシュボードにリダイレクトする。"""
     if current_user.is_admin:
-        # TODO: 管理者用ダッシュボードのテンプレートをレンダリングする
-        return render_template("admin_dashboard.html", title="管理者ダッシュボード")
+        return redirect(url_for("admin.dashboard"))
     else:
-        # TODO: 従業員用ダッシュボードのテンプレートをレンダリングする
-        return render_template("employee_dashboard.html", title="従業員ダッシュボード")
+        return redirect(url_for("employee.dashboard"))
 
 
 @bp.route("/login", methods=["GET", "POST"])

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">{{ title }}</h1>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin.manage_constraints') }}">
+                {{ form.hidden_tag() }}
+                
+                {# Group fields by the 'group' attribute set in the view #}
+                {% for group, fields in form | selectattr('group', 'defined') | groupby('group') | sort %}
+                    <h5 class="mt-4">{{ group }}</h5>
+                    <hr>
+                    {% for field in fields %}
+                    <div class="mb-3 row">
+                        <label for="{{ field.id }}" class="col-sm-5 col-form-label">{{ field.label.text.split("】")[1] | trim }}</label>
+                        <div class="col-sm-7">
+                            {{ field(class="form-control") }}
+                            {% if field.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in field.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% endfor %}
+
+                <div class="d-grid gap-2 mt-4">
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="mt-3">
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">管理者ダッシュボードに戻る</a>
+    </div>
+</div>
+{% endblock %}

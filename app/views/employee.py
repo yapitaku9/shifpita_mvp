@@ -1,8 +1,11 @@
 from flask import render_template, flash, redirect, url_for, Blueprint, request, current_app
 from flask_login import login_required, current_user
+from sqlalchemy import and_
 from app import db
 from app.forms import DayOffRequestForm
 from app.models.day_off_request import DayOffRequest
+from app.models.shift import ShiftAssignment
+from app.models.master import ShiftType
 from app.email import send_email
 import datetime
 
@@ -23,7 +26,7 @@ def before_request():
 
 @employee_bp.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
-    """希望休の申請と一覧表示"""
+    """希望休の申請と一覧表示、および最新シフトの表示"""
     form = DayOffRequestForm()
     if form.validate_on_submit():
         try:
@@ -59,8 +62,41 @@ def dashboard():
         .all()
     )
 
+    # 最新の確定シフトを取得
+    shifts = []
+    shift_month_str = "未確定"
+
+    # ユーザーに紐づく最新のシフト日を取得
+    latest_shift_record = ShiftAssignment.query.filter(
+        ShiftAssignment.user_id == current_user.id
+    ).order_by(ShiftAssignment.date.desc()).first()
+
+    if latest_shift_record:
+        target_year = latest_shift_record.date.year
+        target_month = latest_shift_record.date.month
+        shift_month_str = f"{target_year}年{target_month}月"
+
+        # 最新年月のシフトを全て取得
+        shifts = (
+            ShiftAssignment.query.join(ShiftType)
+            .filter(
+                and_(
+                    ShiftAssignment.user_id == current_user.id,
+                    db.extract("year", ShiftAssignment.date) == target_year,
+                    db.extract("month", ShiftAssignment.date) == target_month,
+                )
+            )
+            .order_by(ShiftAssignment.date.asc())
+            .all()
+        )
+
     return render_template(
-        "employee/dashboard.html", title="従業員ダッシュボード", form=form, requests=requests
+        "employee/dashboard.html",
+        title="従業員ダッシュボード",
+        form=form,
+        requests=requests,
+        shifts=shifts,
+        shift_month_str=shift_month_str,
     )
 
 

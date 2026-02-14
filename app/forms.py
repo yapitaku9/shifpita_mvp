@@ -1,9 +1,10 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, DateField
-from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError, Regexp, Optional
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, DateField, IntegerField
+from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError, Regexp, Optional, NumberRange
 from app.models.user import User
 from app.models.master import Role
 from app.models.day_off_request import DayOffRequest
+import datetime
 
 
 class LoginForm(FlaskForm):
@@ -34,37 +35,58 @@ class EmployeeForm(FlaskForm):
         "メールアドレス",
         validators=[Optional(), Email(message="有効なメールアドレスを入力してください。")]
     )
-    # `coerce=int` は、フォームから送信された値を整数に変換する
     role = SelectField("役割", coerce=int, validators=[DataRequired(message="役割を選択してください。")])
     password = PasswordField(
-        "パスワード (半角数字4文字)",
+        "新しいパスワード (半角数字4文字)",
         validators=[
-            DataRequired(message="入力必須です。"),
+            Optional(),
             Regexp('^[0-9]{4}$', message='パスワードは半角数字4文字で設定してください。')
+        ]
+    )
+    password2 = PasswordField(
+        "新しいパスワード（確認用）",
+        validators=[
+            Optional(),
+            EqualTo('password', message='パスワードが一致しません。')
         ]
     )
     submit = SubmitField("登録する")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, original_username=None, original_email=None, *args, **kwargs):
         super(EmployeeForm, self).__init__(*args, **kwargs)
-        # Roleテーブルから役割の選択肢を動的にセットする
-        # (app_context内でないとDBクエリが実行できないので注意)
+        self.original_username = original_username
+        self.original_email = original_email
+        
         from app import db
         self.role.choices = [(r.role_id, r.name) for r in db.session.query(Role).order_by('name').all()]
 
+        # If it's an edit form, change the submit button text
+        if original_username:
+            self.submit.label.text = "更新する"
+            # For editing, password is not required
+            self.password.label.text = "新しいパスワード (変更する場合のみ入力)"
+            self.password.validators = [
+                Optional(),
+                Regexp('^[0-9]{4}$', message='パスワードは半角数字4文字で設定してください。')
+            ]
+            self.password2.validators = [
+                Optional(),
+                EqualTo('password', message='パスワードが一致しません。')
+            ]
+
+
     def validate_username(self, username):
-        """ユーザーIDのユニーク制約をチェック"""
-        user = User.query.filter_by(username=username.data).first()
-        if user is not None:
-            raise ValidationError('このユーザーIDは既に使用されています。')
+        if username.data != self.original_username:
+            user = User.query.filter_by(username=self.username.data).first()
+            if user:
+                raise ValidationError('このユーザーIDは既に使用されています。')
 
     def validate_email(self, email):
-        """メールアドレスのユニーク制約をチェック"""
-        # メールアドレスが入力されている場合のみチェック
-        if email.data:
-            user = User.query.filter_by(email=email.data).first()
-            if user is not None:
+        if email.data and email.data != self.original_email:
+            user = User.query.filter_by(email=self.email.data).first()
+            if user:
                 raise ValidationError('このメールアドレスは既に使用されています。')
+
 
 
 class DayOffRequestForm(FlaskForm):
@@ -81,3 +103,46 @@ class DayOffRequestForm(FlaskForm):
         ).first()
         if existing_request:
             raise ValidationError('この日付の希望休は既に申請済みです。')
+
+
+class ShiftGenerationForm(FlaskForm):
+    """シフト生成フォーム"""
+    year = IntegerField(
+        "年",
+        validators=[DataRequired(), NumberRange(min=2024, max=2100)],
+        default=datetime.date.today().year
+    )
+    month = IntegerField(
+        "月",
+        validators=[DataRequired(), NumberRange(min=1, max=12)],
+        default=datetime.date.today().month
+    )
+    submit = SubmitField("シフトを生成")
+
+
+def create_shift_constraint_form():
+    """DBから制約を読み込み、動的にフォームクラスを生成するファクトリ関数"""
+    from app.models.master import ShiftConstraint
+    
+    class DynamicShiftConstraintForm(FlaskForm):
+        pass
+
+    # DBからすべての制約を取得
+    constraints = ShiftConstraint.query.order_by(ShiftConstraint.id).all()
+
+    # 各制約に対してフォームフィールドを動的に追加
+    for constraint in constraints:
+        field = IntegerField(
+            label=constraint.description,
+            validators=[
+                DataRequired(message=f"{constraint.description}は必須です。"),
+                NumberRange(min=0, message="0以上の数値を入力してください。")
+            ],
+            default=constraint.value
+        )
+        setattr(DynamicShiftConstraintForm, constraint.name, field)
+
+    # 最後にSubmitボタンを追加
+    setattr(DynamicShiftConstraintForm, 'submit', SubmitField("更新する"))
+    
+    return DynamicShiftConstraintForm
