@@ -202,6 +202,12 @@ def edit_employee(user_id):
             user.username = form.username.data
             user.email = form.email.data or None
             user.role_id = form.role.data
+            # パートタイマーの場合のみ希望勤務日数を更新
+            if user.role and user.role.name.startswith("パート"):
+                user.desired_work_days = form.desired_work_days.data
+            else:
+                user.desired_work_days = None # パート以外はNoneに設定
+            
             if form.password.data:
                 user.set_password(form.password.data)
             db.session.commit()
@@ -215,6 +221,8 @@ def edit_employee(user_id):
         form.username.data = user.username
         form.email.data = user.email
         form.role.data = user.role_id
+        if user.role and user.role.name.startswith("パート"):
+            form.desired_work_days.data = user.desired_work_days
 
     return render_template('admin/edit_employee.html', title='従業員の編集', form=form, user=user)
 

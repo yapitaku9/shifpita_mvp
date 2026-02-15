@@ -50,6 +50,10 @@ class EmployeeForm(FlaskForm):
             EqualTo('password', message='パスワードが一致しません。')
         ]
     )
+    desired_work_days = IntegerField(
+        "希望勤務日数（パートのみ）",
+        validators=[Optional(), NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")]
+    )
     submit = SubmitField("登録する")
 
     def __init__(self, original_username=None, original_email=None, *args, **kwargs):

@@ -38,6 +38,19 @@
                                 </div>
                             {% endif %}
                         </div>
+
+                        {% if user.role and user.role.name.startswith('パート') %}
+                        <div class="mb-3">
+                            {{ form.desired_work_days.label(class="form-label") }}
+                            {{ form.desired_work_days(class="form-control") }}
+                            {% if form.desired_work_days.errors %}
+                                <div class="invalid-feedback d-block">
+                                {% for error in form.desired_work_days.errors %}<span>{{ error }}</span>{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
                         <hr>
                         <p class="text-muted small">パスワードを変更する場合のみ、以下を入力してください。</p>
                         <div class="mb-3">

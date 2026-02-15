@@ -50,7 +50,7 @@ class ShiftGenerator:
         day_off_reqs = {r.user_id: [d.date.isoformat() for d in r.day_off_requests] for r in all_users}
         
         employees_data = [{
-            "id": u.id, "name": u.username, "role": self.roles[u.role_id]
+            "id": u.id, "name": u.username, "role": self.roles[u.role_id], "desired_work_days": u.desired_work_days
         } for u in all_users]
 
         # --- 2. 問題定義 ---
@@ -122,11 +122,18 @@ class ShiftGenerator:
             # --- 3.7 月間勤務日数 ---
             if emp_role_name == "介護員":
                 prob += pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.WORK_SHIFTS) == self.constraints['monthly_work_days_kaigo'], f"MonthlyWorkDays_Kaigo_{emp_id}"
+            
+            desired_days = emp.get('desired_work_days')
             if emp_role_name.startswith("パート"):
-                # パートは希望休以外は勤務 (つまり、非希望休日はWORK_SHIFTSのどれか)
-                for d_str in date_strs:
-                    if d_str not in day_off_reqs.get(emp_id, []):
-                        prob += pulp.lpSum(x[emp_id, d_str, s] for s in self.WORK_SHIFTS) == 1, f"PartTimerMustWork_{emp_id}_{d_str}"
+                if desired_days is not None and desired_days > 0:
+                    # 希望勤務日数が設定されていれば、それを厳守する
+                    prob += pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.WORK_SHIFTS) == desired_days, f"MonthlyWorkDays_Part_{emp_id}"
+                else:
+                    # 設定されていなければ、希望休以外は勤務
+                    for d_str in date_strs:
+                        if d_str not in day_off_reqs.get(emp_id, []):
+                            prob += pulp.lpSum(x[emp_id, d_str, s] for s in self.WORK_SHIFTS) == 1, f"PartTimerMustWork_{emp_id}_{d_str}"
+
 
             # --- 4. ソフト制約 (目的関数) ---
             # 介護員の夜勤回数を目標に近づける

@@ -18,6 +18,8 @@ class User(UserMixin, db.Model):
 
     # 外部キーとリレーションシップ
     role_id = db.Column(db.Integer, db.ForeignKey("roles.role_id"), nullable=True)
+    desired_work_days = db.Column(db.Integer, nullable=True)  # パート用の希望勤務日数
+    
     role = db.relationship("Role", back_populates="users")
 
     day_off_requests = db.relationship("DayOffRequest", back_populates="user", lazy="dynamic")
