@@ -138,7 +138,19 @@ class ShiftGenerator:
                     for s in self.SHIFTS_NIGHT:
                         prob += x[emp_id, d_str, s] == 0, f"NoNightShift_{emp_id}_{d_str}_{s}"
 
+                # 夜勤ができない、または夜勤をしない役割は「明」シフトにもなれない
+                if emp_role_name in ["パート2", "パート3", "パート4"]:
+                    prob += x[emp_id, d_str, self.SHIFT_MING] == 0, f"NoAkeForRole_{emp_id}_{d_str}"
+
                 # --- 3.5 夜勤規則 ---
+                # 「明」の翌日は「休」
+                if d_idx < num_days - 1:
+                    next_d_str = date_strs[d_idx + 1]
+                    prob += (
+                        x[emp_id, d_str, self.SHIFT_MING] <= x[emp_id, next_d_str, self.SHIFT_KYU],
+                        f"AkeNextDayKyu_{emp_id}_{d_str}",
+                    )
+
                 if d_idx > 0:
                     prev_d_str = date_strs[d_idx - 1]
                     # 夜勤の翌日は「夜勤」or「明」
@@ -147,13 +159,15 @@ class ShiftGenerator:
                         <= pulp.lpSum(x[emp_id, d_str, s] for s in self.SHIFTS_NIGHT + [self.SHIFT_MING]),
                         f"NightShiftNextDay_{emp_id}_{d_str}",
                     )
-                if d_idx > 1:
-                    prev_d_str = date_strs[d_idx - 1]
-                    # 「明」の翌日は「休」
+                    # 「明」シフトは前日が夜勤の場合のみ
                     prob += (
-                        x[emp_id, prev_d_str, self.SHIFT_MING] <= x[emp_id, d_str, self.SHIFT_KYU],
-                        f"AkeNextDayKyu_{emp_id}_{d_str}",
+                        x[emp_id, d_str, self.SHIFT_MING]
+                        <= pulp.lpSum(x[emp_id, prev_d_str, s] for s in self.SHIFTS_NIGHT),
+                        f"AkeOnlyAfterNight_{emp_id}_{d_str}",
                     )
+                else:  # 初日
+                    # 初日は「明」になれない
+                    prob += x[emp_id, d_str, self.SHIFT_MING] == 0, f"NoAkeOnFirstDay_{emp_id}"
 
             # --- 3.6 連続勤務 ---
             max_consecutive = self.constraints["max_consecutive_work"]
@@ -200,6 +214,12 @@ class ShiftGenerator:
                     pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_LATE)
                     <= self.constraints["max_part2_late_shifts"],
                     f"MaxPart2LateShifts_{emp_id}",
+                )
+            if emp_role_name == "パート3":
+                prob += (
+                    pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_LATE)
+                    <= self.constraints.get("max_part3_late_shifts", 6),
+                    f"MaxPart3LateShifts_{emp_id}",
                 )
 
             desired_days = emp.get("desired_work_days")
@@ -273,6 +293,21 @@ class ShiftGenerator:
                         - 1
                     )
                     objective_terms.append(w * self.constraints["weight_avoid_leader_support_same_day"])
+
+        # 責任者とサポートの夜勤回数を均等化
+        if leader_ids and support_ids:
+            leader_night_shifts = pulp.lpSum(
+                x[l_id, d, s] for l_id in leader_ids for d in date_strs for s in self.SHIFTS_NIGHT
+            )
+            support_night_shifts = pulp.lpSum(
+                x[s_id, d, s] for s_id in support_ids for d in date_strs for s in self.SHIFTS_NIGHT
+            )
+            diff = pulp.LpVariable("leader_support_night_diff", 0, None)
+            prob += leader_night_shifts - support_night_shifts <= diff, "BalanceNightShifts_upper"
+            prob += support_night_shifts - leader_night_shifts <= diff, "BalanceNightShifts_lower"
+
+            weight = self.constraints.get("weight_balance_leader_support_night", 10)
+            objective_terms.append(diff * weight)
 
         # --- 5. 目的関数設定とソルバー実行 ---
         prob += pulp.lpSum(objective_terms), "Objective"

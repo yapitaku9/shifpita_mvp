@@ -172,19 +172,63 @@ def manage_constraints():
         return redirect(url_for("admin.manage_constraints"))
 
     # GETリクエストの場合、DBから現在の値を読み込んでフォームに設定
-    if request.method == 'GET':
+    if request.method == "GET":
+        # --- DBにない制約の初期値をここで定義・追加 ---
+        default_constraints = {
+            "max_part3_late_shifts": {"description": "【パート】パート3 月間遅番上限", "value": 6},
+            # 今後、追加したい制約があればここに追加
+        }
+        
+        try:
+            # begin_nested を使うことで、既存のトランザクション内で安全に実行
+            with db.session.begin_nested():
+                for name, data in default_constraints.items():
+                    exists = db.session.query(ShiftConstraint).filter_by(name=name).first()
+                    if not exists:
+                        new_constraint = ShiftConstraint(name=name, description=data["description"], value=data["value"])
+                        db.session.add(new_constraint)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            flash(f"制約の初期値設定中にエラーが発生しました: {e}", "danger")
+            current_app.logger.error(f"Error while setting default constraints: {e}")
+        # --- ここまで追加 ---
+
         constraints = ShiftConstraint.query.all()
+        # フォームを再生成して新しいフィールドを含める
+        ShiftConstraintForm = create_shift_constraint_form()
+        form = ShiftConstraintForm()
+
         for constraint in constraints:
             if hasattr(form, constraint.name):
                 field = getattr(form, constraint.name)
                 field.data = constraint.value
     
+    # ラベルの表示名を書き換える
+    label_overrides = {
+        "max_part3_late_shifts": "【勤務回数】パート3の月間遅番回数",
+        "monthly_work_days_kaigo": "【勤務回数】「正規雇用労働者」の月間勤務日数"
+    }
+
     # Add a 'group' attribute to each field for template-side grouping
+    unification_group_name = "【勤務回数】"
+    target_groups = ["【パート】", "【回数上限】", "【夜勤】", "【月間勤務】"]
+
     for field in form:
         if field.type not in ['CSRFTokenField', 'SubmitField']:
+            # ラベルの書き換え
+            if field.name in label_overrides:
+                field.label.text = label_overrides[field.name]
+
             label_text = field.label.text
+            original_group = ""
             if '】' in label_text:
-                field.group = label_text.split('】')[0] + '】'
+                original_group = label_text.split('】')[0] + '】'
+            
+            if original_group in target_groups:
+                field.group = unification_group_name
+            elif original_group:
+                field.group = original_group
             else:
                 field.group = 'その他'
 
