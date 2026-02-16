@@ -1,10 +1,11 @@
 from flask import render_template, flash, redirect, url_for, Blueprint, request, current_app, send_from_directory
 from flask_login import login_required, current_user
 from app import db
-from app.forms import EmployeeForm, ShiftGenerationForm, create_shift_constraint_form
+from app.forms import EmployeeForm, ShiftGenerationForm, create_shift_constraint_form, SpecialDayForm
 from app.models.user import User
 from app.models.master import ShiftConstraint
 from app.models.history import ShiftGenerationHistory
+from app.models.special_day import SpecialDay
 from app.services.generator import ShiftGenerator
 from app.services.pdf_exporter import PDFExporter
 from app.email import send_email
@@ -153,70 +154,76 @@ def generate_shifts():
 
 @admin_bp.route("/constraints", methods=["GET", "POST"])
 def manage_constraints():
-    """シフト作成の制約条件を編集する"""
+    """シフト作成の制約条件と特別日を編集する"""
     ShiftConstraintForm = create_shift_constraint_form()
     form = ShiftConstraintForm()
+    special_day_form = SpecialDayForm()
 
-    if form.validate_on_submit():
-        try:
-            for field_name, field_value in form.data.items():
-                if field_name not in ['csrf_token', 'submit']:
-                    constraint = ShiftConstraint.query.filter_by(name=field_name).first()
-                    if constraint and constraint.value != field_value:
-                        constraint.value = field_value
-            db.session.commit()
-            flash("制約条件を更新しました。", "success")
-        except Exception as e:
-            db.session.rollback()
-            flash(f"エラーが発生しました: {e}", "danger")
-        return redirect(url_for("admin.manage_constraints"))
+    # POSTリクエストの判別
+    if request.method == 'POST':
+        # name属性でどちらのフォームが送信されたかを判断
+        if 'submit_constraints' in request.form and form.validate_on_submit():
+            try:
+                for field_name, field_value in form.data.items():
+                    if field_name not in ['csrf_token', 'submit', 'submit_constraints']:
+                        constraint = ShiftConstraint.query.filter_by(name=field_name).first()
+                        if constraint and constraint.value != field_value:
+                            constraint.value = field_value
+                db.session.commit()
+                flash("制約条件を更新しました。", "success")
+            except Exception as e:
+                db.session.rollback()
+                flash(f"制約条件の更新中にエラーが発生しました: {e}", "danger")
+            return redirect(url_for("admin.manage_constraints"))
 
-    # GETリクエストの場合、DBから現在の値を読み込んでフォームに設定
+        elif 'submit_special_day' in request.form and special_day_form.validate_on_submit():
+            try:
+                special_day = SpecialDay(
+                    date=special_day_form.date.data,
+                    staff_increase=special_day_form.staff_increase.data,
+                    description=special_day_form.description.data
+                )
+                db.session.add(special_day)
+                db.session.commit()
+                flash(f"{special_day.date.strftime('%Y-%m-%d')}を特別日として設定しました。", "success")
+            except Exception as e:
+                db.session.rollback()
+                flash(f"特別日の設定中にエラーが発生しました: {e}", "danger")
+            return redirect(url_for("admin.manage_constraints"))
+
+    # GETリクエストの場合、またはフォームバリデーションが失敗した場合の処理
+    # --- 制約条件の処理 ---
     if request.method == "GET":
-        # --- DBにない制約の初期値をここで定義・追加 ---
         default_constraints = {
             "max_part3_late_shifts": {"description": "【パート】パート3 月間遅番上限", "value": 6},
-            # 今後、追加したい制約があればここに追加
         }
-        
         try:
-            # begin_nested を使うことで、既存のトランザクション内で安全に実行
             with db.session.begin_nested():
                 for name, data in default_constraints.items():
-                    exists = db.session.query(ShiftConstraint).filter_by(name=name).first()
-                    if not exists:
-                        new_constraint = ShiftConstraint(name=name, description=data["description"], value=data["value"])
-                        db.session.add(new_constraint)
+                    if not db.session.query(ShiftConstraint).filter_by(name=name).first():
+                        db.session.add(ShiftConstraint(name=name, description=data["description"], value=data["value"]))
             db.session.commit()
         except Exception as e:
             db.session.rollback()
-            flash(f"制約の初期値設定中にエラーが発生しました: {e}", "danger")
-            current_app.logger.error(f"Error while setting default constraints: {e}")
-        # --- ここまで追加 ---
+            current_app.logger.error(f"Error setting default constraints: {e}")
 
-        constraints = ShiftConstraint.query.all()
-        # フォームを再生成して新しいフィールドを含める
+        # フォームを再生成してDBの値を反映
         ShiftConstraintForm = create_shift_constraint_form()
         form = ShiftConstraintForm()
-
-        for constraint in constraints:
+        for constraint in ShiftConstraint.query.all():
             if hasattr(form, constraint.name):
-                field = getattr(form, constraint.name)
-                field.data = constraint.value
+                getattr(form, constraint.name).data = constraint.value
     
-    # ラベルの表示名を書き換える
+    # --- ラベルとグループの整形 ---
     label_overrides = {
         "max_part3_late_shifts": "【勤務回数】パート3の月間遅番回数",
         "monthly_work_days_kaigo": "【勤務回数】「正規雇用労働者」の月間勤務日数"
     }
-
-    # Add a 'group' attribute to each field for template-side grouping
     unification_group_name = "【勤務回数】"
     target_groups = ["【パート】", "【回数上限】", "【夜勤】", "【月間勤務】"]
 
     for field in form:
         if field.type not in ['CSRFTokenField', 'SubmitField']:
-            # ラベルの書き換え
             if field.name in label_overrides:
                 field.label.text = label_overrides[field.name]
 
@@ -232,12 +239,35 @@ def manage_constraints():
             else:
                 field.group = 'その他'
 
+    # --- 特別日のリストを取得 ---
+    special_days = SpecialDay.query.order_by(SpecialDay.date.asc()).all()
 
     return render_template(
         "admin/constraints.html",
-        title="制約条件の編集",
-        form=form
+        title="制約条件・特別日の編集",
+        form=form,
+        special_day_form=special_day_form,
+        special_days=special_days
     )
+
+
+@admin_bp.route("/delete_special_day/<int:day_id>", methods=['POST'])
+@login_required
+def delete_special_day(day_id):
+    """特別日を削除する"""
+    if not current_user.is_admin:
+        flash("この操作には管理者権限が必要です。")
+        return redirect(url_for("main.index"))
+    
+    day_to_delete = db.get_or_404(SpecialDay, day_id)
+    try:
+        db.session.delete(day_to_delete)
+        db.session.commit()
+        flash(f"{day_to_delete.date.strftime('%Y-%m-%d')}の特別日設定を削除しました。", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"削除中にエラーが発生しました: {e}", "danger")
+    return redirect(url_for('admin.manage_constraints'))
 
 
 @admin_bp.route("/edit_employee/<int:user_id>", methods=['GET', 'POST'])

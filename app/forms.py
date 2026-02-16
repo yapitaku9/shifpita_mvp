@@ -203,3 +203,31 @@ class PasswordChangeForm(FlaskForm):
         ]
     )
     submit = SubmitField("パスワードを変更する")
+
+
+class SpecialDayForm(FlaskForm):
+    """特別日設定フォーム"""
+    date = DateField(
+        "日付",
+        validators=[DataRequired(message="日付は入力必須です。")],
+        format='%Y-%m-%d'
+    )
+    staff_increase = IntegerField(
+        "追加人員数",
+        validators=[
+            DataRequired(message="追加人員数は入力必須です。"),
+            NumberRange(min=0, message="0以上の数値を入力してください。")
+        ],
+        default=1
+    )
+    description = StringField(
+        "説明（例：通院日）",
+        validators=[Optional(), Length(max=100)]
+    )
+    submit = SubmitField("特別日として設定")
+
+    def validate_date(self, date):
+        from app.models.special_day import SpecialDay
+        existing_day = SpecialDay.query.filter_by(date=date.data).first()
+        if existing_day:
+            raise ValidationError('この日付は既に特別日として設定されています。')

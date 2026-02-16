@@ -6,6 +6,7 @@ from app.models.user import User
 from app.models.master import Role, ShiftType, ShiftConstraint
 from app.models.day_off_request import DayOffRequest
 from app.models.shift import ShiftAssignment
+from app.models.special_day import SpecialDay
 
 
 class ShiftGenerator:
@@ -44,11 +45,19 @@ class ShiftGenerator:
         # --- 1. データ準備 ---
         all_users = db.session.query(User).filter_by(is_admin=False).all()
         start_date = date(year, month, 1)
-        num_days = calendar.monthrange(year, month)[1]
-        dates = [start_date + timedelta(days=i) for i in range(num_days)]
+        end_date = date(year, month, calendar.monthrange(year, month)[1])
+        dates = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
         date_strs = [d.isoformat() for d in dates]
 
         day_off_reqs = {r.id: [d.date.isoformat() for d in r.day_off_requests] for r in all_users}
+        
+        # 特別日を取得
+        special_days_query = SpecialDay.query.filter(
+            SpecialDay.date >= start_date,
+            SpecialDay.date <= end_date
+        ).all()
+        special_days_map = {sd.date: sd for sd in special_days_query}
+
 
         employees_data = [
             {
@@ -78,11 +87,15 @@ class ShiftGenerator:
             current_date = date.fromisoformat(d_str)
 
             # --- 3.1 人員配置 ---
+            # その日の特別日設定を取得
+            special_day_info = special_days_map.get(current_date)
+            staff_increase_7_16 = special_day_info.staff_increase if special_day_info else 0
+
             is_sunday = current_date.weekday() == 6
             if is_sunday:
                 prob += (
                     pulp.lpSum(x[e["id"], d_str, s] for e in employees_data for s in self.GROUP_7_16)
-                    >= self.constraints["min_employees_sunday_7_16"],
+                    >= self.constraints["min_employees_sunday_7_16"] + staff_increase_7_16,
                     f"MinStaff_Sunday_7-16_{d_str}",
                 )
                 prob += (
@@ -98,7 +111,7 @@ class ShiftGenerator:
             else:
                 prob += (
                     pulp.lpSum(x[e["id"], d_str, s] for e in employees_data for s in self.GROUP_7_16)
-                    >= self.constraints["min_employees_weekday_7_16"],
+                    >= self.constraints["min_employees_weekday_7_16"] + staff_increase_7_16,
                     f"MinStaff_Weekday_7-16_{d_str}",
                 )
                 prob += (
@@ -155,7 +168,7 @@ class ShiftGenerator:
 
                 # --- 3.5 夜勤規則 ---
                 # 「明」の翌日は「休」
-                if d_idx < num_days - 1:
+                if d_idx < len(dates) - 1:
                     next_d_str = date_strs[d_idx + 1]
                     prob += (
                         x[emp_id, d_str, self.SHIFT_MING] <= x[emp_id, next_d_str, self.SHIFT_KYU],
@@ -182,7 +195,7 @@ class ShiftGenerator:
 
             # --- 3.6 連続勤務 ---
             max_consecutive = self.constraints["max_consecutive_work"]
-            for i in range(num_days - max_consecutive):
+            for i in range(len(dates) - max_consecutive):
                 prob += (
                     pulp.lpSum(
                         x[emp_id, dates[j].isoformat(), s]
@@ -194,7 +207,7 @@ class ShiftGenerator:
                 )
 
             max_consecutive_late_night = self.constraints["max_consecutive_late_night"]
-            for i in range(num_days - max_consecutive_late_night):
+            for i in range(len(dates) - max_consecutive_late_night):
                 prob += (
                     pulp.lpSum(
                         x[emp_id, dates[j].isoformat(), s]
