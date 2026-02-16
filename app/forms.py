@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, DateField, IntegerField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, DateField, IntegerField, SelectMultipleField, widgets
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError, Regexp, Optional, NumberRange
 from app.models.user import User
 from app.models.master import Role
@@ -53,6 +53,13 @@ class EmployeeForm(FlaskForm):
     desired_work_days = IntegerField(
         "希望勤務日数（パートのみ）",
         validators=[Optional(), NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")]
+    )
+    workable_shifts = SelectMultipleField(
+        "勤務可能シフト（パート4のみ）",
+        coerce=int,
+        validators=[Optional()],
+        widget=widgets.ListWidget(prefix_label=False),
+        option_widget=widgets.CheckboxInput()
     )
     submit = SubmitField("登録する")
 

@@ -244,18 +244,35 @@ def manage_constraints():
 def edit_employee(user_id):
     """従業員情報を編集する"""
     user = db.get_or_404(User, user_id)
+    # EmployeeFormのコンストラクタで 'Role' をクエリするため、appコンテキストが必要
+    from app.models.master import Role, ShiftType
+
     form = EmployeeForm(original_username=user.username, original_email=user.email)
+
+    # パート4用のシフト選択肢をフォームに設定
+    part4_shifts = ShiftType.query.filter(ShiftType.name.in_(["1", "2", "3", "4", "5", "6", "7", "8"])).order_by(ShiftType.name).all()
+    form.workable_shifts.choices = [(s.shift_type_id, s.name) for s in part4_shifts]
 
     if form.validate_on_submit():
         try:
             user.username = form.username.data
             user.email = form.email.data or None
             user.role_id = form.role.data
-            # パートタイマーの場合のみ希望勤務日数を更新
-            if user.role and user.role.name.startswith("パート"):
+            
+            new_role = db.session.get(Role, form.role.data)
+            if new_role and new_role.name.startswith("パート"):
                 user.desired_work_days = form.desired_work_days.data
             else:
-                user.desired_work_days = None # パート以外はNoneに設定
+                user.desired_work_days = None
+
+            if new_role and new_role.name == "パート4":
+                user.workable_shifts.clear()
+                selected_shift_ids = form.workable_shifts.data
+                selected_shifts = ShiftType.query.filter(ShiftType.shift_type_id.in_(selected_shift_ids)).all()
+                for shift in selected_shifts:
+                    user.workable_shifts.append(shift)
+            else:
+                user.workable_shifts.clear()
             
             if form.password.data:
                 user.set_password(form.password.data)
@@ -270,8 +287,11 @@ def edit_employee(user_id):
         form.username.data = user.username
         form.email.data = user.email
         form.role.data = user.role_id
-        if user.role and user.role.name.startswith("パート"):
-            form.desired_work_days.data = user.desired_work_days
+        if user.role:
+            if user.role.name.startswith("パート"):
+                form.desired_work_days.data = user.desired_work_days
+            if user.role.name == "パート4":
+                form.workable_shifts.data = [s.shift_type_id for s in user.workable_shifts]
 
     return render_template('admin/edit_employee.html', title='従業員の編集', form=form, user=user)
 

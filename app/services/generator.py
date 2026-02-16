@@ -56,6 +56,7 @@ class ShiftGenerator:
                 "name": u.username,
                 "role": self.roles[u.role_id],
                 "desired_work_days": u.desired_work_days,
+                "workable_shift_ids": {s.shift_type_id for s in u.workable_shifts}
             }
             for u in all_users
         ]
@@ -128,11 +129,21 @@ class ShiftGenerator:
 
                 # --- 3.4 役割別制約 (勤務可能シフト) ---
                 if emp_role_name == "パート4":
+                    # パート4は、許可されていないシフトには入れない
+                    allowed_shift_ids = emp["workable_shift_ids"]
+                    all_part4_shift_ids = {st.shift_type_id for st in self.shift_types.values() if st.name in self.SHIFTS_PART4_ONLY}
+                    
+                    forbidden_shift_ids = all_part4_shift_ids - allowed_shift_ids
+                    for shift_id in forbidden_shift_ids:
+                        shift_name = self.shift_types_by_id[shift_id].name
+                        prob += x[emp_id, d_str, shift_name] == 0, f"Part4_ForbiddenShift_{emp_id}_{d_str}_{shift_name}"
+                    
+                    # パート4は、パート4以外のシフトには入れない (既存のルール)
                     for s in self.SHIFTS_NON_PART4:
-                        prob += x[emp_id, d_str, s] == 0, f"RoleConstraint_{emp_id}_{d_str}_{s}"
+                        prob += x[emp_id, d_str, s] == 0, f"RoleConstraint_NonPart4_{emp_id}_{d_str}_{s}"
                 else:  # パート4以外
                     for s in self.SHIFTS_PART4_ONLY:
-                        prob += x[emp_id, d_str, s] == 0, f"RoleConstraint_{emp_id}_{d_str}_{s}"
+                        prob += x[emp_id, d_str, s] == 0, f"RoleConstraint_Part4Only_{emp_id}_{d_str}_{s}"
 
                 if emp_role_name in ["パート2", "パート3"]:
                     for s in self.SHIFTS_NIGHT:

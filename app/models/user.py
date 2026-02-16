@@ -2,7 +2,13 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from app import db, login_manager
+from app.models.master import ShiftType
 
+# ユーザーと勤務可能シフトの中間テーブル
+user_workable_shifts = db.Table('user_workable_shifts',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('shift_type_id', db.Integer, db.ForeignKey('shift_types.shift_type_id'), primary_key=True)
+)
 
 class User(UserMixin, db.Model):
     """ユーザーアカウントモデル"""
@@ -23,6 +29,12 @@ class User(UserMixin, db.Model):
     role = db.relationship("Role", back_populates="users")
 
     day_off_requests = db.relationship("DayOffRequest", back_populates="user", lazy="dynamic")
+
+    workable_shifts = db.relationship(
+        'ShiftType', secondary=user_workable_shifts,
+        lazy='subquery',
+        backref=db.backref('workers', lazy=True)
+    )
 
     def set_password(self, password):
         """パスワードをハッシュ化して保存します。"""
