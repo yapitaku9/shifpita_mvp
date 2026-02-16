@@ -4,7 +4,18 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2>{{ title }}</h2>
-        <h5 class="mb-0">ようこそ、{{ current_user.username }} さん。</h5>
+        <div class="d-flex align-items-center">
+            <h5 class="mb-0 me-3">ようこそ、{{ current_user.username }} さん。</h5>
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="settingMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-gear"></i> 設定
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="settingMenuButton">
+                    <li><a class="dropdown-item" href="{{ url_for('employee.edit_email') }}">メールアドレス変更</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('employee.change_password') }}">パスワード変更</a></li>
+                </ul>
+            </div>
+        </div>
     </div>
     
     <div class="row mt-4">

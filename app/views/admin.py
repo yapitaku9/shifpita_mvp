@@ -106,9 +106,12 @@ def generate_shifts():
 
     try:
         generator = ShiftGenerator()
-        success, assignments_for_pdf = generator.run(year, month)
+        # 戻り値を success と result (成功時はデータ、失敗時はエラーメッセージ) で受け取る
+        success, result = generator.run(year, month)
 
         if success:
+            assignments_for_pdf = result # 成功時はPDF用データ
+            
             # PDF生成
             all_users = User.query.filter_by(is_admin=False).all()
             employees_for_pdf = [{"id": u.id, "name": u.username} for u in all_users]
@@ -131,8 +134,10 @@ def generate_shifts():
             history.pdf_file_path = pdf_filename # Store relative path from pdf_dir
             flash(f"{year}年{month}月のシフトが正常に作成・保存されました。", "success")
         else:
+            # 失敗時は result がエラーメッセージ
+            error_message = result
             history.status = "Failed"
-            flash("シフトの作成に失敗しました。制約条件を見直してください。", "danger")
+            flash(error_message, "danger")
 
     except Exception as e:
         history.status = "Failed"

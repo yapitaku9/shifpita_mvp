@@ -150,3 +150,49 @@ def create_shift_constraint_form():
     setattr(DynamicShiftConstraintForm, 'submit', SubmitField("更新する"))
     
     return DynamicShiftConstraintForm
+
+
+class EmailEditForm(FlaskForm):
+    """従業員用メールアドレス編集フォーム"""
+    email = StringField(
+        "新しいメールアドレス",
+        validators=[DataRequired(message="入力必須です。"), Email(message="有効なメールアドレスを入力してください。")]
+    )
+    password = PasswordField(
+        "現在のパスワード",
+        validators=[DataRequired(message="変更を確定するには現在のパスワードが必要です。")]
+    )
+    submit = SubmitField("メールアドレスを変更する")
+
+    def __init__(self, original_email=None, *args, **kwargs):
+        super(EmailEditForm, self).__init__(*args, **kwargs)
+        self.original_email = original_email
+
+    def validate_email(self, email):
+        if email.data and email.data != self.original_email:
+            user = User.query.filter_by(email=self.email.data).first()
+            if user:
+                raise ValidationError('このメールアドレスは既に使用されています。')
+
+
+class PasswordChangeForm(FlaskForm):
+    """パスワード変更フォーム"""
+    current_password = PasswordField(
+        "現在のパスワード",
+        validators=[DataRequired(message="現在のパスワードは入力必須です。")]
+    )
+    new_password = PasswordField(
+        "新しいパスワード (半角数字4文字)",
+        validators=[
+            DataRequired(message="新しいパスワードは入力必須です。"),
+            Regexp('^[0-9]{4}$', message='パスワードは半角数字4文字で設定してください。'),
+        ]
+    )
+    new_password2 = PasswordField(
+        "新しいパスワード（確認用）",
+        validators=[
+            DataRequired(message="確認用パスワードは入力必須です。"),
+            EqualTo('new_password', message='新しいパスワードが一致しません。')
+        ]
+    )
+    submit = SubmitField("パスワードを変更する")

@@ -2,7 +2,7 @@ from flask import render_template, flash, redirect, url_for, Blueprint, request,
 from flask_login import login_required, current_user
 from sqlalchemy import and_
 from app import db
-from app.forms import DayOffRequestForm
+from app.forms import DayOffRequestForm, EmailEditForm, PasswordChangeForm
 from app.models.day_off_request import DayOffRequest
 from app.models.shift import ShiftAssignment
 from app.models.master import ShiftType
@@ -119,3 +119,68 @@ def delete_day_off(request_id):
         flash(f"エラーが発生しました: {e}", "danger")
 
     return redirect(url_for("employee.dashboard"))
+
+
+
+@employee_bp.route("/edit_email", methods=["GET", "POST"])
+@login_required
+def edit_email():
+    """従業員が自身のメールアドレスを編集する"""
+    form = EmailEditForm(original_email=current_user.email)
+    if form.validate_on_submit():
+        if not current_user.check_password(form.password.data):
+            flash("パスワードが正しくありません。", "danger")
+            return redirect(url_for("employee.edit_email"))
+        try:
+            current_user.email = form.email.data
+            db.session.commit()
+            flash("メールアドレスを更新しました。", "success")
+            return redirect(url_for("employee.dashboard"))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"エラーが発生しました: {e}", "danger")
+    
+    elif request.method == "GET":
+        form.email.data = current_user.email
+
+    # バリデーション失敗時のエラー表示
+    if request.method == "POST":
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f"{getattr(form, field).label.text}: {error}", "danger")
+
+    return render_template("employee/edit_email.html", title="メールアドレス変更", form=form)
+
+
+@employee_bp.route("/change_password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    """従業員が自身のパスワードを変更する"""
+    form = PasswordChangeForm()
+    if form.validate_on_submit():
+        if not current_user.check_password(form.current_password.data):
+            flash("現在のパスワードが正しくありません。", "danger")
+            return redirect(url_for("employee.change_password"))
+        
+        # 新しいパスワードが現在のパスワードと同じでないことを確認
+        if current_user.check_password(form.new_password.data):
+            flash("新しいパスワードが現在のパスワードと同じです。別のパスワードを設定してください。", "danger")
+            return redirect(url_for("employee.change_password"))
+
+        try:
+            current_user.set_password(form.new_password.data)
+            db.session.commit()
+            flash("パスワードを更新しました。", "success")
+            return redirect(url_for("employee.dashboard"))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"エラーが発生しました: {e}", "danger")
+
+    # バリデーション失敗時のエラー表示
+    if request.method == "POST":
+        for field, errors in form.errors.items():
+            for error in errors:
+                 flash(f"{getattr(form, field).label.text}: {error}", "danger")
+    
+    return render_template("employee/change_password.html", title="パスワード変更", form=form)
+
