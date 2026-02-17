@@ -4,6 +4,7 @@ from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationE
 from app.models.user import User
 from app.models.master import Role
 from app.models.day_off_request import DayOffRequest
+from app.models.work_request import WorkRequest
 import datetime
 
 
@@ -106,14 +107,51 @@ class DayOffRequestForm(FlaskForm):
     submit = SubmitField("申請する")
 
     def validate_date(self, date):
-        """同じ日付の申請が既にないかチェック"""
+        """同じ日付の希望休・希望勤務の申請が既にないかチェック"""
         from flask_login import current_user
-        existing_request = DayOffRequest.query.filter_by(
+        
+        # 同じ日付の希望休をチェック
+        existing_day_off = DayOffRequest.query.filter_by(
             user_id=current_user.id, 
             date=date.data
         ).first()
-        if existing_request:
+        if existing_day_off:
             raise ValidationError('この日付の希望休は既に申請済みです。')
+            
+        # 同じ日付の希望勤務をチェック
+        existing_work_request = WorkRequest.query.filter_by(
+            user_id=current_user.id,
+            date=date.data
+        ).first()
+        if existing_work_request:
+            raise ValidationError('この日付は希望勤務として既に申請済みです。希望休は申請できません。')
+
+
+class WorkRequestForm(FlaskForm):
+    """希望勤務申請フォーム"""
+    date = DateField("日付", validators=[DataRequired(message="日付を入力してください。")], format='%Y-%m-%d')
+    shift_type_id = SelectField("希望勤務", coerce=int, validators=[DataRequired(message="勤務を選択してください。")])
+    submit = SubmitField("申請する")
+
+    def validate_date(self, date):
+        """同じ日付の希望勤務・希望休の申請が既にないかチェック"""
+        from flask_login import current_user
+
+        # 同じ日付の希望勤務をチェック
+        existing_work_request = WorkRequest.query.filter_by(
+            user_id=current_user.id,
+            date=date.data
+        ).first()
+        if existing_work_request:
+            raise ValidationError('この日付の希望勤務は既に申請済みです。')
+            
+        # 同じ日付の希望休をチェック
+        existing_day_off = DayOffRequest.query.filter_by(
+            user_id=current_user.id, 
+            date=date.data
+        ).first()
+        if existing_day_off:
+            raise ValidationError('この日付は希望休として既に申請済みです。希望勤務は申請できません。')
 
 
 class ShiftGenerationForm(FlaskForm):

@@ -2,8 +2,9 @@ from flask import render_template, flash, redirect, url_for, Blueprint, request,
 from flask_login import login_required, current_user
 from sqlalchemy import and_
 from app import db
-from app.forms import DayOffRequestForm, EmailEditForm, PasswordChangeForm
+from app.forms import DayOffRequestForm, WorkRequestForm, EmailEditForm, PasswordChangeForm
 from app.models.day_off_request import DayOffRequest
+from app.models.work_request import WorkRequest
 from app.models.shift import ShiftAssignment
 from app.models.master import ShiftType
 from app.email import send_email
@@ -26,55 +27,106 @@ def before_request():
 
 @employee_bp.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
-    """希望休の申請と一覧表示、および最新シフトの表示"""
-    form = DayOffRequestForm()
-    if form.validate_on_submit():
-        try:
-            req = DayOffRequest(date=form.date.data, user_id=current_user.id)
-            db.session.add(req)
-            db.session.commit()
-            flash(f'{form.date.data.strftime("%Y-%m-%d")} の希望休を申請しました。', "success")
+    """希望休・希望勤務の申請と一覧表示、および最新シフトの表示"""
+    day_off_form = DayOffRequestForm(prefix="day_off")
+    work_request_form = WorkRequestForm(prefix="work_request")
 
-            # 管理者へ通知メールを送信
-            send_email(
-                subject="[シフぴた] 希望休の申請通知",
-                recipients=current_app.config["ADMINS"],
-                template="day_off_notification",
-                user=current_user,
-                request=req,
-            )
-        except Exception as e:
-            db.session.rollback()
-            flash(f"エラーが発生しました: {e}", "danger")
-        return redirect(url_for("employee.dashboard"))
+    # ユーザーが正規雇用労働者かどうかのフラグ
+    is_regular_employee = (
+        current_user.role and not current_user.role.name.startswith("パート")
+    )
 
-    if request.method == "POST":  # validate_on_submitがFalseだった場合
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f"{getattr(form, field).label.text}: {error}", "danger")
+    # 希望勤務フォームの選択肢を動的に設定
+    if is_regular_employee:
+        target_shifts = ["早1", "早2", "日1", "日2", "遅1", "遅2", "夜1", "夜2"]
+        work_request_form.shift_type_id.choices = [
+            (st.shift_type_id, st.name)
+            for st in ShiftType.query.filter(ShiftType.name.in_(target_shifts)).all()
+        ]
 
-    # 全ての申請を表示
-    requests = (
-        DayOffRequest.query.filter(DayOffRequest.user_id == current_user.id)
-        .order_by(DayOffRequest.date.desc())
-        .all()
+    if request.method == "POST":
+        # どちらのフォームが送信されたかを判定
+        if (
+            "day_off-submit" in request.form
+            and day_off_form.validate_on_submit()
+        ):
+            try:
+                req = DayOffRequest(
+                    date=day_off_form.date.data, user_id=current_user.id
+                )
+                db.session.add(req)
+                db.session.commit()
+                flash(
+                    f'{day_off_form.date.data.strftime("%Y-%m-%d")} の希望休を申請しました。',
+                    "success",
+                )
+                # 管理者へ通知メール
+                # send_email(...)
+            except Exception as e:
+                db.session.rollback()
+                flash(f"エラーが発生しました: {e}", "danger")
+            return redirect(url_for("employee.dashboard"))
+
+        elif (
+            "work_request-submit" in request.form
+            and work_request_form.validate_on_submit()
+        ):
+            try:
+                req = WorkRequest(
+                    date=work_request_form.date.data,
+                    user_id=current_user.id,
+                    shift_type_id=work_request_form.shift_type_id.data,
+                )
+                db.session.add(req)
+                db.session.commit()
+                flash(
+                    f'{work_request_form.date.data.strftime("%Y-%m-%d")} の希望勤務を申請しました。',
+                    "success",
+                )
+                # 管理者へ通知メール
+                # send_email(...)
+            except Exception as e:
+                db.session.rollback()
+                flash(f"エラーが発生しました: {e}", "danger")
+            return redirect(url_for("employee.dashboard"))
+
+        # バリデーションエラーの表示
+        if day_off_form.errors:
+            for field, errors in day_off_form.errors.items():
+                for error in errors:
+                    flash(
+                        f"{getattr(day_off_form, field).label.text}: {error}", "danger"
+                    )
+        if work_request_form.errors:
+            for field, errors in work_request_form.errors.items():
+                for error in errors:
+                    flash(
+                        f"{getattr(work_request_form, field).label.text}: {error}",
+                        "danger",
+                    )
+
+    # 申請済みの一覧を取得
+    day_off_requests = current_user.day_off_requests.order_by(
+        DayOffRequest.date.desc()
+    ).all()
+    work_requests = (
+        current_user.work_requests.order_by(WorkRequest.date.desc()).all()
+        if is_regular_employee
+        else []
     )
 
     # 最新の確定シフトを取得
     shifts = []
     shift_month_str = "未確定"
-
-    # ユーザーに紐づく最新のシフト日を取得
-    latest_shift_record = ShiftAssignment.query.filter(
-        ShiftAssignment.user_id == current_user.id
-    ).order_by(ShiftAssignment.date.desc()).first()
-
+    latest_shift_record = (
+        ShiftAssignment.query.filter(ShiftAssignment.user_id == current_user.id)
+        .order_by(ShiftAssignment.date.desc())
+        .first()
+    )
     if latest_shift_record:
         target_year = latest_shift_record.date.year
         target_month = latest_shift_record.date.month
         shift_month_str = f"{target_year}年{target_month}月"
-
-        # 最新年月のシフトを全て取得
         shifts = (
             ShiftAssignment.query.join(ShiftType)
             .filter(
@@ -91,8 +143,11 @@ def dashboard():
     return render_template(
         "employee/dashboard.html",
         title="従業員ダッシュボード",
-        form=form,
-        requests=requests,
+        day_off_form=day_off_form,
+        work_request_form=work_request_form,
+        is_regular_employee=is_regular_employee,
+        day_off_requests=day_off_requests,
+        work_requests=work_requests,
         shifts=shifts,
         shift_month_str=shift_month_str,
     )
@@ -120,9 +175,32 @@ def delete_day_off(request_id):
     except Exception as e:
         db.session.rollback()
         flash(f"エラーが発生しました: {e}", "danger")
-
     return redirect(url_for("employee.dashboard"))
 
+
+@employee_bp.route("/work_request/delete/<int:request_id>", methods=["POST"])
+@login_required
+def delete_work_request(request_id):
+    """希望勤務申請を取り消す"""
+    req_to_delete = db.get_or_404(WorkRequest, request_id)
+
+    if req_to_delete.user_id != current_user.id:
+        flash("権限がありません。", "danger")
+        return redirect(url_for("employee.dashboard"))
+
+    if req_to_delete.status != "pending":
+        flash("承認済みまたは却下済みの申請は取り消せません。", "warning")
+        return redirect(url_for("employee.dashboard"))
+
+    try:
+        db.session.delete(req_to_delete)
+        db.session.commit()
+        flash(f'{req_to_delete.date.strftime("%Y-%m-%d")} の希望勤務申請を取り消しました。', "info")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"エラーが発生しました: {e}", "danger")
+
+    return redirect(url_for("employee.dashboard"))
 
 
 @employee_bp.route("/edit_email", methods=["GET", "POST"])

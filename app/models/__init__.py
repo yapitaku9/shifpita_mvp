@@ -8,3 +8,4 @@ from .day_off_request import DayOffRequest
 from .shift import ShiftAssignment
 from .history import ShiftGenerationHistory
 from .special_day import SpecialDay
+from .work_request import WorkRequest

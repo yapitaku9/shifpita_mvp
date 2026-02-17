@@ -4,9 +4,9 @@
 <div class="container mt-4">
     <h2>{{ title }}</h2>
 
-    <!-- Shift Generation & History Section -->
-    <div class="row mb-4">
-        <div class="col-md-3">
+    <!-- Control Panel Section -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-5 g-4 mb-4">
+        <div class="col">
             <div class="card h-100">
                 <div class="card-header fw-bold">シフトを生成</div>
                 <div class="card-body d-flex flex-column">
@@ -30,7 +30,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col">
             <div class="card h-100">
                 <div class="card-header fw-bold">希望休の管理</div>
                 <div class="card-body d-flex flex-column">
@@ -41,32 +41,43 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col">
             <div class="card h-100">
-                <div class="card-header fw-bold">制約条件を編集</div>
+                <div class="card-header fw-bold">希望勤務の管理</div>
                 <div class="card-body d-flex flex-column">
-                    <p>シフト作成アルゴリズムが使用する制約条件（必要人数など）を確認・編集します。</p>
+                    <p>正規雇用の従業員から希望された勤務を承認・却下します。</p>
                     <div class="d-grid mt-auto">
-                        <a href="{{ url_for('admin.manage_constraints') }}" class="btn btn-outline-primary">制約を編集する</a>
+                        <a href="{{ url_for('admin.manage_work_requests') }}" class="btn btn-outline-info">申請を管理する</a>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-header fw-bold">制約条件を編集</div>
+                <div class="card-body d-flex flex-column">
+                    <p>シフト作成アルゴリズムが使用する制約条件を確認・編集します。</p>
+                    <div class="d-grid mt-auto">
+                        <a href="{{ url_for('admin.manage_constraints') }}" class="btn btn-outline-secondary">制約を編集する</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col">
             <div class="card h-100">
                 <div class="card-header fw-bold">シフト生成履歴</div>
                 <div class="card-body">
                     {% if history_list %}
                         <ul class="list-group list-group-flush">
                         {% for history in history_list %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
                                 <div>
                                     <span class="fw-bold">{{ history.target_year }}年{{ history.target_month }}月</span>
                                     <small class="text-muted d-block">{{ history.generation_timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
                                 </div>
                                 {% if history.status == 'Success' and history.pdf_file_path %}
                                     <a href="{{ url_for('admin.download_pdf', history_id=history.id) }}" class="btn btn-sm btn-outline-success">
-                                        <i class="bi bi-download"></i> PDF
+                                        <i class="bi bi-download"></i>
                                     </a>
                                 {% elif history.status == 'Failed' %}
                                     <span class="badge bg-danger">失敗</span>
@@ -77,7 +88,7 @@
                         {% endfor %}
                         </ul>
                     {% else %}
-                        <p class="text-center text-muted my-5">履歴はありません</p>
+                        <p class="text-center text-muted my-3">履歴はありません</p>
                     {% endif %}
                 </div>
             </div>

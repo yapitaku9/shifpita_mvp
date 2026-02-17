@@ -28,7 +28,12 @@ class User(UserMixin, db.Model):
     
     role = db.relationship("Role", back_populates="users")
 
-    day_off_requests = db.relationship("DayOffRequest", back_populates="user", lazy="dynamic")
+    day_off_requests = db.relationship(
+        "DayOffRequest", back_populates="user", lazy="dynamic", cascade="all, delete-orphan"
+    )
+    work_requests = db.relationship(
+        "WorkRequest", back_populates="user", lazy="dynamic", cascade="all, delete-orphan"
+    )
 
     workable_shifts = db.relationship(
         'ShiftType', secondary=user_workable_shifts,

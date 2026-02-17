@@ -5,6 +5,7 @@ from app import db
 from app.models.user import User
 from app.models.master import Role, ShiftType, ShiftConstraint
 from app.models.day_off_request import DayOffRequest
+from app.models.work_request import WorkRequest
 from app.models.shift import ShiftAssignment
 from app.models.special_day import SpecialDay
 
@@ -50,6 +51,16 @@ class ShiftGenerator:
         date_strs = [d.isoformat() for d in dates]
 
         day_off_reqs = {r.id: [d.date.isoformat() for d in r.day_off_requests] for r in all_users}
+
+        # 承認済みの希望勤務を取得し、(user_id, date) をキーとする辞書を作成
+        approved_work_reqs = WorkRequest.query.filter(
+            WorkRequest.date.between(start_date, end_date),
+            WorkRequest.status == 'approved'
+        ).all()
+        work_req_map = {}
+        for req in approved_work_reqs:
+            key = (req.user_id, req.date.isoformat())
+            work_req_map[key] = req.shift_type_id
         
         # 特別日を取得
         special_days_query = SpecialDay.query.filter(
@@ -139,6 +150,13 @@ class ShiftGenerator:
                 # --- 3.3 希望休 ---
                 if d_str in day_off_reqs.get(emp_id, []):
                     prob += x[emp_id, d_str, self.SHIFT_KYU] == 1, f"DayOffRequest_{emp_id}_{d_str}"
+                
+                # --- 3.3.1 希望勤務 (ハード制約) ---
+                work_req_key = (emp_id, d_str)
+                if work_req_key in work_req_map:
+                    shift_id = work_req_map[work_req_key]
+                    shift_name = self.shift_types_by_id[shift_id].name
+                    prob += x[emp_id, d_str, shift_name] == 1, f"WorkRequest_{emp_id}_{d_str}"
 
                 # --- 3.4 役割別制約 (勤務可能シフト) ---
                 if emp_role_name == "パート4":

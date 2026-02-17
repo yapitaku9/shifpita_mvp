@@ -19,40 +19,73 @@
     </div>
     
     <div class="row mt-4">
-        <!-- 左側: 希望休関連 -->
+        <!-- 左側: 申請関連 -->
         <div class="col-md-5 mb-4">
-            <!-- 希望休申請フォーム -->
+            <!-- 希望申請フォーム (タブ形式) -->
             <div class="card mb-4">
-                <div class="card-header fw-bold">
-                    希望休を申請
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" id="request-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="day-off-tab" data-bs-toggle="tab" data-bs-target="#day-off-form-pane" type="button" role="tab" aria-controls="day-off-form-pane" aria-selected="true">希望休</button>
+                        </li>
+                        {% if is_regular_employee %}
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="work-request-tab" data-bs-toggle="tab" data-bs-target="#work-request-form-pane" type="button" role="tab" aria-controls="work-request-form-pane" aria-selected="false">希望勤務</button>
+                        </li>
+                        {% endif %}
+                    </ul>
                 </div>
-                <div class="card-body">
-                    <form action="{{ url_for('employee.dashboard') }}" method="post" novalidate>
-                        {{ form.hidden_tag() }}
-                        <div class="mb-3">
-                            {{ form.date.label(class="form-label") }}
-                            {{ form.date(class="form-control", type="date") }}
-                        </div>
-                        <div class="d-grid">
-                            {{ form.submit(class="btn btn-primary") }}
-                        </div>
-                    </form>
+                <div class="card-body tab-content" id="request-tabs-content">
+                    <!-- 希望休申請フォーム -->
+                    <div class="tab-pane fade show active" id="day-off-form-pane" role="tabpanel" aria-labelledby="day-off-tab">
+                        <form action="{{ url_for('employee.dashboard') }}" method="post" novalidate>
+                            {{ day_off_form.hidden_tag() }}
+                            <div class="mb-3">
+                                {{ day_off_form.date.label(class="form-label") }}
+                                {{ day_off_form.date(class="form-control", type="date") }}
+                            </div>
+                            <div class="d-grid">
+                                {{ day_off_form.submit(class="btn btn-primary", name="day_off-submit") }}
+                            </div>
+                        </form>
+                    </div>
+                    <!-- 希望勤務申請フォーム -->
+                    {% if is_regular_employee %}
+                    <div class="tab-pane fade" id="work-request-form-pane" role="tabpanel" aria-labelledby="work-request-tab">
+                         <form action="{{ url_for('employee.dashboard') }}" method="post" novalidate>
+                            {{ work_request_form.hidden_tag() }}
+                            <div class="mb-3">
+                                {{ work_request_form.date.label(class="form-label") }}
+                                {{ work_request_form.date(class="form-control", type="date") }}
+                            </div>
+                             <div class="mb-3">
+                                {{ work_request_form.shift_type_id.label(class="form-label") }}
+                                {{ work_request_form.shift_type_id(class="form-select") }}
+                            </div>
+                            <div class="d-grid">
+                                {{ work_request_form.submit(class="btn btn-primary", name="work_request-submit") }}
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
-            <!-- 申請済み希望休一覧 -->
+            <!-- 申請済み希望一覧 -->
             <div class="card">
                 <div class="card-header fw-bold">
-                    申請済みの希望休
+                    申請済みの希望
                 </div>
                 <div class="card-body">
-                    {% if requests %}
+                    {% if not day_off_requests and not work_requests %}
+                    <p class="text-center text-muted mb-0">申請済みの希望はありません。</p>
+                    {% else %}
                     <ul class="list-group list-group-flush">
-                        {% for req in requests %}
+                        {% for req in day_off_requests %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
+                                <span class="badge bg-light text-dark me-2">希望休</span>
                                 <span class="fw-bold">{{ req.date.strftime('%Y-%m-%d') }}</span>
-                                <small class="text-muted ms-2">{{ req.created_at.strftime('%Y-%m-%d %H:%M') if req.created_at }}</small>
                             </div>
                             <div class="d-flex align-items-center">
                                 <span class="badge
@@ -72,9 +105,32 @@
                             </div>
                         </li>
                         {% endfor %}
+                        {% for req in work_requests %}
+                         <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-light text-dark me-2">希望勤務</span>
+                                <span class="fw-bold">{{ req.date.strftime('%Y-%m-%d') }}</span>
+                                <span class="badge rounded-pill bg-info text-dark ms-2">{{ req.shift_type.name }}</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="badge
+                                    {% if req.status == 'approved' %} bg-success
+                                    {% elif req.status == 'rejected' %} bg-danger
+                                    {% else %} bg-secondary {% endif %}">
+                                    {% if req.status == 'approved' %} 承認済み
+                                    {% elif req.status == 'rejected' %} 却下
+                                    {% else %} 申請中
+                                    {% endif %}
+                                </span>
+                                {% if req.status == 'pending' %}
+                                <form action="{{ url_for('employee.delete_work_request', request_id=req.id) }}" method="post" onsubmit="return confirm('本当にこの申請を取り消しますか？');" class="ms-2">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1">取消</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </li>
+                        {% endfor %}
                     </ul>
-                    {% else %}
-                    <p class="text-center text-muted mb-0">申請済みの希望休はありません。</p>
                     {% endif %}
                 </div>
             </div>
