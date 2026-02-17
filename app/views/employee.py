@@ -53,12 +53,10 @@ def dashboard():
             for error in errors:
                 flash(f"{getattr(form, field).label.text}: {error}", "danger")
 
-    # 未来の申請のみ表示
+    # 全ての申請を表示
     requests = (
-        DayOffRequest.query.filter(
-            DayOffRequest.user_id == current_user.id, DayOffRequest.date >= datetime.date.today()
-        )
-        .order_by(DayOffRequest.date.asc())
+        DayOffRequest.query.filter(DayOffRequest.user_id == current_user.id)
+        .order_by(DayOffRequest.date.desc())
         .all()
     )
 
@@ -108,6 +106,11 @@ def delete_day_off(request_id):
     # 自分の申請以外は削除できないようにする
     if req_to_delete.user_id != current_user.id:
         flash("権限がありません。", "danger")
+        return redirect(url_for("employee.dashboard"))
+
+    # 'pending' 状態の申請のみ取り消し可能
+    if req_to_delete.status != "pending":
+        flash("承認済みまたは却下済みの申請は取り消せません。", "warning")
         return redirect(url_for("employee.dashboard"))
 
     try:

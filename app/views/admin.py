@@ -6,6 +6,7 @@ from app.models.user import User
 from app.models.master import ShiftConstraint
 from app.models.history import ShiftGenerationHistory
 from app.models.special_day import SpecialDay
+from app.models.day_off_request import DayOffRequest
 from app.services.generator import ShiftGenerator
 from app.services.pdf_exporter import PDFExporter
 from app.email import send_email
@@ -339,3 +340,63 @@ def delete_employee(user_id):
         db.session.rollback()
         flash(f"エラーが発生しました: {e}", "danger")
     return redirect(url_for('admin.dashboard'))
+
+
+@admin_bp.route("/day_off_requests")
+def manage_day_off_requests():
+    """希望休の申請を一覧表示し、管理する"""
+    status_filter = request.args.get('status', 'pending')  # デフォルトは 'pending'
+
+    query = DayOffRequest.query.join(User).order_by(DayOffRequest.date.asc())
+
+    if status_filter and status_filter != 'all':
+        query = query.filter(DayOffRequest.status == status_filter)
+
+    requests = query.all()
+
+    # タブの各件数を計算
+    count_all = DayOffRequest.query.count()
+    count_pending = DayOffRequest.query.filter_by(status='pending').count()
+    count_approved = DayOffRequest.query.filter_by(status='approved').count()
+    count_rejected = DayOffRequest.query.filter_by(status='rejected').count()
+
+    return render_template(
+        "admin/day_off_requests.html",
+        title="希望休申請の管理",
+        requests=requests,
+        current_status=status_filter,
+        counts={
+            'all': count_all,
+            'pending': count_pending,
+            'approved': count_approved,
+            'rejected': count_rejected
+        }
+    )
+
+
+@admin_bp.route("/day_off_requests/<int:request_id>/<string:action>", methods=['POST'])
+def action_day_off_request(request_id, action):
+    """希望休申請を承認または却下する"""
+    req = db.get_or_404(DayOffRequest, request_id)
+    
+    if action == 'approve':
+        req.status = 'approved'
+        flash(f'{req.user.username}さんの {req.date.strftime("%Y-%m-%d")} の希望休を承認しました。', 'success')
+    elif action == 'reject':
+        req.status = 'rejected'
+        flash(f'{req.user.username}さんの {req.date.strftime("%Y-%m-%d")} の希望休を却下しました。', 'warning')
+    else:
+        flash('無効な操作です。', 'danger')
+        return redirect(url_for('admin.manage_day_off_requests'))
+
+    try:
+        db.session.commit()
+        # TODO: 従業員への通知メールを送信する
+        # send_email(...)
+    except Exception as e:
+        db.session.rollback()
+        flash(f"処理中にエラーが発生しました: {e}", "danger")
+
+    # 元のフィルタ状態を維持してリダイレクト
+    status_filter = request.args.get('status', 'pending')
+    return redirect(url_for('admin.manage_day_off_requests', status=status_filter))
