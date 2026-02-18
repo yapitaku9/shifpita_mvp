@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+
+    <!-- Control Panel Section -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-5 g-4 mb-4">
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-header fw-bold">シフトを生成</div>
+                <div class="card-body d-flex flex-column">
+                    <p>対象の年月を指定して、新しいシフトを作成します。</p>
+                    <form action="{{ url_for('admin.generate_shifts') }}" method="post" novalidate class="mt-auto">
+                        {{ gen_form.hidden_tag() }}
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                {{ gen_form.year.label(class="form-label") }}
+                                {{ gen_form.year(class="form-control") }}
+                            </div>
+                            <div class="col-6 mb-3">
+                                {{ gen_form.month.label(class="form-label") }}
+                                {{ gen_form.month(class="form-control") }}
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            {{ gen_form.submit(class="btn btn-success") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-header fw-bold">希望休の管理</div>
+                <div class="card-body d-flex flex-column">
+                    <p>従業員から提出された希望休の申請を確認し、承認または却下します。</p>
+                    <div class="d-grid mt-auto">
+                        <a href="{{ url_for('admin.manage_day_off_requests') }}" class="btn btn-outline-primary">申請を管理する</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-header fw-bold">希望勤務の管理</div>
+                <div class="card-body d-flex flex-column">
+                    <p>正規雇用の従業員から希望された勤務を承認・却下します。</p>
+                    <div class="d-grid mt-auto">
+                        <a href="{{ url_for('admin.manage_work_requests') }}" class="btn btn-outline-info">申請を管理する</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-header fw-bold">制約条件を編集</div>
+                <div class="card-body d-flex flex-column">
+                    <p>シフト作成アルゴリズムが使用する制約条件を確認・編集します。</p>
+                    <div class="d-grid mt-auto">
+                        <a href="{{ url_for('admin.manage_constraints') }}" class="btn btn-outline-secondary">制約を編集する</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-header fw-bold">シフト生成履歴</div>
+                <div class="card-body">
+                    {% if history_list %}
+                        <ul class="list-group list-group-flush">
+                        {% for history in history_list %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                                <div>
+                                    <span class="fw-bold">{{ history.target_year }}年{{ history.target_month }}月</span>
+                                    <small class="text-muted d-block">{{ history.generation_timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                                </div>
+                                {% if history.status == 'Success' and history.pdf_file_path %}
+                                    <a href="{{ url_for('admin.download_pdf', history_id=history.id) }}" class="btn btn-sm btn-outline-success">
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                {% elif history.status == 'Failed' %}
+                                    <span class="badge bg-danger">失敗</span>
+                                {% else %}
+                                     <span class="badge bg-secondary">{{ history.status }}</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-center text-muted my-3">履歴はありません</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Management Section -->
+    <div class="row mt-4">
+        <!-- 左側: 従業員追加フォーム -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header fw-bold">
+                    従業員を追加
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('admin.dashboard') }}" method="post" novalidate>
+                        {{ form.hidden_tag() }}
+                        <input type="hidden" name="form_name" value="employee_form">
+                        <div class="mb-3">
+                            {{ form.username.label(class="form-label") }}
+                            {{ form.username(class="form-control") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.email.label(class="form-label") }}
+                            {{ form.email(class="form-control") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.role.label(class="form-label") }}
+                            {{ form.role(class="form-select") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.password.label(class="form-label") }}
+                            {{ form.password(class="form-control") }}
+                        </div>
+                        <div class="d-grid">
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側: 従業員一覧 -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header fw-bold">
+                    従業員一覧
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ユーザーID</th>
+                                <th>役割</th>
+                                <th>メールアドレス</th>
+                                <th>登録日</th>
+                                <th class="text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.username }}</td>
+                                <td>{{ user.role.name if user.role else '未設定' }}</td>
+                                <td>{{ user.email or '-' }}</td>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at }}</td>
+                                <td class="text-center">
+                                    <a href="{{ url_for('admin.edit_employee', user_id=user.id) }}" class="btn btn-sm btn-outline-primary">編集</a>
+                                    <form action="{{ url_for('admin.delete_employee', user_id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('本当に「{{ user.username }}」さんを削除しますか？関連するデータも削除され、元に戻すことはできません。');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">削除</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">従業員はまだ登録されていません。</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

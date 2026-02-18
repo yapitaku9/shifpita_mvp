@@ -1,13 +1,20 @@
 # Core Framework & ORM
 Flask==3.0.0
-peewee==3.17.0
+Flask-SQLAlchemy
+Flask-Migrate
 
 # Extensions
 Flask-Login==0.6.3
 Flask-WTF==1.2.1
 python-dotenv  # 環境変数管理 (.env)
+email-validator
 
 # Utilities (Image & PDF)
+
 Pillow>=10.4.0
+
 reportlab      # PDF生成用 (features_design.md参照)
+
 pulp           # 数理最適化（シフト生成エンジン用）
+
+Flask-Mail     # メール送信用

@@ -2,146 +2,126 @@
 alwaysApply: false
 ---
 
-# ShifPita MVP Database Design
+# ShifPita MVP Database Design Rules
 
-このドキュメントは、ShifPita MVPにおけるデータベース設計とORM (PeeWee) の実装ガイドラインを提供します。
+このドキュメントは、ShifPita MVPにおけるデータベース設計の基本方針とテーブル定義を記述します。
 
 - **DBMS**: SQLite (開発環境)
-- **ORM**: PeeWee
+- **ORM**: Flask-SQLAlchemy
 
-## 1. モデル定義 (PeeWee Models)
+## 1. 設計思想・方針
 
-### Base Model & Setup
+本アプリケーションのデータベースは、以下の思想に基づいて設計されています。
 
-```python
-from peewee import *
-from playhouse.sqlite_ext import JSONField
-import datetime
+- **ユーザー中心設計:**
+  従来の従業員リストという考え方から、システムにログインする「ユーザー(`User`)」をデータモデルの中心に据えました。これにより、認証情報（パスワード等）と個人情報、役割(`Role`)、そしてそのユーザーに紐づく全ての活動（希望休申請、シフト割り当て）を一元的に管理できます。
 
-# データベース接続設定
-db = SqliteDatabase('shifpita.db', pragmas={'foreign_keys': 1})
+- **履歴の保持:**
+  いつ、誰が、どのシフトを生成したかを記録するため、「シフト生成履歴(`Transaction`)」テーブルを導入しました。これにより、過去に生成されたシフトをバージョンとして管理し、将来的な監査や再確認に対応できる拡張性を持たせています。個々のシフト(`Shift`)は、この`Transaction`に紐付きます。
 
-class BaseModel(Model):
-    class Meta:
-        database = db
-```
+- **正規化:**
+  繰り返し発生するデータ（役割名、シフトのパターン名など）は、それぞれ`roles`、`shift_types`としてマスタテーブルに分離し、各テーブルからは外部キーで参照します。これにより、データの一貫性を保ち、変更を容易にしています。
 
-### 1.1. マスタデータ (Master Data)
+- **柔軟性の確保:**
+  シフト生成のルールなど、将来的に変更される可能性が高い固定値は `master` テーブルでキー・バリュー形式で管理し、コードの変更なしに設定を更新できる仕組みを目指します。
 
-#### Role (役割マスタ)
+---
 
-```python
-class Role(BaseModel):
-    role_id = AutoField()
-    name = CharField(unique=True, max_length=50)
-    can_night_shift = BooleanField(default=False)
-    monthly_work_days_rule = IntegerField(null=True)
+## 2. テーブル定義書
 
-    class Meta:
-        table_name = 'roles'
-```
+### 2.1. `roles` (役割マスタ)
+従業員の役割を定義します。
 
-#### ShiftType (シフト区分マスタ)
+| カラム名 | データ型 | PK | FK | Null | UQ | 説明 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INTEGER | ✔ | | | | 主キー |
+| `name` | VARCHAR(64) | | | | ✔ | 役割名 (例: `管理者`, `介護員`) |
+| `can_night_shift`| BOOLEAN | | | | | 夜勤可否フラグ |
+| `is_part_time` | BOOLEAN | | | | | パートタイマーフラグ |
 
-```python
-class ShiftType(BaseModel):
-    shift_type_id = AutoField()
-    name = CharField(unique=True, max_length=20)
-    start_time = TimeField()
-    end_time = TimeField()
+### 2.2. `users` (ユーザー)
+アプリケーションのログインユーザー。従業員と管理者の両方を含みます。
 
-    class Meta:
-        table_name = 'shift_types'
-```
+| カラム名 | データ型 | PK | FK | Null | UQ | 説明 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INTEGER | ✔ | | | | 主キー |
+| `username` | VARCHAR(64) | | | | ✔ | ログインID |
+| `email` | VARCHAR(120) | | | ✔ | ✔ | メールアドレス |
+| `password_hash` | VARCHAR(256) | | | | | ハッシュ化されたパスワード |
+| `role_id` | INTEGER | | ✔ | | | `roles.id`への外部キー |
 
-#### ConstraintRule (制約ルールマスタ)
+### 2.3. `shift_types` (シフトパターンマスタ)
+勤務の種類を定義します。
 
-```python
-class ConstraintRule(BaseModel):
-    rule_id = AutoField()
-    type = CharField(max_length=20)  # 'HARD' or 'SOFT'
-    parameters = JSONField()  # playhouse.sqlite_ext.JSONField
+| カラム名 | データ型 | PK | FK | Null | UQ | 説明 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INTEGER | ✔ | | | | 主キー |
+| `name` | VARCHAR(64) | | | | ✔ | シフト名 (例: `早1`, `夜1`) |
+| `start_time` | TIME | | | | | 開始時刻 |
+| `end_time` | TIME | | | | | 終了時刻 |
 
-    class Meta:
-        table_name = 'constraint_rules'
-```
+### 2.4. `day_off_requests` (希望休申請)
+従業員からの希望休申請を記録します。
 
-### 1.2. トランザクションデータ (Transaction Data)
+| カラム名 | データ型 | PK | FK | Null | UQ | 説明 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INTEGER | ✔ | | | | 主キー |
+| `request_date` | DATE | | | | | 希望休の日付 |
+| `user_id` | INTEGER | | ✔ | | | `users.id`への外部キー |
+| `created_at` | DATETIME | | | | | 申請日時 |
 
-#### ShiftContext (シフト作成コンテキスト)
+*複合ユニークキー: (`user_id`, `request_date`)*
 
-```python
-class ShiftContext(BaseModel):
-    context_id = AutoField()
-    year = IntegerField()
-    month = IntegerField()
-    created_at = DateTimeField(default=datetime.datetime.now)
+### 2.5. `transactions` (シフト生成履歴)
+シフト自動生成の実行履歴です。
 
-    class Meta:
-        table_name = 'shift_contexts'
-```
+| カラム名 | データ型 | PK | FK | Null | UQ | 説明 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INTEGER | ✔ | | | | 主キー |
+| `year` | INTEGER | | | | | 対象年 |
+| `month` | INTEGER | | | | | 対象月 |
+| `status` | VARCHAR(32) | | | | | 状態 (例: `success`, `failure`) |
+| `created_at` | DATETIME | | | | | 生成実行日時 |
 
-#### Employee (従業員)
+### 2.6. `shifts` (シフト)
+生成されたシフトの一つ一つの割り当てを記録します。
 
-```python
-class Employee(BaseModel):
-    employee_id = AutoField()
-    context = ForeignKeyField(ShiftContext, backref='employees', on_delete='CASCADE')
-    role = ForeignKeyField(Role, backref='employees')
-    name = CharField(max_length=100)
+| カラム名 | データ型 | PK | FK | Null | UQ | 説明 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INTEGER | ✔ | | | | 主キー |
+| `shift_date` | DATE | | | | | 勤務日 |
+| `user_id` | INTEGER | | ✔ | | | `users.id`への外部キー |
+| `shift_type_id` | INTEGER | | ✔ | | | `shift_types.id`への外部キー |
+| `transaction_id`| INTEGER | | ✔ | | | `transactions.id`への外部キー |
 
-    class Meta:
-        table_name = 'employees'
-        indexes = (
-            (('context',), False),  # idx_employee_context
-        )
-```
+*複合ユニークキー: (`user_id`, `shift_date`)*
 
-#### DayOffRequest (希望休)
+### 2.7. `master` (マスター設定)
+アプリケーション全体の固定設定値を管理します。
 
-```python
-class DayOffRequest(BaseModel):
-    request_id = AutoField()
-    employee = ForeignKeyField(Employee, backref='day_off_requests', on_delete='CASCADE')
-    date = DateField()
+| カラム名 | データ型 | PK | FK | Null | UQ | 説明 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `key` | VARCHAR(64) | ✔ | | | | 設定キー (例: `max_consecutive_work_days`) |
+| `value` | VARCHAR(256)| | | | | 設定値 |
+| `description` | TEXT | | | ✔ | | 設定の説明 |
 
-    class Meta:
-        table_name = 'day_off_requests'
-        indexes = (
-            (('employee', 'date'), True),  # Unique constraint
-        )
-```
+---
 
-#### SpecialDay (特別日)
+## 3. 初期データ (Seed Data)
 
-```python
-class SpecialDay(BaseModel):
-    special_day_id = AutoField()
-    context = ForeignKeyField(ShiftContext, backref='special_days', on_delete='CASCADE')
-    date = DateField()
-    additional_staff_count = IntegerField(default=0)
+アプリケーションの初回起動時に、正常な動作に必須となる以下のマスタデータを投入します。
 
-    class Meta:
-        table_name = 'special_days'
-        indexes = (
-            (('context', 'date'), True),  # Unique constraint
-        )
-```
+### 3.1. `roles` (役割)
+| id | name |
+|:---|:---|
+| 1 | 管理者 |
+| 2 | 介護員 |
+| 3 | パート1 |
+| 4 | パート2 |
+| 5 | パート3 |
+| 6 | パート4 |
+| 7 | 責任者 |
+| 8 | サポート |
 
-#### ShiftAssignment (シフト割当結果)
-
-```python
-class ShiftAssignment(BaseModel):
-    assignment_id = AutoField()
-    context = ForeignKeyField(ShiftContext, backref='assignments', on_delete='CASCADE')
-    employee = ForeignKeyField(Employee, backref='assignments', on_delete='CASCADE')
-    shift_type = ForeignKeyField(ShiftType, backref='assignments')
-    date = DateField()
-
-    class Meta:
-        table_name = 'shift_assignments'
-        indexes = (
-            (('employee', 'date'), True),  # Unique constraint
-            (('context',), False),  # idx_assignment_context
-        )
-```
+### 3.2. `shift_types` (シフト区分)
+*`requirements.md`に記載されている18パターンのシフト（早1, 夜1, 休, 明, 1〜8など）を登録します。*

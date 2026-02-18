@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header fw-bold">
+                    {{ title }}: {{ user.username }}
+                </div>
+                <div class="card-body">
+                    <form action="" method="post" novalidate>
+                        {{ form.hidden_tag() }}
+                        <div class="mb-3">
+                            {{ form.username.label(class="form-label") }}
+                            {{ form.username(class="form-control") }}
+                            {% if form.username.errors %}
+                                <div class="invalid-feedback d-block">
+                                {% for error in form.username.errors %}<span>{{ error }}</span>{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.email.label(class="form-label") }}
+                            {{ form.email(class="form-control") }}
+                            {% if form.email.errors %}
+                                <div class="invalid-feedback d-block">
+                                {% for error in form.email.errors %}<span>{{ error }}</span>{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.role.label(class="form-label") }}
+                            {{ form.role(class="form-select", id="role-select") }}
+                             {% if form.role.errors %}
+                                <div class="invalid-feedback d-block">
+                                {% for error in form.role.errors %}<span>{{ error }}</span>{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div id="part-time-fields" style="display: none;">
+                            <div class="mb-3">
+                                {{ form.desired_work_days.label(class="form-label") }}
+                                {{ form.desired_work_days(class="form-control") }}
+                                {% if form.desired_work_days.errors %}
+                                    <div class="invalid-feedback d-block">
+                                    {% for error in form.desired_work_days.errors %}<span>{{ error }}</span>{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- パート4専用の勤務可能シフト選択フィールド -->
+                        <div id="part4-workable-shifts-field" class="mb-3" style="display: none;">
+                            {{ form.workable_shifts.label(class="form-label") }}
+                            <div class="form-control" style="height: auto; border: none;">
+                                {% for subfield in form.workable_shifts %}
+                                <div class="form-check">
+                                    {{ subfield(class="form-check-input") }}
+                                    {{ subfield.label(class="form-check-label") }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                             {% if form.workable_shifts.errors %}
+                                <div class="invalid-feedback d-block">
+                                {% for error in form.workable_shifts.errors %}<span>{{ error }}</span>{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <hr>
+                        <p class="text-muted small">パスワードを変更する場合のみ、以下を入力してください。</p>
+                        <div class="mb-3">
+                            {{ form.password.label(class="form-label") }}
+                            {{ form.password(class="form-control") }}
+                            {% if form.password.errors %}
+                                <div class="invalid-feedback d-block">
+                                {% for error in form.password.errors %}<span>{{ error }}</span>{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.password2.label(class="form-label") }}
+                            {{ form.password2(class="form-control") }}
+                            {% if form.password2.errors %}
+                                <div class="invalid-feedback d-block">
+                                {% for error in form.password2.errors %}<span>{{ error }}</span>{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">キャンセル</a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const roleSelect = document.getElementById('role-select');
+    const partTimeFields = document.getElementById('part-time-fields');
+    const part4Fields = document.getElementById('part4-workable-shifts-field');
+
+    // The choices are passed from the view, but in case they are not, we can get them from the form object if rendered to json
+    const roles = JSON.parse('{{ form.role.choices | tojson | safe }}');
+    const roleMap = roles.reduce((acc, [id, name]) => {
+        acc[String(id)] = name;
+        return acc;
+    }, {});
+
+    function toggleFields() {
+        const selectedRoleId = roleSelect.value;
+        const selectedRoleName = roleMap[selectedRoleId] || '';
+
+        if (selectedRoleName.startsWith('パート')) {
+            partTimeFields.style.display = 'block';
+        } else {
+            partTimeFields.style.display = 'none';
+        }
+
+        if (selectedRoleName === 'パート4') {
+            part4Fields.style.display = 'block';
+        } else {
+            part4Fields.style.display = 'none';
+        }
+    }
+
+    roleSelect.addEventListener('change', toggleFields);
+    toggleFields(); // Initial check on page load
+});
+</script>
+{% endblock %}

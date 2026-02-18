@@ -1,0 +1,16 @@
+<p>シフぴたをご利用いただきありがとうございます。</p>
+<p>
+    従業員の <strong>{{ user.username }}</strong> さんから、希望休の申請がありました。
+</p>
+<hr>
+<ul>
+    <li><strong>申請日:</strong> {{ request.date.strftime('%Y-%m-%d') }}</li>
+    <li><strong>申請日時:</strong> {{ request.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
+</ul>
+<hr>
+<p>
+    アプリケーションにログインして、内容をご確認ください。
+</p>
+<p>
+    <small>※このメールはシステムから自動的に送信されています。</small>
+</p>
