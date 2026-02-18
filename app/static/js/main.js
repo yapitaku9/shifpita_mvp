@@ -33,11 +33,6 @@ let state = {
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
   console.log('ShifPita MVP loaded.');
-<<<<<<< HEAD
-  generateRandomDayOffs(); // テスト用：初期希望休設定
-  generateRandomAvailableShifts(); // テスト用：初期勤務可能シフト設定
-=======
->>>>>>> parent of ac489dc (だいぶ良さそうだけど、２１日の勤務日数が守られていないぞ！)
   renderEmployeeTable();
   updateEmployeeSelect();
   renderCalendar();
@@ -331,34 +326,6 @@ async function downloadPDF() {
   } else {
     alert('PDF生成に失敗しました。');
   }
-<<<<<<< HEAD
-}
-
-// テスト用：ランダム希望休生成
-function generateRandomDayOffs() {
-  const partTimeRoles = [2, 3, 4, 5]; // パートのロールID
-  const daysInMonth = new Date(state.year, state.month, 0).getDate();
-
-  state.employees.forEach(emp => {
-    const isPartTime = partTimeRoles.includes(emp.role_id);
-    const count = isPartTime ? 17 : 2;
-    const requests = new Set();
-    while (requests.size < count) {
-      const d = Math.floor(Math.random() * daysInMonth) + 1;
-      const dateStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      requests.add(dateStr);
-    }
-    emp.day_off_requests = Array.from(requests).sort();
-  });
-}
-
-// テスト用：ランダム勤務可能シフト生成 (パート4用)
-function generateRandomAvailableShifts() {
-  state.employees.forEach(emp => {
-    if (emp.role_id == 5 && !emp.available_shifts) {
-      randomizeAvailableShifts(emp);
-    }
-  });
 }
 
 function randomizeAvailableShifts(emp) {
@@ -366,11 +333,8 @@ function randomizeAvailableShifts(emp) {
   ['1', '2', '3', '4', '5', '6', '7', '8'].forEach(shift => {
     if (Math.random() < 0.5) emp.available_shifts.push(shift);
   });
-  // 少なくとも1つは選択状態にする
   if (emp.available_shifts.length === 0) {
     const randomShift = String(Math.floor(Math.random() * 8) + 1);
     emp.available_shifts.push(randomShift);
   }
-=======
->>>>>>> parent of ac489dc (だいぶ良さそうだけど、２１日の勤務日数が守られていないぞ！)
 }
