@@ -21,3 +21,5 @@ instance/*
 .idea/
 .vscode/
 .DS_Store
+# Environment variables
+.env
