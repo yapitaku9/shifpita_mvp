@@ -19,3 +19,4 @@ pulp           # 数理最適化（シフト生成エンジン用）
 
 Flask-Mail     # メール送信用
 python-dotenv
+gunicorn
