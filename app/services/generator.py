@@ -294,18 +294,6 @@ class ShiftGenerator:
                 objective_terms.append(delta * self.constraints["weight_kaigo_night_shift_target"])
 
             # 役割ごとの優先シフト
-            if emp_role_name == "パート1":
-                objective_terms.append(
-                    -1
-                    * self.constraints["weight_part1_night_shift"]
-                    * pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_NIGHT)
-                )
-            if emp_role_name == "パート2":
-                objective_terms.append(
-                    -1
-                    * self.constraints["weight_part2_late_shift"]
-                    * pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_LATE)
-                )
             if emp_role_name == "責任者" or emp_role_name == "サポート":
                 objective_terms.append(
                     -1

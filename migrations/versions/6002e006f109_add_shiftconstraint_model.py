@@ -54,9 +54,7 @@ def upgrade():
             {'name': 'kaigo_night_shift_target', 'value': 10, 'description': '【夜勤】「介護員」の月間夜勤の目標回数'},
             # Soft Constraints (Weights)
             {'name': 'weight_kaigo_night_shift_target', 'value': 5, 'description': '【重み】介護員の夜勤目標回数からの逸脱ペナルティ'},
-            {'name': 'weight_part1_night_shift', 'value': 10, 'description': '【重み】パート1の夜勤優先度'},
-            {'name': 'weight_part2_late_shift', 'value': 10, 'description': '【重み】パート2の遅番優先度'},
-            {'name': 'weight_leader_support_early_shift', 'value': 5, 'description': '【重み】責任者・サポートの早番優先度'},
+            {'name': 'weight_leader_support_early_shift', 'value': 5, 'description': '【重み】責任者・サポートの早番・日勤優先度'},
             {'name': 'weight_avoid_leader_support_same_day', 'value': 20, 'description': '【重み】責任者・サポートの同日勤務回避ペナルティ'},
             {'name': 'weight_minimize_consecutive_work', 'value': 1, 'description': '【重み】連続勤務日数の短縮化へのインセンティブ'},
         ]
