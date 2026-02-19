@@ -41,4 +41,8 @@ def create_app(test_config=None) -> Flask:
     app.register_blueprint(admin.admin_bp)
     app.register_blueprint(employee.employee_bp)
 
+    # Register commands
+    from . import commands
+    commands.init_app(app)
+
     return app

@@ -8,6 +8,7 @@ Flask-Login==0.6.3
 Flask-WTF==1.2.1
 python-dotenv  # 環境変数管理 (.env)
 email-validator
+click
 
 # Utilities (Image & PDF)
 
