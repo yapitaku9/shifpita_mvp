@@ -243,6 +243,33 @@ class PasswordChangeForm(FlaskForm):
     submit = SubmitField("パスワードを変更する")
 
 
+class UsernameChangeForm(FlaskForm):
+    """ユーザー名変更フォーム"""
+    username = StringField(
+        "新しいユーザーID (半角英数字6文字以上)",
+        validators=[
+            DataRequired(message="入力必須です。"),
+            Length(min=6, message="6文字以上で入力してください。"),
+            Regexp('^[A-Za-z0-9]+$', message='ユーザー名は半角英数字のみ使用できます。'),
+        ]
+    )
+    password = PasswordField(
+        "現在のパスワード",
+        validators=[DataRequired(message="変更を確定するには現在のパスワードが必要です。")]
+    )
+    submit = SubmitField("ユーザーIDを変更する")
+
+    def __init__(self, original_username=None, *args, **kwargs):
+        super(UsernameChangeForm, self).__init__(*args, **kwargs)
+        self.original_username = original_username
+
+    def validate_username(self, username):
+        if username.data != self.original_username:
+            user = User.query.filter_by(username=self.username.data).first()
+            if user:
+                raise ValidationError('このユーザーIDは既に使用されています。')
+
+
 class SpecialDayForm(FlaskForm):
     """特別日設定フォーム"""
     date = DateField(

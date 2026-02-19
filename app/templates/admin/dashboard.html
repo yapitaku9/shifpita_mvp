@@ -93,6 +93,19 @@
                 </div>
             </div>
         </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-header fw-bold">アカウント設定</div>
+                <div class="card-body d-flex flex-column">
+                    <p>あなたのアカウント情報を編集します。</p>
+                    <div class="d-grid gap-2 mt-auto">
+                        <a href="{{ url_for('admin.edit_username') }}" class="btn btn-outline-dark">ユーザーIDを変更</a>
+                        <a href="{{ url_for('admin.edit_email') }}" class="btn btn-outline-dark">メールアドレスを変更</a>
+                        <a href="{{ url_for('admin.change_password') }}" class="btn btn-outline-dark">パスワードを変更</a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Employee Management Section -->
