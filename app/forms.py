@@ -269,3 +269,33 @@ class SpecialDayForm(FlaskForm):
         existing_day = SpecialDay.query.filter_by(date=date.data).first()
         if existing_day:
             raise ValidationError('この日付は既に特別日として設定されています。')
+
+
+class RegistrationForm(FlaskForm):
+    """管理者初回登録フォーム"""
+    username = StringField(
+        "ユーザーID (半角英数字6文字以上)",
+        validators=[
+            DataRequired(message="入力必須です。"),
+            Length(min=6, message="6文字以上で入力してください。"),
+            Regexp('^[A-Za-z0-9]+$', message='ユーザー名は半角英数字のみ使用できます。'),
+        ]
+    )
+    password = PasswordField(
+        "パスワード",
+        validators=[DataRequired(message="パスワードは入力必須です。")]
+    )
+    password2 = PasswordField(
+        "パスワード（確認用）",
+        validators=[
+            DataRequired(message="確認用パスワードは入力必須です。"),
+            EqualTo('password', message='パスワードが一致しません。')
+        ]
+    )
+    submit = SubmitField("登録する")
+
+    def validate_username(self, username):
+        """ユーザーIDの重複チェック"""
+        user = User.query.filter_by(username=username.data).first()
+        if user:
+            raise ValidationError('このユーザーIDは既に使用されています。')

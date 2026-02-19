@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header text-center bg-danger text-white">
+                <h4 class="mb-0">{{ title }}</h4>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-center text-muted">データベースに管理者が存在しません。最初の管理者アカウントを作成してください。</p>
+                <form action="" method="post" novalidate>
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.username.label(class="form-label") }}
+                        {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else ""), size=32) }}
+                        {% for error in form.username.errors %}
+                            <span class="invalid-feedback">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.password.label(class="form-label") }}
+                        {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else ""), size=32) }}
+                        {% for error in form.password.errors %}
+                            <span class="invalid-feedback">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        {{ form.password2.label(class="form-label") }}
+                        {{ form.password2(class="form-control" + (" is-invalid" if form.password2.errors else ""), size=32) }}
+                        {% for error in form.password2.errors %}
+                            <span class="invalid-feedback">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="d-grid">
+                        {{ form.submit(class="btn btn-danger btn-lg") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
