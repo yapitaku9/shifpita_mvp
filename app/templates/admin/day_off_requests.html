@@ -28,13 +28,19 @@
         </li>
     </ul>
 
+        <form action="{{ url_for('admin.bulk_action_day_off') }}" method="post">
+    <input type="hidden" name="status_filter" value="{{ current_status }}">
     <div class="card">
         <div class="card-body">
             {% if requests %}
             <table class="table table-hover align-middle">
                 <thead>
                     <tr>
+                        {% if current_status == 'pending' %}
+                        <th style="width: 5%;"><input class="form-check-input" type="checkbox" id="select-all"></th>
+                        {% endif %}
                         <th>申請者</th>
+                        <th>申請種別</th>
                         <th>希望日</th>
                         <th>申請日</th>
                         <th class="text-center">ステータス</th>
@@ -44,7 +50,19 @@
                 <tbody>
                     {% for req in requests %}
                     <tr>
-                        <td>{{ req.user.username }}</td>
+                        {% if current_status == 'pending' %}
+                        <td><input class="form-check-input" type="checkbox" name="request_ids" value="{{ req.id }}"></td>
+                        {% endif %}
+                        <td>{{ req.user.full_name }}</td>
+                        <td>
+                            <span class="badge 
+                                {% if req.request_type == 'paid_leave' %} bg-info text-dark
+                                {% else %} bg-light text-dark {% endif %}">
+                                {% if req.request_type == 'paid_leave' %}有給休暇
+                                {% else %}希望休
+                                {% endif %}
+                            </span>
+                        </td>
                         <td>{{ req.date.strftime('%Y-%m-%d') }}</td>
                         <td>{{ req.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                         <td class="text-center">
@@ -60,10 +78,10 @@
                         </td>
                         <td class="text-center">
                             {% if req.status == 'pending' %}
-                            <form action="{{ url_for('admin.action_day_off_request', request_id=req.id, action='approve', status=current_status) }}" method="post" class="d-inline">
+                            <form action="{{ url_for('admin.action_day_off_request', request_id=req.id, action='approve', status=current_status) }}" method="post" class="d-inline individual-form">
                                 <button type="submit" class="btn btn-sm btn-success">承認</button>
                             </form>
-                            <form action="{{ url_for('admin.action_day_off_request', request_id=req.id, action='reject', status=current_status) }}" method="post" class="d-inline">
+                            <form action="{{ url_for('admin.action_day_off_request', request_id=req.id, action='reject', status=current_status) }}" method="post" class="d-inline individual-form">
                                 <button type="submit" class="btn btn-sm btn-danger">却下</button>
                             </form>
                             {% else %}
@@ -78,6 +96,54 @@
             <p class="text-center text-muted mb-0">対象の希望休申請はありません。</p>
             {% endif %}
         </div>
+        {% if current_status == 'pending' and requests %}
+        <div class="card-footer text-end">
+            <button type="submit" class="btn btn-primary">選択した申請を一括承認</button>
+        </div>
+        {% elif current_status != 'pending' %}
+        <div class="card-footer text-muted">
+            一括操作は「申請中」タブでのみ行えます。
+        </div>
+        {% endif %}
     </div>
-</div>
+    </form>
+    </div>
+    
+    {% endblock %}
+    
+    {% block scripts %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAll = document.getElementById('select-all');    const checkboxes = document.querySelectorAll('input[name="request_ids"]');
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (!this.checked) {
+                    selectAll.checked = false;
+                } else {
+                    const allChecked = Array.from(checkboxes).every(c => c.checked);
+                    if (allChecked) {
+                        selectAll.checked = true;
+                    }
+                }
+            });
+        });
+    }
+
+    // Prevent bulk form submission if an individual action is taken
+    const individualForms = document.querySelectorAll('.individual-form');
+    individualForms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.stopPropagation();
+        });
+    });
+});
+</script>
 {% endblock %}

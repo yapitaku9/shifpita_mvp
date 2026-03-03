@@ -4,44 +4,124 @@
 <div class="container mt-4">
     <h1 class="mb-4">{{ title }}</h1>
 
-    {# 制約条件のカード #}
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5>人員配置と勤務に関する制約</h5>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('admin.manage_constraints') }}">
-                {{ form.hidden_tag() }}
-                
-                {% for group, fields in form | selectattr('group', 'defined') | groupby('group') | sort %}
-                    <h6 class="mt-3 text-secondary">{{ group }}</h6>
-                    <hr class="mt-1">
-                    {% for field in fields %}
+    <form method="POST" action="{{ url_for('admin.manage_constraints') }}">
+        {{ form.hidden_tag() }}
+
+        {# Card 1: 人員配置（平日） #}
+        <div class="card mb-3">
+            <div class="card-header">人員配置（日曜日以外）</div>
+            <div class="card-body">
+                {% for field in form if field.label.text.startswith('【人員配置_平日】') %}
+                    {% set label_text = field.label.text.split('】')[1] %}
                     <div class="mb-3 row">
-                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ field.label.text.split("】")[1] | trim }}</label>
+                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
                         <div class="col-sm-6">
                             {{ field(class="form-control") }}
-                            {% if field.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {% for error in field.errors %}
-                                        <span>{{ error }}</span>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
+                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                         </div>
                     </div>
-                    {% endfor %}
                 {% endfor %}
-
-                <div class="d-grid gap-2 mt-4">
-                    <button type="submit" name="submit_constraints" class="btn btn-primary">制約条件を更新</button>
-                </div>
-            </form>
+            </div>
         </div>
-    </div>
+
+        {# Card 2: 人員配置（日曜） #}
+        <div class="card mb-3">
+            <div class="card-header">人員配置（日曜日）</div>
+            <div class="card-body">
+                {% for field in form if field.label.text.startswith('【人員配置_日曜】') %}
+                    {% set label_text = field.label.text.split('】')[1] %}
+                    <div class="mb-3 row">
+                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
+                        <div class="col-sm-6">
+                            {{ field(class="form-control") }}
+                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        {# Card 3: 連勤制約 #}
+        <div class="card mb-3">
+            <div class="card-header">連勤制約</div>
+            <div class="card-body">
+                {% for field in form if field.label.text.startswith('【連勤制約】') %}
+                    {% set label_text = field.label.text.split('】')[1] %}
+                    <div class="mb-3 row">
+                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
+                        <div class="col-sm-6">
+                            {{ field(class="form-control") }}
+                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Card 4: シフト構成 #}
+        <div class="card mb-3">
+            <div class="card-header">シフト構成</div>
+            <div class="card-body">
+                {% for field in form if field.label.text.startswith('【シフト構成】') %}
+                    {% set label_text = field.label.text.split('】')[1] %}
+                    <div class="mb-3 row">
+                        <div class="col-sm-6">
+                            {# BooleanFieldはラベルの表示方法が異なるため、手動で設定 #}
+                            <label class="form-check-label" for="{{ field.id }}">{{ label_text }}</label>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-check">
+                                {{ field(class="form-check-input") }}
+                            </div>
+                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Card 5: その他 #}
+        <div class="card mb-3">
+            <div class="card-header">その他</div>
+            <div class="card-body">
+                {% for field in form if field.label.text.startswith('【その他】') %}
+                    {% set label_text = field.label.text.split('】')[1] %}
+                    <div class="mb-3 row">
+                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
+                        <div class="col-sm-6">
+                            {{ field(class="form-control") }}
+                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Card 6: ソフト制約の重み #}
+        <div class="card mb-3">
+            <div class="card-header">【ソフト制約】 重み設定</div>
+            <div class="card-body">
+                <p class="card-text text-muted small">各項目に対するペナルティ（または報酬）の大きさを設定します。数値が大きいほど影響が強くなります。</p>
+                {% for field in form if field.label.text.startswith('【重み】') %}
+                    {% set label_text = field.label.text.split('】')[1] %}
+                    <div class="mb-3 row">
+                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
+                        <div class="col-sm-6">
+                            {{ field(class="form-control") }}
+                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="d-grid gap-2 mt-4">
+            <button type="submit" name="submit_constraints" class="btn btn-primary">制約条件を更新</button>
+        </div>
+    </form>
 
     {# 特別日設定のカード #}
-    <div class="card">
+    <div class="card mt-5">
         <div class="card-header">
             <h5>特別日（通院日など）の設定</h5>
         </div>
@@ -56,6 +136,10 @@
                     <div class="col-md">
                         {{ special_day_form.description.label(class="form-label") }}
                         {{ special_day_form.description(class="form-control") }}
+                    </div>
+                    <div class="col-md">
+                        {{ special_day_form.visit_time.label(class="form-label") }}
+                        {{ special_day_form.visit_time(class="form-control") }}
                     </div>
                     <div class="col-md">
                         {{ special_day_form.staff_increase.label(class="form-label") }}
@@ -85,6 +169,7 @@
                     <tr>
                         <th>日付</th>
                         <th>説明</th>
+                        <th>通院時間</th>
                         <th>追加人員</th>
                         <th>操作</th>
                     </tr>
@@ -94,6 +179,7 @@
                     <tr>
                         <td>{{ day.date.strftime('%Y-%m-%d') }}</td>
                         <td>{{ day.description or '-' }}</td>
+                        <td>{{ day.visit_time or '---' }}</td>
                         <td>{{ day.staff_increase }}人</td>
                         <td>
                             <form action="{{ url_for('admin.delete_special_day', day_id=day.id) }}" method="POST" onsubmit="return confirm('本当に削除しますか？');">

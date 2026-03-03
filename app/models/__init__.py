@@ -3,9 +3,10 @@
 # for example for Flask-Migrate and the Flask shell.
 
 from .user import User
-from .master import Role, ShiftType
+from .master import ShiftType
 from .day_off_request import DayOffRequest
 from .shift import ShiftAssignment
 from .history import ShiftGenerationHistory
 from .special_day import SpecialDay
 from .work_request import WorkRequest
+from .desired_work_days_request import DesiredWorkDaysRequest

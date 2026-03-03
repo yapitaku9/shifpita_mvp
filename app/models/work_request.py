@@ -2,6 +2,24 @@ from datetime import datetime
 from app import db
 
 
+# 中間テーブル
+work_request_shifts = db.Table(
+    "work_request_shifts",
+    db.Column(
+        "work_request_id",
+        db.Integer,
+        db.ForeignKey("work_requests.id"),
+        primary_key=True,
+    ),
+    db.Column(
+        "shift_type_id",
+        db.Integer,
+        db.ForeignKey("shift_types.shift_type_id"),
+        primary_key=True,
+    ),
+)
+
+
 class WorkRequest(db.Model):
     """希望勤務申請モデル"""
 
@@ -14,12 +32,14 @@ class WorkRequest(db.Model):
 
     # 外部キーとリレーションシップ
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    shift_type_id = db.Column(
-        db.Integer, db.ForeignKey("shift_types.shift_type_id"), nullable=False
+    user = db.relationship("User", back_populates="work_requests")
+    shift_types = db.relationship(
+        "ShiftType",
+        secondary=work_request_shifts,
+        lazy="subquery",  # subquery is often a good default for lazy loading
+        backref=db.backref("work_requests", lazy=True),
     )
 
-    user = db.relationship("User", back_populates="work_requests")
-    shift_type = db.relationship("ShiftType")
-
     def __repr__(self):
-        return f"<WorkRequest {self.user.username} for {self.shift_type.name} on {self.date}>"
+        shift_names = ", ".join([st.name for st in self.shift_types])
+        return f"<WorkRequest {self.user.username} for [{shift_names}] on {self.date}>"

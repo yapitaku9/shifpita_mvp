@@ -1,13 +1,15 @@
-from flask import render_template, flash, redirect, url_for, Blueprint, request, current_app, send_from_directory
+from flask import render_template, flash, redirect, url_for, Blueprint, request, current_app, send_from_directory, jsonify
 from flask_login import login_required, current_user
+from wtforms import BooleanField
 from app import db
-from app.forms import EmployeeForm, ShiftGenerationForm, create_shift_constraint_form, SpecialDayForm, EmailEditForm, PasswordChangeForm, UsernameChangeForm
-from app.models.user import User
+from app.forms import EmployeeForm, ShiftGenerationForm, create_shift_constraint_form, SpecialDayForm, EmailEditForm, PasswordChangeForm, UsernameChangeForm, AdminEditDesiredWorkDaysForm
+from app.models.user import User, EmploymentType, get_selectable_shift_choices
 from app.models.master import ShiftConstraint
 from app.models.history import ShiftGenerationHistory
 from app.models.special_day import SpecialDay
 from app.models.day_off_request import DayOffRequest
 from app.models.work_request import WorkRequest
+from app.models.desired_work_days_request import DesiredWorkDaysRequest
 from app.services.generator import ShiftGenerator
 from app.services.pdf_exporter import PDFExporter
 from app.email import send_email
@@ -33,42 +35,101 @@ def before_request():
 @admin_bp.route("/", methods=["GET", "POST"])
 def dashboard():
     """従業員の一覧表示と追加処理 (管理者ダッシュボード)"""
-    form = EmployeeForm()
+    # 追加フォーム: 雇用形態の初期値でシフト選択肢を設定
+    form = EmployeeForm(employment_type=EmploymentType.FULL_TIME)
     gen_form = ShiftGenerationForm()  # シフト生成フォーム
 
     # 従業員追加フォームのPOSTリクエストを処理
     # テンプレート側で form.submit の name 属性を 'submit_employee' などに設定して区別する想定
     if form.validate_on_submit() and request.form.get("form_name") == "employee_form":
         try:
-            user = User(username=form.username.data, email=form.email.data or None, role_id=form.role.data)
-            user.set_password(form.password.data)
+            employment_type_enum = EmploymentType[form.employment_type.data]
+            ng_shifts_str = ",".join(map(str, form.ng_shifts.data))
+
+            user = User(
+                username=form.username.data,
+                full_name=form.full_name.data,
+                email=form.email.data or None,
+                employment_type=employment_type_enum,
+                max_consecutive_work_days=form.max_consecutive_work_days.data,
+                preferred_night_shifts=form.preferred_night_shifts.data,
+                preferred_shift_1_id=form.preferred_shift_1.data,
+                preferred_shift_2_id=form.preferred_shift_2.data,
+                ng_shifts=ng_shifts_str
+            )
+            if form.password.data:
+                user.set_password(form.password.data)
+            else:
+                # 新規作成時はパスワードが必須
+                flash("新規従業員登録にはパスワードが必要です。", "danger")
+                # redirectする前にフォームエラーを再表示させるため、ここでrenderする
+                user_list = User.query.filter_by(is_admin=False).order_by(User.username).all()
+                history_list = ShiftGenerationHistory.query.order_by(ShiftGenerationHistory.generation_timestamp.desc()).limit(5).all()
+                return render_template(
+                    "admin/dashboard.html",
+                    title="管理者ダッシュボード",
+                    form=form,
+                    gen_form=gen_form,
+                    users=user_list,
+                    history_list=history_list
+                )
+
             db.session.add(user)
             db.session.commit()
-            flash(f"従業員「{user.username}」を追加しました。", "success")
+            flash(f"従業員「{user.full_name}」を追加しました。", "success")
         except Exception as e:
             db.session.rollback()
             flash(f"エラーが発生しました: {e}", "danger")
         return redirect(url_for("admin.dashboard"))
 
-    # EmployeeFormのバリデーションが失敗した場合のエラー表示
+    # EmployeeFormのバリデーションが失敗した場合のエラー表示と選択肢の再設定
     if request.method == "POST" and request.form.get("form_name") == "employee_form":
+        emp_type_str = request.form.get("employment_type")
+        if emp_type_str:
+            try:
+                form.set_shift_choices_by_employment(EmploymentType[emp_type_str])
+            except (KeyError, TypeError):
+                pass
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f"{getattr(form, field).label.text}: {error}", "danger")
 
-    user_list = User.query.filter_by(is_admin=False).order_by(User.username).all()
+    user_list = User.query.filter_by(is_admin=False).order_by(User.full_name).all()
     
     # シフト生成履歴を取得 (最新5件)
     history_list = ShiftGenerationHistory.query.order_by(ShiftGenerationHistory.generation_timestamp.desc()).limit(5).all()
     
+    # 各種申請の未処理件数を取得
+    pending_day_off_count = DayOffRequest.query.filter_by(status='pending').count()
+    pending_work_request_count = WorkRequest.query.filter_by(status='pending').count()
+    pending_dwd_request_count = DesiredWorkDaysRequest.query.filter_by(status='pending').count()
+
     return render_template(
         "admin/dashboard.html",
         title="管理者ダッシュボード",
         form=form,
         gen_form=gen_form,
         users=user_list,
-        history_list=history_list
+        history_list=history_list,
+        pending_day_off_count=pending_day_off_count,
+        pending_work_request_count=pending_work_request_count,
+        pending_dwd_request_count=pending_dwd_request_count,
     )
+
+
+@admin_bp.route("/shift_choices/<employment_type>")
+def get_shift_choices(employment_type):
+    """雇用形態に応じたシフト選択肢をJSONで返す（フォームの動的更新用）"""
+    try:
+        et = EmploymentType[employment_type]
+    except (KeyError, TypeError):
+        return jsonify({"error": "Invalid employment type"}), 400
+    ng_choices = get_selectable_shift_choices(et, exclude_kyu=True, coerce_int=True)
+    pref_choices = get_selectable_shift_choices(et, include_blank=True, coerce_int=True)
+    return jsonify({
+        "ng_shifts": [{"id": tid, "name": name} for tid, name in ng_choices],
+        "preferred_shifts": [{"id": tid if tid is not None else "", "name": name} for tid, name in pref_choices]
+    })
 
 
 @admin_bp.route("/download_pdf/<int:history_id>")
@@ -117,7 +178,7 @@ def generate_shifts():
             
             # PDF生成
             all_users = User.query.filter_by(is_admin=False).all()
-            employees_for_pdf = [{"id": u.id, "name": u.username} for u in all_users]
+            employees_for_pdf = [{"id": u.id, "name": u.full_name} for u in all_users]
             
             pdf_exporter = PDFExporter()
             pdf_data = pdf_exporter.generate(year, month, employees_for_pdf, assignments_for_pdf)
@@ -154,6 +215,7 @@ def generate_shifts():
 
 
 
+
 @admin_bp.route("/constraints", methods=["GET", "POST"])
 def manage_constraints():
     """シフト作成の制約条件と特別日を編集する"""
@@ -169,8 +231,17 @@ def manage_constraints():
                 for field_name, field_value in form.data.items():
                     if field_name not in ['csrf_token', 'submit', 'submit_constraints']:
                         constraint = ShiftConstraint.query.filter_by(name=field_name).first()
-                        if constraint and constraint.value != field_value:
-                            constraint.value = field_value
+                        if constraint:
+                            current_value = constraint.value
+                            new_value = field_value
+                            
+                            # BooleanFieldの場合、boolをintに変換して比較・更新
+                            field = getattr(form, field_name)
+                            if isinstance(field, BooleanField):
+                                new_value = int(field_value)
+
+                            if current_value != new_value:
+                                constraint.value = new_value
                 db.session.commit()
                 flash("制約条件を更新しました。", "success")
             except Exception as e:
@@ -183,7 +254,8 @@ def manage_constraints():
                 special_day = SpecialDay(
                     date=special_day_form.date.data,
                     staff_increase=special_day_form.staff_increase.data,
-                    description=special_day_form.description.data
+                    description=special_day_form.description.data,
+                    visit_time=special_day_form.visit_time.data or None
                 )
                 db.session.add(special_day)
                 db.session.commit()
@@ -197,12 +269,71 @@ def manage_constraints():
     # --- 制約条件の処理 ---
     if request.method == "GET":
         default_constraints = {
-            "max_part3_late_shifts": {"description": "【パート】パート3 月間遅番上限", "value": 6},
+            # 人員配置基準（日曜日以外）
+            "min_staff_weekday_0700": {"description": "【人員配置_平日】07時", "value": 3},
+            "min_staff_weekday_0800": {"description": "【人員配置_平日】08時", "value": 4},
+            "min_staff_weekday_0900": {"description": "【人員配置_平日】09時", "value": 3},
+            "min_staff_weekday_1200": {"description": "【人員配置_平日】12時", "value": 3},
+            "min_staff_weekday_1300": {"description": "【人員配置_平日】13時", "value": 3},
+            "min_staff_weekday_1400": {"description": "【人員配置_平日】14時", "value": 3},
+            "min_staff_weekday_1600": {"description": "【人員配置_平日】16時", "value": 3},
+            "min_staff_weekday_1800": {"description": "【人員配置_平日】18時", "value": 3},
+            "min_staff_weekday_1900": {"description": "【人員配置_平日】19時", "value": 3},
+            "min_staff_weekday_2000_next_0700": {"description": "【人員配置_平日】20時-翌7時", "value": 2},
+            # 人員配置基準（日曜日）
+            "min_staff_sunday_0700": {"description": "【人員配置_日曜】07時", "value": 3},
+            "min_staff_sunday_0800": {"description": "【人員配置_日曜】08時", "value": 4},
+            "min_staff_sunday_0900": {"description": "【人員配置_日曜】09時", "value": 3},
+            "min_staff_sunday_1200": {"description": "【人員配置_日曜】12時", "value": 4},
+            "min_staff_sunday_1300": {"description": "【人員配置_日曜】13時", "value": 4},
+            "min_staff_sunday_1400": {"description": "【人員配置_日曜】14時", "value": 4},
+            "min_staff_sunday_1600": {"description": "【人員配置_日曜】16時", "value": 4},
+            "min_staff_sunday_1800": {"description": "【人員配置_日曜】18時", "value": 4},
+            "min_staff_sunday_1900": {"description": "【人員配置_日曜】19時", "value": 3},
+            "min_staff_sunday_2000_next_0700": {"description": "【人員配置_日曜】20時-翌7時", "value": 2},
+            # 連勤制約
+            "max_consecutive_work_days": {"description": "【連勤制約】最大連勤日数", "value": 5},
+            "max_consecutive_night_shifts": {"description": "【連勤制約】夜勤の最大連勤日数", "value": 4},
+            "max_consecutive_late_and_night": {"description": "【連勤制約】遅番・夜勤の最大連勤日数", "value": 4},
+            # シフト構成
+            "require_day_off_after_ake": {"description": "【シフト構成】明けの翌日は休み", "value": 1},
+            "disallow_specific_shifts_after_night": {"description": "【シフト構成】夜勤翌日の禁止シフト(遅日早)", "value": 1},
+            "disallow_specific_shifts_after_late": {"description": "【シフト構成】遅番翌日の禁止シフト(日早)", "value": 1},
+            "disallow_specific_shifts_after_day": {"description": "【シフト構成】日勤翌日の禁止シフト(早)", "value": 1},
+            # ソフト制約の重み
+            "weight_avoid_charge_support": {"description": "【重み】責任者とサポの同日勤務回避 (ペナルティ)", "value": 1},
+            "weight_ensure_main_staff": {"description": "【重み】正職員の早番/日勤確保 (ペナルティ)", "value": 50},
+            "weight_avoid_4_night_streak": {"description": "【重み】4連続夜勤の回避 (ペナルティ)", "value": 10},
+            "penalty_missed_preferred_shift": {"description": "【重み】優先シフト非採用(勤務日) (ペナルティ)", "value": 10},
+            "weight_exceed_staffing_1": {"description": "【重み】人員超過ペナルティ（1人）", "value": 10},
+            "weight_exceed_staffing_2": {"description": "【重み】人員超過ペナルティ（2人）", "value": 30},
+            "weight_exceed_staffing_3_plus": {"description": "【重み】人員超過ペナルティ（3人以上）", "value": 100},
         }
         try:
             with db.session.begin_nested():
+                # 不要になった古い制約をDBから削除
+                old_constraint_names = [
+                    "avoid_charge_and_support_same_day", 
+                    "ensure_main_staff_in_day_shift",
+                    "max_part3_late_shifts", # 過去の遺物があれば削除
+                    "weight_exceed_staffing_A", # 旧ペナルティ
+                    "weight_exceed_staffing_B", # 旧ペナルティ
+                    "weight_preferred_shift", # 報酬からペナルティへの移行
+                ]
+                for name in old_constraint_names:
+                    old_constraint = db.session.query(ShiftConstraint).filter_by(name=name).first()
+                    if old_constraint:
+                        db.session.delete(old_constraint)
+
+                # デフォルト制約をDBに同期
                 for name, data in default_constraints.items():
-                    if not db.session.query(ShiftConstraint).filter_by(name=name).first():
+                    constraint = db.session.query(ShiftConstraint).filter_by(name=name).first()
+                    if constraint:
+                        # 存在する場合は説明を更新
+                        if constraint.description != data["description"]:
+                            constraint.description = data["description"]
+                    else:
+                        # 存在しない場合は追加
                         db.session.add(ShiftConstraint(name=name, description=data["description"], value=data["value"]))
             db.session.commit()
         except Exception as e:
@@ -214,32 +345,12 @@ def manage_constraints():
         form = ShiftConstraintForm()
         for constraint in ShiftConstraint.query.all():
             if hasattr(form, constraint.name):
-                getattr(form, constraint.name).data = constraint.value
-    
-    # --- ラベルとグループの整形 ---
-    label_overrides = {
-        "max_part3_late_shifts": "【勤務回数】パート3の月間遅番回数",
-        "monthly_work_days_kaigo": "【勤務回数】「正規雇用労働者」の月間勤務日数"
-    }
-    unification_group_name = "【勤務回数】"
-    target_groups = ["【パート】", "【回数上限】", "【夜勤】", "【月間勤務】"]
-
-    for field in form:
-        if field.type not in ['CSRFTokenField', 'SubmitField']:
-            if field.name in label_overrides:
-                field.label.text = label_overrides[field.name]
-
-            label_text = field.label.text
-            original_group = ""
-            if '】' in label_text:
-                original_group = label_text.split('】')[0] + '】'
-            
-            if original_group in target_groups:
-                field.group = unification_group_name
-            elif original_group:
-                field.group = original_group
-            else:
-                field.group = 'その他'
+                field = getattr(form, constraint.name)
+                # BooleanFieldの場合は、DBの値(0 or 1)をboolに変換して設定
+                if isinstance(field, BooleanField):
+                    field.data = bool(constraint.value)
+                else:
+                    field.data = constraint.value
 
     # --- 特別日のリストを取得 ---
     special_days = SpecialDay.query.order_by(SpecialDay.date.asc()).all()
@@ -274,58 +385,135 @@ def delete_special_day(day_id):
 
 @admin_bp.route("/edit_employee/<int:user_id>", methods=['GET', 'POST'])
 def edit_employee(user_id):
-    """従業員情報を編集する"""
+    """従業員情報と希望勤務日数を編集する"""
     user = db.get_or_404(User, user_id)
-    # EmployeeFormのコンストラクタで 'Role' をクエリするため、appコンテキストが必要
-    from app.models.master import Role, ShiftType
+    form = EmployeeForm(
+        original_username=user.username,
+        original_email=user.email,
+        employment_type=user.employment_type,
+        prefix="employee"
+    )
+    dwd_form = AdminEditDesiredWorkDaysForm(prefix="dwd")
 
-    form = EmployeeForm(original_username=user.username, original_email=user.email)
+    # 対象月（来月）を計算
+    today = datetime.date.today()
+    first_day_of_current_month = today.replace(day=1)
+    first_day_of_next_month = (first_day_of_current_month + datetime.timedelta(days=32)).replace(day=1)
+    dwd_year = first_day_of_next_month.year
+    dwd_month = first_day_of_next_month.month
 
-    # パート4用のシフト選択肢をフォームに設定
-    part4_shifts = ShiftType.query.filter(ShiftType.name.in_(["1", "2", "3", "4", "5", "6", "7", "8"])).order_by(ShiftType.name).all()
-    form.workable_shifts.choices = [(s.shift_type_id, s.name) for s in part4_shifts]
+    if request.method == 'POST':
+        # 従業員基本情報の更新
+        if form.validate_on_submit() and 'employee-submit' in request.form:
+            try:
+                user.username = form.username.data
+                user.full_name = form.full_name.data
+                user.email = form.email.data or None
+                user.employment_type = EmploymentType[form.employment_type.data]
+                user.max_consecutive_work_days = form.max_consecutive_work_days.data
+                user.preferred_night_shifts = form.preferred_night_shifts.data
+                user.preferred_shift_1_id = form.preferred_shift_1.data
+                user.preferred_shift_2_id = form.preferred_shift_2.data
+                user.ng_shifts = ",".join(map(str, form.ng_shifts.data))
+                
+                if form.password.data:
+                    user.set_password(form.password.data)
+                
+                db.session.commit()
+                flash(f"従業員「{user.full_name}」の基本情報を更新しました。", "success")
+            except Exception as e:
+                db.session.rollback()
+                flash(f"エラーが発生しました: {e}", "danger")
+            return redirect(url_for('admin.edit_employee', user_id=user_id))
 
-    if form.validate_on_submit():
-        try:
-            user.username = form.username.data
-            user.email = form.email.data or None
-            user.role_id = form.role.data
-            
-            new_role = db.session.get(Role, form.role.data)
-            if new_role and new_role.name.startswith("パート"):
-                user.desired_work_days = form.desired_work_days.data
-            else:
-                user.desired_work_days = None
+        # 希望勤務日数の更新
+        if dwd_form.validate_on_submit() and 'dwd-submit' in request.form:
+            try:
+                existing_request = DesiredWorkDaysRequest.query.filter_by(
+                    user_id=user.id, year=dwd_year, month=dwd_month
+                ).first()
 
-            if new_role and new_role.name == "パート4":
-                user.workable_shifts.clear()
-                selected_shift_ids = form.workable_shifts.data
-                selected_shifts = ShiftType.query.filter(ShiftType.shift_type_id.in_(selected_shift_ids)).all()
-                for shift in selected_shifts:
-                    user.workable_shifts.append(shift)
-            else:
-                user.workable_shifts.clear()
-            
-            if form.password.data:
-                user.set_password(form.password.data)
-            db.session.commit()
-            flash(f"従業員「{user.username}」の情報を更新しました。", "success")
-        except Exception as e:
-            db.session.rollback()
-            flash(f"エラーが発生しました: {e}", "danger")
-        return redirect(url_for('admin.dashboard'))
+                if existing_request:
+                    existing_request.min_days = dwd_form.min_days.data
+                    existing_request.max_days = dwd_form.max_days.data
+                    existing_request.status = 'approved'
+                else:
+                    new_request = DesiredWorkDaysRequest(
+                        user_id=user.id,
+                        year=dwd_year,
+                        month=dwd_month,
+                        min_days=dwd_form.min_days.data,
+                        max_days=dwd_form.max_days.data,
+                        status='approved'
+                    )
+                    db.session.add(new_request)
+                
+                db.session.commit()
+                flash(f"従業員「{user.full_name}」の{dwd_year}年{dwd_month}月の希望勤務日数を更新しました。", "success")
+            except Exception as e:
+                db.session.rollback()
+                flash(f"エラーが発生しました: {e}", "danger")
+            return redirect(url_for('admin.edit_employee', user_id=user_id))
+        
+        # バリデーションエラー時: 雇用形態に応じてシフト選択肢を再設定
+        if form.errors and form.employment_type.data:
+            try:
+                form.set_shift_choices_by_employment(EmploymentType[form.employment_type.data])
+            except (KeyError, TypeError):
+                pass
+        if form.errors:
+             for field, errors in form.errors.items():
+                for error in errors:
+                    flash(f"基本情報: {getattr(form, field).label.text}: {error}", "danger")
+        if dwd_form.errors:
+             for field, errors in dwd_form.errors.items():
+                for error in errors:
+                    flash(f"希望勤務日数: {getattr(dwd_form, field).label.text}: {error}", "danger")
 
-    elif request.method == 'GET':
+
+    # GETリクエスト時のフォーム初期化（POSTでバリデーション失敗時はrequestの値を保持）
+    if request.method == "GET":
+        form.set_shift_choices_by_employment(user.employment_type)
         form.username.data = user.username
+        form.full_name.data = user.full_name
         form.email.data = user.email
-        form.role.data = user.role_id
-        if user.role:
-            if user.role.name.startswith("パート"):
-                form.desired_work_days.data = user.desired_work_days
-            if user.role.name == "パート4":
-                form.workable_shifts.data = [s.shift_type_id for s in user.workable_shifts]
+        form.employment_type.data = user.employment_type.name
+        form.max_consecutive_work_days.data = user.max_consecutive_work_days
+        form.preferred_shift_1.data = user.preferred_shift_1_id
+        form.preferred_shift_2.data = user.preferred_shift_2_id
+        form.preferred_night_shifts.data = user.preferred_night_shifts
+        if user.ng_shifts:
+            form.ng_shifts.data = [int(shift_id) for shift_id in user.ng_shifts.split(',') if shift_id.strip()]
+        else:
+            form.ng_shifts.data = []
 
-    return render_template('admin/edit_employee.html', title='従業員の編集', form=form, user=user)
+    # 希望勤務日数フォーム
+    approved_dwd_request = DesiredWorkDaysRequest.query.filter_by(
+        user_id=user.id, year=dwd_year, month=dwd_month, status='approved'
+    ).first()
+
+    if approved_dwd_request:
+        dwd_form.min_days.data = approved_dwd_request.min_days
+        dwd_form.max_days.data = approved_dwd_request.max_days
+    else:
+        # 承認済みのものがない場合、pendingのものを表示
+        pending_dwd_request = DesiredWorkDaysRequest.query.filter_by(
+            user_id=user.id, year=dwd_year, month=dwd_month, status='pending'
+        ).first()
+        if pending_dwd_request:
+            dwd_form.min_days.data = pending_dwd_request.min_days
+            dwd_form.max_days.data = pending_dwd_request.max_days
+        # ここで古い desired_work_days を使うこともできるが、今回は新機能への移行を促すため空欄とする
+
+    return render_template(
+        'admin/edit_employee.html', 
+        title='従業員の編集', 
+        form=form, 
+        dwd_form=dwd_form,
+        user=user,
+        dwd_year=dwd_year,
+        dwd_month=dwd_month
+    )
 
 
 @admin_bp.route("/delete_employee/<int:user_id>", methods=['POST'])
@@ -336,7 +524,7 @@ def delete_employee(user_id):
         # TODO: 関連するシフトデータなども削除、あるいは無効化する処理が必要か検討
         db.session.delete(user)
         db.session.commit()
-        flash(f"従業員「{user.username}」を削除しました。", "success")
+        flash(f"従業員「{user.full_name}」を削除しました。", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"エラーが発生しました: {e}", "danger")
@@ -403,6 +591,39 @@ def action_day_off_request(request_id, action):
     return redirect(url_for('admin.manage_day_off_requests', status=status_filter))
 
 
+@admin_bp.route("/day_off/bulk_action", methods=['POST'])
+def bulk_action_day_off():
+    """選択された希望休申請を一括で承認する"""
+    request_ids = request.form.getlist('request_ids')
+    status_filter = request.form.get('status_filter', 'pending')
+
+    if not request_ids:
+        flash('一括操作の対象となる申請が選択されていません。', 'warning')
+        return redirect(url_for('admin.manage_day_off_requests', status=status_filter))
+
+    try:
+        requests_to_approve = DayOffRequest.query.filter(DayOffRequest.id.in_(request_ids)).all()
+        
+        approved_count = 0
+        for req in requests_to_approve:
+            # 念のため、'pending' のものだけを対象とする
+            if req.status == 'pending':
+                req.status = 'approved'
+                approved_count += 1
+        
+        if approved_count > 0:
+            db.session.commit()
+            flash(f'{approved_count}件の希望休申請を一括で承認しました。', 'success')
+        else:
+            flash('承認対象の申請（申請中）がありませんでした。', 'info')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"一括承認処理中にエラーが発生しました: {e}", "danger")
+
+    return redirect(url_for('admin.manage_day_off_requests', status=status_filter))
+
+
 @admin_bp.route("/work_requests")
 def manage_work_requests():
     """希望勤務の申請を一覧表示し、管理する"""
@@ -439,13 +660,14 @@ def manage_work_requests():
 def action_work_request(request_id, action):
     """希望勤務申請を承認または却下する"""
     req = db.get_or_404(WorkRequest, request_id)
+    shift_names = ", ".join([st.name for st in req.shift_types])
     
     if action == 'approve':
         req.status = 'approved'
-        flash(f'{req.user.username}さんの {req.date.strftime("%Y-%m-%d")} の希望勤務 ({req.shift_type.name}) を承認しました。', 'success')
+        flash(f'{req.user.username}さんの {req.date.strftime("%Y-%m-%d")} の希望勤務 ({shift_names}) を承認しました。', 'success')
     elif action == 'reject':
         req.status = 'rejected'
-        flash(f'{req.user.username}さんの {req.date.strftime("%Y-%m-%d")} の希望勤務 ({req.shift_type.name}) を却下しました。', 'warning')
+        flash(f'{req.user.username}さんの {req.date.strftime("%Y-%m-%d")} の希望勤務 ({shift_names}) を却下しました。', 'warning')
     else:
         flash('無効な操作です。', 'danger')
         return redirect(url_for('admin.manage_work_requests'))
@@ -458,6 +680,79 @@ def action_work_request(request_id, action):
 
     status_filter = request.args.get('status', 'pending')
     return redirect(url_for('admin.manage_work_requests', status=status_filter))
+
+
+@admin_bp.route("/desired_work_days_requests")
+def manage_desired_work_days_requests():
+    """希望勤務日数申請を一覧表示し、管理する"""
+    status_filter = request.args.get('status', 'pending')
+
+    query = DesiredWorkDaysRequest.query.join(User).order_by(DesiredWorkDaysRequest.year.desc(), DesiredWorkDaysRequest.month.desc(), User.full_name.asc())
+
+    if status_filter and status_filter != 'all':
+        query = query.filter(DesiredWorkDaysRequest.status == status_filter)
+
+    requests = query.all()
+
+    # タブの各件数を計算
+    count_all = DesiredWorkDaysRequest.query.count()
+    count_pending = DesiredWorkDaysRequest.query.filter_by(status='pending').count()
+    count_approved = DesiredWorkDaysRequest.query.filter_by(status='approved').count()
+    count_rejected = DesiredWorkDaysRequest.query.filter_by(status='rejected').count()
+
+    return render_template(
+        "admin/desired_work_days_requests.html",
+        title="希望勤務日数申請の管理",
+        requests=requests,
+        current_status=status_filter,
+        counts={
+            'all': count_all,
+            'pending': count_pending,
+            'approved': count_approved,
+            'rejected': count_rejected
+        }
+    )
+
+
+@admin_bp.route("/desired_work_days_requests/<int:request_id>/<string:action>", methods=['POST'])
+def action_desired_work_days_request(request_id, action):
+    """希望勤務日数申請を承認または却下する"""
+    req = db.get_or_404(DesiredWorkDaysRequest, request_id)
+    
+    if action == 'approve':
+        try:
+            # 同じユーザーの同じ月に対する他の承認済み申請があれば、それをpendingに戻す
+            existing_approved_requests = DesiredWorkDaysRequest.query.filter(
+                DesiredWorkDaysRequest.user_id == req.user_id,
+                DesiredWorkDaysRequest.year == req.year,
+                DesiredWorkDaysRequest.month == req.month,
+                DesiredWorkDaysRequest.status == 'approved',
+                DesiredWorkDaysRequest.id != req.id
+            ).all()
+            for r in existing_approved_requests:
+                r.status = 'pending'
+            
+            req.status = 'approved'
+            db.session.commit()
+            flash(f'{req.user.full_name}さんの {req.year}年{req.month}月 の希望勤務日数申請を承認しました。', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f"処理中にエラーが発生しました: {e}", "danger")
+
+    elif action == 'reject':
+        try:
+            req.status = 'rejected'
+            db.session.commit()
+            flash(f'{req.user.full_name}さんの {req.year}年{req.month}月 の希望勤務日数申請を却下しました。', 'warning')
+        except Exception as e:
+            db.session.rollback()
+            flash(f"処理中にエラーが発生しました: {e}", "danger")
+    
+    else:
+        flash('無効な操作です。', 'danger')
+
+    status_filter = request.args.get('status', 'pending')
+    return redirect(url_for('admin.manage_desired_work_days_requests', status=status_filter))
 
 
 @admin_bp.route("/edit_username", methods=["GET", "POST"])

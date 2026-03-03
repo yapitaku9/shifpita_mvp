@@ -1,29 +1,13 @@
 import click
 from flask.cli import with_appcontext
 from . import db
-from .models.master import Role, ShiftType, ShiftConstraint
+from .models.master import ShiftType, ShiftConstraint
 import datetime
 
 @click.command('seed')
 @with_appcontext
 def seed_command():
     """Seeds the database with initial master data for production."""
-    # Seed Roles
-    if Role.query.first() is None:
-        roles = [
-            Role(name='責任者', can_night_shift=True, monthly_work_days_rule=21),
-            Role(name='介護員', can_night_shift=True, monthly_work_days_rule=21),
-            Role(name='パート1', can_night_shift=True),
-            Role(name='パート2', can_night_shift=False),
-            Role(name='パート3', can_night_shift=False),
-            Role(name='パート4', can_night_shift=False),
-            Role(name='サポート', can_night_shift=True),
-        ]
-        db.session.bulk_save_objects(roles)
-        click.echo('Seeded roles.')
-    else:
-        click.echo('Roles already exist.')
-
     # Seed ShiftTypes
     if ShiftType.query.first() is None:
         shift_types = [
@@ -74,6 +58,7 @@ def seed_command():
             click.echo('Updated max_consecutive_work_days to 5.')
 
     db.session.commit()
+
 
 def init_app(app):
     """Register command with app."""

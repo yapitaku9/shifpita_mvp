@@ -3,97 +3,131 @@
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-lg-6">
+        <div class="col-lg-8">
             <div class="card">
                 <div class="card-header fw-bold">
-                    {{ title }}: {{ user.username }}
+                    {{ title }}: {{ user.full_name }}
                 </div>
                 <div class="card-body">
-                    <form action="" method="post" novalidate>
+                    <!-- Form for Basic Employee Info -->
+                    <form action="{{ url_for('admin.edit_employee', user_id=user.id) }}" method="post" novalidate>
                         {{ form.hidden_tag() }}
-                        <div class="mb-3">
-                            {{ form.username.label(class="form-label") }}
-                            {{ form.username(class="form-control") }}
-                            {% if form.username.errors %}
-                                <div class="invalid-feedback d-block">
-                                {% for error in form.username.errors %}<span>{{ error }}</span>{% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
-                        <div class="mb-3">
-                            {{ form.email.label(class="form-label") }}
-                            {{ form.email(class="form-control") }}
-                            {% if form.email.errors %}
-                                <div class="invalid-feedback d-block">
-                                {% for error in form.email.errors %}<span>{{ error }}</span>{% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
-                        <div class="mb-3">
-                            {{ form.role.label(class="form-label") }}
-                            {{ form.role(class="form-select", id="role-select") }}
-                             {% if form.role.errors %}
-                                <div class="invalid-feedback d-block">
-                                {% for error in form.role.errors %}<span>{{ error }}</span>{% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
-
-                        <div id="part-time-fields" style="display: none;">
-                            <div class="mb-3">
-                                {{ form.desired_work_days.label(class="form-label") }}
-                                {{ form.desired_work_days(class="form-control") }}
-                                {% if form.desired_work_days.errors %}
-                                    <div class="invalid-feedback d-block">
-                                    {% for error in form.desired_work_days.errors %}<span>{{ error }}</span>{% endfor %}
-                                    </div>
-                                {% endif %}
+                        
+                        <h5>基本情報</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.full_name.label(class="form-label") }}
+                                {{ form.full_name(class="form-control") }}
+                                {% if form.full_name.errors %}<div class="invalid-feedback d-block">{% for error in form.full_name.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.username.label(class="form-label") }}
+                                {{ form.username(class="form-control") }}
+                                {% if form.username.errors %}<div class="invalid-feedback d-block">{% for error in form.username.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                             </div>
                         </div>
-
-                        <!-- パート4専用の勤務可能シフト選択フィールド -->
-                        <div id="part4-workable-shifts-field" class="mb-3" style="display: none;">
-                            {{ form.workable_shifts.label(class="form-label") }}
-                            <div class="form-control" style="height: auto; border: none;">
-                                {% for subfield in form.workable_shifts %}
-                                <div class="form-check">
-                                    {{ subfield(class="form-check-input") }}
-                                    {{ subfield.label(class="form-check-label") }}
-                                </div>
-                                {% endfor %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.email.label(class="form-label") }}
+                                {{ form.email(class="form-control") }}
+                                {% if form.email.errors %}<div class="invalid-feedback d-block">{% for error in form.email.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                             </div>
-                             {% if form.workable_shifts.errors %}
-                                <div class="invalid-feedback d-block">
-                                {% for error in form.workable_shifts.errors %}<span>{{ error }}</span>{% endfor %}
-                                </div>
-                            {% endif %}
+                            <div class="col-md-6 mb-3">
+                                {{ form.employment_type.label(class="form-label") }}
+                                {{ form.employment_type(class="form-select", id="employment_type") }}
+                                {% if form.employment_type.errors %}<div class="invalid-feedback d-block">{% for error in form.employment_type.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
                         </div>
 
                         <hr>
+                        <h5>制約と希望</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.max_consecutive_work_days.label(class="form-label") }}
+                                {{ form.max_consecutive_work_days(class="form-control") }}
+                                {% if form.max_consecutive_work_days.errors %}<div class="invalid-feedback d-block">{% for error in form.max_consecutive_work_days.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.preferred_shift_1.label(class="form-label") }}
+                                {{ form.preferred_shift_1(class="form-select", id="preferred_shift_1") }}
+                                {% if form.preferred_shift_1.errors %}<div class="invalid-feedback d-block">{% for error in form.preferred_shift_1.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.preferred_shift_2.label(class="form-label") }}
+                                {{ form.preferred_shift_2(class="form-select", id="preferred_shift_2") }}
+                                {% if form.preferred_shift_2.errors %}<div class="invalid-feedback d-block">{% for error in form.preferred_shift_2.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.preferred_night_shifts.label(class="form-label") }}
+                                {{ form.preferred_night_shifts(class="form-control") }}
+                                {% if form.preferred_night_shifts.errors %}<div class="invalid-feedback d-block">{% for error in form.preferred_night_shifts.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                        </div>
+                        <div class="mb-3" id="ng_shifts_container">
+                            {{ form.ng_shifts.label(class="form-label") }}
+                            <div id="ng_shifts_checkboxes" class="border p-2 rounded">
+                                {% if form.ng_shifts.choices %}
+                                    {% for subfield in form.ng_shifts %}
+                                    <div class="form-check form-check-inline">
+                                        {{ subfield(class="form-check-input") }}
+                                        {{ subfield.label(class="form-check-label") }}
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-muted">雇用形態を選択すると表示されます。</span>
+                                {% endif %}
+                            </div>
+                            {% if form.ng_shifts.errors %}<div class="invalid-feedback d-block">{% for error in form.ng_shifts.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+
+                        <hr>
+                        <h5>パスワード変更</h5>
                         <p class="text-muted small">パスワードを変更する場合のみ、以下を入力してください。</p>
-                        <div class="mb-3">
-                            {{ form.password.label(class="form-label") }}
-                            {{ form.password(class="form-control") }}
-                            {% if form.password.errors %}
-                                <div class="invalid-feedback d-block">
-                                {% for error in form.password.errors %}<span>{{ error }}</span>{% endfor %}
-                                </div>
-                            {% endif %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.password.label(class="form-label") }}
+                                {{ form.password(class="form-control") }}
+                                {% if form.password.errors %}<div class="invalid-feedback d-block">{% for error in form.password.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.password2.label(class="form-label") }}
+                                {{ form.password2(class="form-control") }}
+                                {% if form.password2.errors %}<div class="invalid-feedback d-block">{% for error in form.password2.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            {{ form.password2.label(class="form-label") }}
-                            {{ form.password2(class="form-control") }}
-                            {% if form.password2.errors %}
-                                <div class="invalid-feedback d-block">
-                                {% for error in form.password2.errors %}<span>{{ error }}</span>{% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
+
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">キャンセル</a>
                             {{ form.submit(class="btn btn-primary") }}
                         </div>
                     </form>
+
+                    <hr class="my-4">
+
+                    <!-- Form for Desired Work Days -->
+                    <form action="{{ url_for('admin.edit_employee', user_id=user.id) }}" method="post" novalidate>
+                        {{ dwd_form.hidden_tag() }}
+                        <h5>希望勤務日数の設定 ({{ dwd_year }}年{{ dwd_month }}月)</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ dwd_form.min_days.label(class="form-label") }}
+                                {{ dwd_form.min_days(class="form-control") }}
+                                {% if dwd_form.min_days.errors %}<div class="invalid-feedback d-block">{% for error in dwd_form.min_days.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ dwd_form.max_days.label(class="form-label") }}
+                                {{ dwd_form.max_days(class="form-control") }}
+                                {% if dwd_form.max_days.errors %}<div class="invalid-feedback d-block">{% for error in dwd_form.max_days.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                        </div>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                             {{ dwd_form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">ダッシュボードに戻る</a>
                 </div>
             </div>
         </div>
@@ -105,36 +139,79 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const roleSelect = document.getElementById('role-select');
-    const partTimeFields = document.getElementById('part-time-fields');
-    const part4Fields = document.getElementById('part4-workable-shifts-field');
+    const empSelect = document.getElementById('employment_type');
+    const ngShiftsContainer = document.getElementById('ng_shifts_checkboxes');
+    const prefShift1Select = document.getElementById('preferred_shift_1');
+    const prefShift2Select = document.getElementById('preferred_shift_2');
+    
+    // このフォームのng_shiftsフィールドのname属性を取得
+    const ngShiftsName = '{{ form.ng_shifts.name }}';
 
-    // The choices are passed from the view, but in case they are not, we can get them from the form object if rendered to json
-    const roles = JSON.parse('{{ form.role.choices | tojson | safe }}');
-    const roleMap = roles.reduce((acc, [id, name]) => {
-        acc[String(id)] = name;
-        return acc;
-    }, {});
+    if (!empSelect) return;
 
-    function toggleFields() {
-        const selectedRoleId = roleSelect.value;
-        const selectedRoleName = roleMap[selectedRoleId] || '';
-
-        if (selectedRoleName.startsWith('パート')) {
-            partTimeFields.style.display = 'block';
-        } else {
-            partTimeFields.style.display = 'none';
+    empSelect.addEventListener('change', function() {
+        const empType = this.value;
+        if (!empType) {
+            ngShiftsContainer.innerHTML = '<span class="text-muted">雇用形態を選択してください。</span>';
+            prefShift1Select.innerHTML = '<option value="">---</option>';
+            prefShift2Select.innerHTML = '<option value="">---</option>';
+            return;
         }
 
-        if (selectedRoleName === 'パート4') {
-            part4Fields.style.display = 'block';
-        } else {
-            part4Fields.style.display = 'none';
-        }
-    }
+        // 既存の選択値を取得しておく
+        const selectedNgShiftIds = Array.from(ngShiftsContainer.querySelectorAll('input:checked')).map(input => input.value);
+        const selectedPref1 = prefShift1Select.value;
+        const selectedPref2 = prefShift2Select.value;
+        
+        fetch('{{ url_for("admin.get_shift_choices", employment_type="__ET__") }}'.replace('__ET__', empType))
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error fetching shift choices:', data.error);
+                    return;
+                }
 
-    roleSelect.addEventListener('change', toggleFields);
-    toggleFields(); // Initial check on page load
+                // NG勤務チェックボックスを再構築
+                let ngShiftsHtml = '';
+                if (data.ng_shifts && data.ng_shifts.length > 0) {
+                    data.ng_shifts.forEach(function(shift, index) {
+                        const fieldId = `{{ form.ng_shifts.id }}-${index}`;
+                        // 以前に選択されていた項目であれば checked を付加
+                        const isChecked = selectedNgShiftIds.includes(String(shift.id));
+                        ngShiftsHtml += `
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="${ngShiftsName}" value="${shift.id}" id="${fieldId}" ${isChecked ? 'checked' : ''}>
+                                <label class="form-check-label" for="${fieldId}">${shift.name}</label>
+                            </div>
+                        `;
+                    });
+                } else {
+                    ngShiftsHtml = '<span class="text-muted">この雇用形態で選択可能なNG勤務はありません。</span>';
+                }
+                ngShiftsContainer.innerHTML = ngShiftsHtml;
+
+                // 優先シフトのプルダウンを再構築
+                let prefShiftsOptions = (data.preferred_shifts || []).map(function(shift) {
+                    return `<option value="${shift.id}">${shift.name}</option>`;
+                }).join('');
+
+                prefShift1Select.innerHTML = prefShiftsOptions;
+                prefShift2Select.innerHTML = prefShiftsOptions;
+
+                // 以前の選択値を復元（新しい選択肢の中に存在する場合のみ）
+                if (Array.from(prefShift1Select.options).some(opt => opt.value === selectedPref1)) {
+                    prefShift1Select.value = selectedPref1;
+                }
+                if (Array.from(prefShift2Select.options).some(opt => opt.value === selectedPref2)) {
+                    prefShift2Select.value = selectedPref2;
+                }
+            })
+            .catch(error => {
+                console.error('Failed to update shift choices:', error);
+                ngShiftsContainer.innerHTML = '<span class="text-danger">選択肢の読み込みに失敗しました。</span>';
+            });
+    });
 });
 </script>
 {% endblock %}
+

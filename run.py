@@ -1,7 +1,7 @@
 import click
 from app import create_app, db
 from app.models.user import User
-from app.models.master import Role, ShiftType
+from app.models.master import ShiftType # Role
 import datetime
 
 app = create_app()
@@ -39,20 +39,20 @@ def seed_data():
     print("Seeding master data...")
 
     # Roles
-    roles = [
-        {"name": "介護員", "can_night_shift": True, "monthly_work_days_rule": 21},
-        {"name": "パート1", "can_night_shift": True, "monthly_work_days_rule": None},
-        {"name": "パート2", "can_night_shift": False, "monthly_work_days_rule": None},
-        {"name": "パート3", "can_night_shift": False, "monthly_work_days_rule": None},
-        {"name": "パート4", "can_night_shift": False, "monthly_work_days_rule": None},
-        {"name": "責任者", "can_night_shift": True, "monthly_work_days_rule": None},
-        {"name": "サポート", "can_night_shift": True, "monthly_work_days_rule": None},
-    ]
-    for r_data in roles:
-        if not Role.query.filter_by(name=r_data['name']).first():
-            role = Role(**r_data)
-            db.session.add(role)
-            print(f"  Added Role: {r_data['name']}")
+    # roles = [
+    #     {"name": "介護員", "can_night_shift": True, "monthly_work_days_rule": 21},
+    #     {"name": "パート1", "can_night_shift": True, "monthly_work_days_rule": None},
+    #     {"name": "パート2", "can_night_shift": False, "monthly_work_days_rule": None},
+    #     {"name": "パート3", "can_night_shift": False, "monthly_work_days_rule": None},
+    #     {"name": "パート4", "can_night_shift": False, "monthly_work_days_rule": None},
+    #     {"name": "責任者", "can_night_shift": True, "monthly_work_days_rule": None},
+    #     {"name": "サポート", "can_night_shift": True, "monthly_work_days_rule": None},
+    # ]
+    # for r_data in roles:
+    #     if not Role.query.filter_by(name=r_data['name']).first():
+    #         role = Role(**r_data)
+    #         db.session.add(role)
+    #         print(f"  Added Role: {r_data['name']}")
 
     # ShiftTypes
     def t(h, m): return datetime.time(h, m)
@@ -88,3 +88,4 @@ def seed_data():
 
 if __name__ == "__main__":
     app.run(debug=True)
+

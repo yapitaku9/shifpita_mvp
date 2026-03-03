@@ -2,9 +2,11 @@ from flask import render_template, flash, redirect, url_for, Blueprint, request,
 from flask_login import login_required, current_user
 from sqlalchemy import and_
 from app import db
-from app.forms import DayOffRequestForm, WorkRequestForm, EmailEditForm, PasswordChangeForm
+from app.forms import DayOffRequestForm, WorkRequestForm, EmailEditForm, PasswordChangeForm, DesiredWorkDaysRequestForm
+from app.models.user import get_selectable_shift_choices, EmploymentType
 from app.models.day_off_request import DayOffRequest
 from app.models.work_request import WorkRequest
+from app.models.desired_work_days_request import DesiredWorkDaysRequest
 from app.models.shift import ShiftAssignment
 from app.models.master import ShiftType
 from app.email import send_email
@@ -31,18 +33,11 @@ def dashboard():
     day_off_form = DayOffRequestForm(prefix="day_off")
     work_request_form = WorkRequestForm(prefix="work_request")
 
-    # ユーザーが正規雇用労働者かどうかのフラグ
-    is_regular_employee = (
-        current_user.role and not current_user.role.name.startswith("パート")
-    )
-
-    # 希望勤務フォームの選択肢を動的に設定
-    if is_regular_employee:
-        target_shifts = ["早1", "早2", "日1", "日2", "遅1", "遅2", "夜1", "夜2"]
-        work_request_form.shift_type_id.choices = [
-            (st.shift_type_id, st.name)
-            for st in ShiftType.query.filter(ShiftType.name.in_(target_shifts)).all()
-        ]
+    # 雇用形態に応じて希望勤務フォームを表示（全雇用形態で申請可能）
+    # 選択肢は雇用形態に基づいてフィルタ
+    employment_type = current_user.employment_type
+    shift_choices = get_selectable_shift_choices(employment_type, exclude_kyu=True, coerce_int=True)
+    work_request_form.shift_type_ids.choices = shift_choices
 
     if request.method == "POST":
         # どちらのフォームが送信されたかを判定
@@ -51,15 +46,27 @@ def dashboard():
             and day_off_form.validate_on_submit()
         ):
             try:
-                req = DayOffRequest(
-                    date=day_off_form.date.data, user_id=current_user.id
-                )
-                db.session.add(req)
-                db.session.commit()
-                flash(
-                    f'{day_off_form.date.data.strftime("%Y-%m-%d")} の希望休を申請しました。',
-                    "success",
-                )
+                date_list_str = day_off_form.dates.data.split(', ')
+                processed_dates = []
+                for date_str in date_list_str:
+                    if not date_str: continue
+                    date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+                    req = DayOffRequest(
+                        date=date, 
+                        user_id=current_user.id,
+                        request_type=day_off_form.request_type.data
+                    )
+                    db.session.add(req)
+                    processed_dates.append(date_str)
+                
+                if processed_dates:
+                    db.session.commit()
+                    flash(
+                        f'{", ".join(processed_dates)} の休み希望を申請しました。',
+                        "success",
+                    )
+                else:
+                    flash('日付が選択されていません。', 'warning')
                 # 管理者へ通知メール
                 # send_email(...)
             except Exception as e:
@@ -72,15 +79,22 @@ def dashboard():
             and work_request_form.validate_on_submit()
         ):
             try:
+                date_obj = datetime.datetime.strptime(work_request_form.date.data, '%Y-%m-%d').date()
                 req = WorkRequest(
-                    date=work_request_form.date.data,
-                    user_id=current_user.id,
-                    shift_type_id=work_request_form.shift_type_id.data,
+                    date=date_obj,
+                    user_id=current_user.id
                 )
+                # 選択されたShiftTypeオブジェクトを取得し、リレーションに追加
+                shift_types = ShiftType.query.filter(
+                    ShiftType.shift_type_id.in_(work_request_form.shift_type_ids.data)
+                ).all()
+                for st in shift_types:
+                    req.shift_types.append(st)
+                
                 db.session.add(req)
                 db.session.commit()
                 flash(
-                    f'{work_request_form.date.data.strftime("%Y-%m-%d")} の希望勤務を申請しました。',
+                    f'{date_obj.strftime("%Y-%m-%d")} の希望勤務を申請しました。',
                     "success",
                 )
                 # 管理者へ通知メール
@@ -109,11 +123,7 @@ def dashboard():
     day_off_requests = current_user.day_off_requests.order_by(
         DayOffRequest.date.desc()
     ).all()
-    work_requests = (
-        current_user.work_requests.order_by(WorkRequest.date.desc()).all()
-        if is_regular_employee
-        else []
-    )
+    work_requests = current_user.work_requests.order_by(WorkRequest.date.desc()).all()
 
     # 最新の確定シフトを取得
     shifts = []
@@ -140,16 +150,31 @@ def dashboard():
             .all()
         )
 
+    # 来月の希望勤務日数申請を取得
+    today = datetime.date.today()
+    first_day_of_current_month = today.replace(day=1)
+    first_day_of_next_month = (first_day_of_current_month + datetime.timedelta(days=32)).replace(day=1)
+    dwd_year = first_day_of_next_month.year
+    dwd_month = first_day_of_next_month.month
+    desired_work_days_request = DesiredWorkDaysRequest.query.filter_by(
+        user_id=current_user.id,
+        year=dwd_year,
+        month=dwd_month
+    ).first()
+
     return render_template(
         "employee/dashboard.html",
         title="従業員ダッシュボード",
         day_off_form=day_off_form,
         work_request_form=work_request_form,
-        is_regular_employee=is_regular_employee,
+        employment_type=employment_type,
         day_off_requests=day_off_requests,
         work_requests=work_requests,
         shifts=shifts,
         shift_month_str=shift_month_str,
+        desired_work_days_request=desired_work_days_request,
+        dwd_year=dwd_year,
+        dwd_month=dwd_month,
     )
 
 
@@ -264,4 +289,70 @@ def change_password():
                  flash(f"{getattr(form, field).label.text}: {error}", "danger")
     
     return render_template("employee/change_password.html", title="パスワード変更", form=form)
+
+
+@employee_bp.route("/request_work_days", methods=["GET", "POST"])
+@login_required
+def request_desired_work_days():
+    """希望勤務日数を申請する"""
+    form = DesiredWorkDaysRequestForm()
+    
+    # 対象月（来月）を計算
+    today = datetime.date.today()
+    first_day_of_current_month = today.replace(day=1)
+    first_day_of_next_month = (first_day_of_current_month + datetime.timedelta(days=32)).replace(day=1)
+    target_year = first_day_of_next_month.year
+    target_month = first_day_of_next_month.month
+    
+    # 既存の申請を取得
+    existing_request = DesiredWorkDaysRequest.query.filter_by(
+        user_id=current_user.id,
+        year=target_year,
+        month=target_month
+    ).first()
+
+    if form.validate_on_submit():
+        try:
+            if existing_request:
+                # 既存の申請を更新
+                existing_request.min_days = form.min_days.data
+                existing_request.max_days = form.max_days.data
+                existing_request.status = 'pending' # 再申請されたらステータスを更新
+                flash(f'{target_year}年{target_month}月の希望勤務日数を更新しました。', 'success')
+            else:
+                # 新規申請を作成
+                new_request = DesiredWorkDaysRequest(
+                    user_id=current_user.id,
+                    year=target_year,
+                    month=target_month,
+                    min_days=form.min_days.data,
+                    max_days=form.max_days.data
+                )
+                db.session.add(new_request)
+                flash(f'{target_year}年{target_month}月の希望勤務日数を申請しました。', 'success')
+            
+            db.session.commit()
+            return redirect(url_for('employee.dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'エラーが発生しました: {e}', 'danger')
+
+    elif request.method == 'GET':
+        if existing_request:
+            form.min_days.data = existing_request.min_days
+            form.max_days.data = existing_request.max_days
+    
+    # バリデーション失敗時のエラー表示
+    if request.method == "POST":
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f"{getattr(form, field).label.text}: {error}", "danger")
+
+    return render_template(
+        'employee/request_work_days.html',
+        title='希望勤務日数の申請',
+        form=form,
+        year=target_year,
+        month=target_month
+    )
 

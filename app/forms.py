@@ -2,7 +2,9 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, DateField, IntegerField, SelectMultipleField, widgets
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError, Regexp, Optional, NumberRange
 from app.models.user import User
-from app.models.master import Role
+from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError, Regexp, Optional, NumberRange
+from app.models.user import User, EmploymentType, get_selectable_shift_choices
+from app.models.master import ShiftType
 from app.models.day_off_request import DayOffRequest
 from app.models.work_request import WorkRequest
 import datetime
@@ -25,18 +27,26 @@ class LoginForm(FlaskForm):
 class EmployeeForm(FlaskForm):
     """従業員登録・編集フォーム"""
     username = StringField(
-        "ユーザーID (半角英数字6文字以上)",
+        "ログインID (半角英数字6文字以上)",
         validators=[
             DataRequired(message="入力必須です。"),
             Length(min=6, message="6文字以上で入力してください。"),
-            Regexp('^[A-Za-z0-9]+$', message='ユーザー名は半角英数字のみ使用できます。'),
+            Regexp('^[A-Za-z0-9]+$', message='ログインIDは半角英数字のみ使用できます。'),
         ]
+    )
+    full_name = StringField(
+        "氏名",
+        validators=[DataRequired(message="氏名は入力必須です。")]
     )
     email = StringField(
         "メールアドレス",
         validators=[Optional(), Email(message="有効なメールアドレスを入力してください。")]
     )
-    role = SelectField("役割", coerce=int, validators=[DataRequired(message="役割を選択してください。")])
+    employment_type = SelectField(
+        "雇用形態",
+        coerce=str,
+        validators=[DataRequired(message="雇用形態を選択してください。")]
+    )
     password = PasswordField(
         "新しいパスワード (半角数字4文字)",
         validators=[
@@ -51,12 +61,26 @@ class EmployeeForm(FlaskForm):
             EqualTo('password', message='パスワードが一致しません。')
         ]
     )
-    desired_work_days = IntegerField(
-        "希望勤務日数（パートのみ）",
-        validators=[Optional(), NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")]
+    max_consecutive_work_days = IntegerField(
+        "連勤制限（日数）",
+        validators=[Optional(), NumberRange(min=1, max=31, message="1から31の範囲で入力してください。")]
     )
-    workable_shifts = SelectMultipleField(
-        "勤務可能シフト（パート4のみ）",
+    preferred_shift_1 = SelectField(
+        "優先シフト1",
+        coerce=lambda x: int(x) if x else None,
+        validators=[Optional()],
+    )
+    preferred_shift_2 = SelectField(
+        "優先シフト2",
+        coerce=lambda x: int(x) if x else None,
+        validators=[Optional()],
+    )
+    preferred_night_shifts = IntegerField(
+        "夜勤希望回数",
+        validators=[Optional(), NumberRange(min=0, message="0以上の数値を入力してください。")]
+    )
+    ng_shifts = SelectMultipleField(
+        "NG勤務",
         coerce=int,
         validators=[Optional()],
         widget=widgets.ListWidget(prefix_label=False),
@@ -64,13 +88,14 @@ class EmployeeForm(FlaskForm):
     )
     submit = SubmitField("登録する")
 
-    def __init__(self, original_username=None, original_email=None, *args, **kwargs):
+    def __init__(self, original_username=None, original_email=None, employment_type=None, *args, **kwargs):
         super(EmployeeForm, self).__init__(*args, **kwargs)
         self.original_username = original_username
         self.original_email = original_email
-        
-        from app import db
-        self.role.choices = [(r.role_id, r.name) for r in db.session.query(Role).order_by('name').all()]
+        self._employment_type = employment_type
+
+        self.employment_type.choices = [(e.name, e.value) for e in EmploymentType]
+        self._update_shift_choices(employment_type or EmploymentType.FULL_TIME)
 
         # If it's an edit form, change the submit button text
         if original_username:
@@ -86,6 +111,20 @@ class EmployeeForm(FlaskForm):
                 EqualTo('password', message='パスワードが一致しません。')
             ]
 
+    def _update_shift_choices(self, employment_type):
+        """雇用形態に応じてNG勤務・優先シフトの選択肢を更新"""
+        ng_choices = get_selectable_shift_choices(employment_type, exclude_kyu=True, coerce_int=True)
+        pref_choices = get_selectable_shift_choices(employment_type, include_blank=True, coerce_int=True)
+        self.ng_shifts.choices = ng_choices
+        self.preferred_shift_1.choices = pref_choices
+        self.preferred_shift_2.choices = pref_choices
+
+    def set_shift_choices_by_employment(self, employment_type):
+        """フォーム表示前に雇用形態に基づきシフト選択肢を更新（ビューから呼ぶ）"""
+        if employment_type:
+            if isinstance(employment_type, str):
+                employment_type = EmploymentType[employment_type]
+            self._update_shift_choices(employment_type)
 
     def validate_username(self, username):
         if username.data != self.original_username:
@@ -103,44 +142,71 @@ class EmployeeForm(FlaskForm):
 
 class DayOffRequestForm(FlaskForm):
     """希望休申請フォーム"""
-    date = DateField("日付", validators=[DataRequired(message="日付を入力してください。")], format='%Y-%m-%d')
+    request_type = SelectField(
+        "申請種別",
+        choices=[('day_off', '希望休'), ('paid_leave', '有給休暇')],
+        default='day_off',
+        validators=[DataRequired(message="申請種別を選択してください。")]
+    )
+    dates = StringField("日付", validators=[DataRequired(message="日付を入力してください。")])
     submit = SubmitField("申請する")
 
-    def validate_date(self, date):
+    def validate_dates(self, dates):
         """同じ日付の希望休・希望勤務の申請が既にないかチェック"""
         from flask_login import current_user
         
-        # 同じ日付の希望休をチェック
-        existing_day_off = DayOffRequest.query.filter_by(
-            user_id=current_user.id, 
-            date=date.data
-        ).first()
-        if existing_day_off:
-            raise ValidationError('この日付の希望休は既に申請済みです。')
-            
-        # 同じ日付の希望勤務をチェック
-        existing_work_request = WorkRequest.query.filter_by(
-            user_id=current_user.id,
-            date=date.data
-        ).first()
-        if existing_work_request:
-            raise ValidationError('この日付は希望勤務として既に申請済みです。希望休は申請できません。')
+        date_list_str = dates.data.split(', ')
+        if not date_list_str or date_list_str == ['']:
+            raise ValidationError('日付を選択してください。')
+
+        for date_str in date_list_str:
+            try:
+                date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                raise ValidationError(f'無効な日付形式です: {date_str}')
+
+            # 同じ日付の休み希望をチェック
+            existing_day_off = DayOffRequest.query.filter_by(
+                user_id=current_user.id, 
+                date=date
+            ).first()
+            if existing_day_off:
+                raise ValidationError(f'{date_str}の休み希望は既に申請済みです。')
+                
+            # 同じ日付の希望勤務をチェック
+            existing_work_request = WorkRequest.query.filter_by(
+                user_id=current_user.id,
+                date=date
+            ).first()
+            if existing_work_request:
+                raise ValidationError(f'{date_str}は希望勤務として既に申請済みです。休み希望は申請できません。')
 
 
 class WorkRequestForm(FlaskForm):
     """希望勤務申請フォーム"""
-    date = DateField("日付", validators=[DataRequired(message="日付を入力してください。")], format='%Y-%m-%d')
-    shift_type_id = SelectField("希望勤務", coerce=int, validators=[DataRequired(message="勤務を選択してください。")])
+    date = StringField("日付", validators=[DataRequired(message="日付を入力してください。")])
+    shift_type_ids = SelectMultipleField(
+        "希望勤務",
+        coerce=int,
+        validators=[DataRequired(message="希望勤務を1つ以上選択してください。")],
+        widget=widgets.ListWidget(prefix_label=False),
+        option_widget=widgets.CheckboxInput()
+    )
     submit = SubmitField("申請する")
 
     def validate_date(self, date):
         """同じ日付の希望勤務・希望休の申請が既にないかチェック"""
         from flask_login import current_user
 
+        try:
+            date_obj = datetime.datetime.strptime(date.data, '%Y-%m-%d').date()
+        except ValueError:
+            raise ValidationError('無効な日付形式です。')
+
         # 同じ日付の希望勤務をチェック
         existing_work_request = WorkRequest.query.filter_by(
             user_id=current_user.id,
-            date=date.data
+            date=date_obj
         ).first()
         if existing_work_request:
             raise ValidationError('この日付の希望勤務は既に申請済みです。')
@@ -148,10 +214,10 @@ class WorkRequestForm(FlaskForm):
         # 同じ日付の希望休をチェック
         existing_day_off = DayOffRequest.query.filter_by(
             user_id=current_user.id, 
-            date=date.data
+            date=date_obj
         ).first()
         if existing_day_off:
-            raise ValidationError('この日付は希望休として既に申請済みです。希望勤務は申請できません。')
+            raise ValidationError('この日付は休み希望として既に申請済みです。希望勤務は申請できません。')
 
 
 class ShiftGenerationForm(FlaskForm):
@@ -177,18 +243,25 @@ def create_shift_constraint_form():
         pass
 
     # DBからすべての制約を取得
-    constraints = ShiftConstraint.query.order_by(ShiftConstraint.id).all()
+    constraints = ShiftConstraint.query.order_by(ShiftConstraint.display_order, ShiftConstraint.id).all()
 
     # 各制約に対してフォームフィールドを動的に追加
     for constraint in constraints:
-        field = IntegerField(
-            label=constraint.description,
-            validators=[
-                DataRequired(message=f"{constraint.description}は必須です。"),
-                NumberRange(min=0, message="0以上の数値を入力してください。")
-            ],
-            default=constraint.value
-        )
+        # 説明が「【シフト構成】」で始まる場合はBooleanFieldを使用
+        if constraint.description.startswith('【シフト構成】'):
+            field = BooleanField(
+                label=constraint.description,
+                default=bool(constraint.value)
+            )
+        else:
+            field = IntegerField(
+                label=constraint.description,
+                validators=[
+                    DataRequired(message=f"{constraint.description}は必須です。"),
+                    NumberRange(min=0, message="0以上の数値を入力してください。")
+                ],
+                default=constraint.value
+            )
         setattr(DynamicShiftConstraintForm, constraint.name, field)
 
     # 最後にSubmitボタンを追加
@@ -289,6 +362,15 @@ class SpecialDayForm(FlaskForm):
         "説明（例：通院日）",
         validators=[Optional(), Length(max=100)]
     )
+    visit_time = SelectField(
+        "通院時間",
+        choices=[
+            ('', '---'),
+            ('08:00', '08:00'),
+            ('09:00', '09:00')
+        ],
+        validators=[Optional()]
+    )
     submit = SubmitField("特別日として設定")
 
     def validate_date(self, date):
@@ -326,3 +408,52 @@ class RegistrationForm(FlaskForm):
         user = User.query.filter_by(username=username.data).first()
         if user:
             raise ValidationError('このユーザーIDは既に使用されています。')
+
+
+class DesiredWorkDaysRequestForm(FlaskForm):
+    """従業員用 希望勤務日数申請フォーム"""
+    min_days = IntegerField(
+        "最低希望勤務日数",
+        validators=[
+            DataRequired(message="入力必須です。"),
+            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
+        ]
+    )
+    max_days = IntegerField(
+        "最大希望勤務日数",
+        validators=[
+            DataRequired(message="入力必須です。"),
+            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
+        ]
+    )
+    submit = SubmitField("申請する")
+
+    def validate_max_days(self, max_days):
+        if self.min_days.data and max_days.data:
+            if self.min_days.data > max_days.data:
+                raise ValidationError('最大日数は最低日数以上である必要があります。')
+
+
+class AdminEditDesiredWorkDaysForm(FlaskForm):
+    """管理者用 希望勤務日数編集フォーム"""
+    min_days = IntegerField(
+        "最低希望勤務日数",
+        validators=[
+            DataRequired(message="入力必須です。"),
+            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
+        ]
+    )
+    max_days = IntegerField(
+        "最大希望勤務日数",
+        validators=[
+            DataRequired(message="入力必須です。"),
+            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
+        ]
+    )
+    submit = SubmitField("更新する")
+
+    def validate_max_days(self, max_days):
+        if self.min_days.data and max_days.data:
+            if self.min_days.data > max_days.data:
+                raise ValidationError('最大日数は最低日数以上である必要があります。')
+
