@@ -42,10 +42,20 @@
                         <hr>
                         <h5>制約と希望</h5>
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 {{ form.max_consecutive_work_days.label(class="form-label") }}
                                 {{ form.max_consecutive_work_days(class="form-control") }}
                                 {% if form.max_consecutive_work_days.errors %}<div class="invalid-feedback d-block">{% for error in form.max_consecutive_work_days.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.min_work_days.label(class="form-label") }}
+                                {{ form.min_work_days(class="form-control") }}
+                                {% if form.min_work_days.errors %}<div class="invalid-feedback d-block">{% for error in form.min_work_days.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.max_work_days.label(class="form-label") }}
+                                {{ form.max_work_days(class="form-control") }}
+                                {% if form.max_work_days.errors %}<div class="invalid-feedback d-block">{% for error in form.max_work_days.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                             </div>
                         </div>
                         <div class="row">
@@ -59,10 +69,17 @@
                                 {{ form.preferred_shift_2(class="form-select", id="preferred_shift_2") }}
                                 {% if form.preferred_shift_2.errors %}<div class="invalid-feedback d-block">{% for error in form.preferred_shift_2.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                             </div>
-                            <div class="col-md-4 mb-3">
-                                {{ form.preferred_night_shifts.label(class="form-label") }}
-                                {{ form.preferred_night_shifts(class="form-control") }}
-                                {% if form.preferred_night_shifts.errors %}<div class="invalid-feedback d-block">{% for error in form.preferred_night_shifts.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.min_night_shifts.label(class="form-label") }}
+                                {{ form.min_night_shifts(class="form-control") }}
+                                {% if form.min_night_shifts.errors %}<div class="invalid-feedback d-block">{% for error in form.min_night_shifts.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.max_night_shifts.label(class="form-label") }}
+                                {{ form.max_night_shifts(class="form-control") }}
+                                {% if form.max_night_shifts.errors %}<div class="invalid-feedback d-block">{% for error in form.max_night_shifts.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                             </div>
                         </div>
                         <div class="mb-3" id="ng_shifts_container">
@@ -102,29 +119,6 @@
                             {{ form.submit(class="btn btn-primary") }}
                         </div>
                     </form>
-
-                    <hr class="my-4">
-
-                    <!-- Form for Desired Work Days -->
-                    <form action="{{ url_for('admin.edit_employee', user_id=user.id) }}" method="post" novalidate>
-                        {{ dwd_form.hidden_tag() }}
-                        <h5>希望勤務日数の設定 ({{ dwd_year }}年{{ dwd_month }}月)</h5>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                {{ dwd_form.min_days.label(class="form-label") }}
-                                {{ dwd_form.min_days(class="form-control") }}
-                                {% if dwd_form.min_days.errors %}<div class="invalid-feedback d-block">{% for error in dwd_form.min_days.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                {{ dwd_form.max_days.label(class="form-label") }}
-                                {{ dwd_form.max_days(class="form-control") }}
-                                {% if dwd_form.max_days.errors %}<div class="invalid-feedback d-block">{% for error in dwd_form.max_days.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
-                            </div>
-                        </div>
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                             {{ dwd_form.submit(class="btn btn-primary") }}
-                        </div>
-                    </form>
                 </div>
                 <div class="card-footer">
                     <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">ダッシュボードに戻る</a>
@@ -158,10 +152,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 既存の選択値を取得しておく
-        const selectedNgShiftIds = Array.from(ngShiftsContainer.querySelectorAll('input:checked')).map(input => input.value);
-        const selectedPref1 = prefShift1Select.value;
-        const selectedPref2 = prefShift2Select.value;
+        // 選択肢を更新する前に、まずコンテナをクリアし、古い選択を破棄する
+        ngShiftsContainer.innerHTML = '<span class="text-muted">読み込み中...</span>';
         
         fetch('{{ url_for("admin.get_shift_choices", employment_type="__ET__") }}'.replace('__ET__', empType))
             .then(response => response.json())
@@ -176,11 +168,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.ng_shifts && data.ng_shifts.length > 0) {
                     data.ng_shifts.forEach(function(shift, index) {
                         const fieldId = `{{ form.ng_shifts.id }}-${index}`;
-                        // 以前に選択されていた項目であれば checked を付加
-                        const isChecked = selectedNgShiftIds.includes(String(shift.id));
                         ngShiftsHtml += `
                             <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" name="${ngShiftsName}" value="${shift.id}" id="${fieldId}" ${isChecked ? 'checked' : ''}>
+                                <input class="form-check-input" type="checkbox" name="${ngShiftsName}" value="${shift.id}" id="${fieldId}">
                                 <label class="form-check-label" for="${fieldId}">${shift.name}</label>
                             </div>
                         `;
@@ -198,13 +188,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 prefShift1Select.innerHTML = prefShiftsOptions;
                 prefShift2Select.innerHTML = prefShiftsOptions;
 
-                // 以前の選択値を復元（新しい選択肢の中に存在する場合のみ）
-                if (Array.from(prefShift1Select.options).some(opt => opt.value === selectedPref1)) {
-                    prefShift1Select.value = selectedPref1;
-                }
-                if (Array.from(prefShift2Select.options).some(opt => opt.value === selectedPref2)) {
-                    prefShift2Select.value = selectedPref2;
-                }
+                // 雇用形態を変更した際は、優先シフトの選択もリセットする
+                prefShift1Select.value = '';
+                prefShift2Select.value = '';
             })
             .catch(error => {
                 console.error('Failed to update shift choices:', error);

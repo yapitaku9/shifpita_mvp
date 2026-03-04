@@ -10,6 +10,13 @@ from app.models.work_request import WorkRequest
 import datetime
 
 
+def safe_int_coerce(x):
+    try:
+        return int(x)
+    except (ValueError, TypeError):
+        return None
+
+
 class LoginForm(FlaskForm):
     """ログインフォーム"""
     username = StringField(
@@ -67,17 +74,41 @@ class EmployeeForm(FlaskForm):
     )
     preferred_shift_1 = SelectField(
         "優先シフト1",
-        coerce=lambda x: int(x) if x else None,
+        coerce=safe_int_coerce,
         validators=[Optional()],
     )
     preferred_shift_2 = SelectField(
         "優先シフト2",
-        coerce=lambda x: int(x) if x else None,
+        coerce=safe_int_coerce,
         validators=[Optional()],
     )
-    preferred_night_shifts = IntegerField(
-        "夜勤希望回数",
-        validators=[Optional(), NumberRange(min=0, message="0以上の数値を入力してください。")]
+    min_work_days = IntegerField(
+        "最低希望勤務日数",
+        validators=[
+            Optional(),
+            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
+        ]
+    )
+    max_work_days = IntegerField(
+        "最大希望勤務日数",
+        validators=[
+            Optional(),
+            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
+        ]
+    )
+    min_night_shifts = IntegerField(
+        "最低夜勤日数",
+        validators=[
+            Optional(),
+            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
+        ]
+    )
+    max_night_shifts = IntegerField(
+        "最大夜勤日数",
+        validators=[
+            Optional(),
+            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
+        ]
     )
     ng_shifts = SelectMultipleField(
         "NG勤務",
@@ -87,6 +118,16 @@ class EmployeeForm(FlaskForm):
         option_widget=widgets.CheckboxInput()
     )
     submit = SubmitField("登録する")
+
+    def validate_max_work_days(self, max_work_days):
+        if self.min_work_days.data is not None and max_work_days.data is not None:
+            if self.min_work_days.data > max_work_days.data:
+                raise ValidationError('最大日数は最低日数以上である必要があります。')
+
+    def validate_max_night_shifts(self, max_night_shifts):
+        if self.min_night_shifts.data is not None and max_night_shifts.data is not None:
+            if self.min_night_shifts.data > max_night_shifts.data:
+                raise ValidationError('最大夜勤日数は最低夜勤日数以上である必要があります。')
 
     def __init__(self, original_username=None, original_email=None, employment_type=None, *args, **kwargs):
         super(EmployeeForm, self).__init__(*args, **kwargs)
@@ -110,6 +151,27 @@ class EmployeeForm(FlaskForm):
                 Optional(),
                 EqualTo('password', message='パスワードが一致しません。')
             ]
+
+    def validate(self, extra_validators=None):
+        """
+        Overrides the default validation to perform data cleansing before the
+        standard validators run.
+        """
+        # First, update choices based on the submitted employment_type.
+        if self.employment_type.data:
+            try:
+                emp_type = EmploymentType[self.employment_type.data]
+                self.set_shift_choices_by_employment(emp_type)
+            except (KeyError, TypeError):
+                pass
+
+        # Second, cleanse the ng_shifts data based on the updated choices.
+        if self.ng_shifts.data:
+            allowed_ids = {choice[0] for choice in self.ng_shifts.choices}
+            self.ng_shifts.data = [d for d in self.ng_shifts.data if d in allowed_ids]
+        
+        # Finally, call the parent's validate method.
+        return super(EmployeeForm, self).validate(extra_validators)
 
     def _update_shift_choices(self, employment_type):
         """雇用形態に応じてNG勤務・優先シフトの選択肢を更新"""
@@ -408,52 +470,4 @@ class RegistrationForm(FlaskForm):
         user = User.query.filter_by(username=username.data).first()
         if user:
             raise ValidationError('このユーザーIDは既に使用されています。')
-
-
-class DesiredWorkDaysRequestForm(FlaskForm):
-    """従業員用 希望勤務日数申請フォーム"""
-    min_days = IntegerField(
-        "最低希望勤務日数",
-        validators=[
-            DataRequired(message="入力必須です。"),
-            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
-        ]
-    )
-    max_days = IntegerField(
-        "最大希望勤務日数",
-        validators=[
-            DataRequired(message="入力必須です。"),
-            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
-        ]
-    )
-    submit = SubmitField("申請する")
-
-    def validate_max_days(self, max_days):
-        if self.min_days.data and max_days.data:
-            if self.min_days.data > max_days.data:
-                raise ValidationError('最大日数は最低日数以上である必要があります。')
-
-
-class AdminEditDesiredWorkDaysForm(FlaskForm):
-    """管理者用 希望勤務日数編集フォーム"""
-    min_days = IntegerField(
-        "最低希望勤務日数",
-        validators=[
-            DataRequired(message="入力必須です。"),
-            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
-        ]
-    )
-    max_days = IntegerField(
-        "最大希望勤務日数",
-        validators=[
-            DataRequired(message="入力必須です。"),
-            NumberRange(min=0, max=31, message="0から31の範囲で入力してください。")
-        ]
-    )
-    submit = SubmitField("更新する")
-
-    def validate_max_days(self, max_days):
-        if self.min_days.data and max_days.data:
-            if self.min_days.data > max_days.data:
-                raise ValidationError('最大日数は最低日数以上である必要があります。')
 

@@ -2,11 +2,10 @@ from flask import render_template, flash, redirect, url_for, Blueprint, request,
 from flask_login import login_required, current_user
 from sqlalchemy import and_
 from app import db
-from app.forms import DayOffRequestForm, WorkRequestForm, EmailEditForm, PasswordChangeForm, DesiredWorkDaysRequestForm
+from app.forms import DayOffRequestForm, WorkRequestForm, EmailEditForm, PasswordChangeForm
 from app.models.user import get_selectable_shift_choices, EmploymentType
 from app.models.day_off_request import DayOffRequest
 from app.models.work_request import WorkRequest
-from app.models.desired_work_days_request import DesiredWorkDaysRequest
 from app.models.shift import ShiftAssignment
 from app.models.master import ShiftType
 from app.email import send_email
@@ -150,18 +149,6 @@ def dashboard():
             .all()
         )
 
-    # 来月の希望勤務日数申請を取得
-    today = datetime.date.today()
-    first_day_of_current_month = today.replace(day=1)
-    first_day_of_next_month = (first_day_of_current_month + datetime.timedelta(days=32)).replace(day=1)
-    dwd_year = first_day_of_next_month.year
-    dwd_month = first_day_of_next_month.month
-    desired_work_days_request = DesiredWorkDaysRequest.query.filter_by(
-        user_id=current_user.id,
-        year=dwd_year,
-        month=dwd_month
-    ).first()
-
     return render_template(
         "employee/dashboard.html",
         title="従業員ダッシュボード",
@@ -172,9 +159,6 @@ def dashboard():
         work_requests=work_requests,
         shifts=shifts,
         shift_month_str=shift_month_str,
-        desired_work_days_request=desired_work_days_request,
-        dwd_year=dwd_year,
-        dwd_month=dwd_month,
     )
 
 
@@ -290,69 +274,4 @@ def change_password():
     
     return render_template("employee/change_password.html", title="パスワード変更", form=form)
 
-
-@employee_bp.route("/request_work_days", methods=["GET", "POST"])
-@login_required
-def request_desired_work_days():
-    """希望勤務日数を申請する"""
-    form = DesiredWorkDaysRequestForm()
-    
-    # 対象月（来月）を計算
-    today = datetime.date.today()
-    first_day_of_current_month = today.replace(day=1)
-    first_day_of_next_month = (first_day_of_current_month + datetime.timedelta(days=32)).replace(day=1)
-    target_year = first_day_of_next_month.year
-    target_month = first_day_of_next_month.month
-    
-    # 既存の申請を取得
-    existing_request = DesiredWorkDaysRequest.query.filter_by(
-        user_id=current_user.id,
-        year=target_year,
-        month=target_month
-    ).first()
-
-    if form.validate_on_submit():
-        try:
-            if existing_request:
-                # 既存の申請を更新
-                existing_request.min_days = form.min_days.data
-                existing_request.max_days = form.max_days.data
-                existing_request.status = 'pending' # 再申請されたらステータスを更新
-                flash(f'{target_year}年{target_month}月の希望勤務日数を更新しました。', 'success')
-            else:
-                # 新規申請を作成
-                new_request = DesiredWorkDaysRequest(
-                    user_id=current_user.id,
-                    year=target_year,
-                    month=target_month,
-                    min_days=form.min_days.data,
-                    max_days=form.max_days.data
-                )
-                db.session.add(new_request)
-                flash(f'{target_year}年{target_month}月の希望勤務日数を申請しました。', 'success')
-            
-            db.session.commit()
-            return redirect(url_for('employee.dashboard'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'エラーが発生しました: {e}', 'danger')
-
-    elif request.method == 'GET':
-        if existing_request:
-            form.min_days.data = existing_request.min_days
-            form.max_days.data = existing_request.max_days
-    
-    # バリデーション失敗時のエラー表示
-    if request.method == "POST":
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f"{getattr(form, field).label.text}: {error}", "danger")
-
-    return render_template(
-        'employee/request_work_days.html',
-        title='希望勤務日数の申請',
-        form=form,
-        year=target_year,
-        month=target_month
-    )
 

@@ -7,8 +7,8 @@ class DesiredWorkDaysRequest(db.Model):
     __tablename__ = "desired_work_days_requests"
 
     id = db.Column(db.Integer, primary_key=True)
-    min_days = db.Column(db.Integer, nullable=False)
-    max_days = db.Column(db.Integer, nullable=False)
+    min_days = db.Column(db.Integer, nullable=True)
+    max_days = db.Column(db.Integer, nullable=True)
     year = db.Column(db.Integer, nullable=False)
     month = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(20), default="pending", nullable=False) # pending, approved, rejected

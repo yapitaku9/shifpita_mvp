@@ -34,6 +34,17 @@ def get_selectable_shift_choices(employment_type, include_blank=False, coerce_in
     coerce_int=True の場合は (int, name) のタプル。
     exclude_kyu=True の場合は「休」を除外（NG勤務用）。
     """
+    if isinstance(employment_type, str):
+        try:
+            # Try to convert from enum member name string (e.g., 'PART_TIME_SHORT')
+            employment_type = EmploymentType[employment_type]
+        except KeyError:
+            # Try to convert from enum member value string (e.g., 'パート短時間勤務')
+            try:
+                employment_type = EmploymentType(employment_type)
+            except ValueError:
+                return [] # Invalid string, return empty list
+
     if employment_type is None:
         return []
 
@@ -81,9 +92,11 @@ class User(UserMixin, db.Model):
     employment_type = db.Column(db.Enum(EmploymentType), nullable=False, default=EmploymentType.FULL_TIME)
     
     # 希望・制約
-    desired_work_days = db.Column(db.Integer, nullable=True, default=20)  # 希望勤務日数
+    min_work_days = db.Column(db.Integer, nullable=True)  # 希望勤務日数（最小）
+    max_work_days = db.Column(db.Integer, nullable=True)  # 希望勤務日数（最大）
+    min_night_shifts = db.Column(db.Integer, nullable=True) # 夜勤日数（最小）
+    max_night_shifts = db.Column(db.Integer, nullable=True) # 夜勤日数（最大）
     ng_shifts = db.Column(db.String(255), nullable=True) # NG勤務 (ShiftTypeのIDをカンマ区切りで保存)
-    preferred_night_shifts = db.Column(db.Integer, nullable=True, default=0) # 夜勤希望回数
     preferred_shift_1_id = db.Column(db.Integer, db.ForeignKey('shift_types.shift_type_id'), nullable=True)
     preferred_shift_2_id = db.Column(db.Integer, db.ForeignKey('shift_types.shift_type_id'), nullable=True)
     max_consecutive_work_days = db.Column(db.Integer, nullable=True, default=5) # 連勤制限
