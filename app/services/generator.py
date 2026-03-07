@@ -49,6 +49,8 @@ class ShiftGenerator:
         # --- 時間帯別人員配置のためのグループ ---
         self.hourly_groups = {h: [] for h in range(24)}
         for st in self.shift_types_by_id.values():
+            if st.name in [self.SHIFT_KYU, self.SHIFT_AKE]:
+                continue
             if not st.start_time or not st.end_time:
                 continue
 
@@ -169,6 +171,14 @@ class ShiftGenerator:
             staff_increase = special_day_info.staff_increase if special_day_info else 0
 
             for key in hourly_req_keys:
+                # 時間帯ごとに staff_increase を決定する
+                staff_increase = 0
+                if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
+                    visit_hour = int(special_day_info.visit_time.split(':')[0])
+                    current_hour_str = key.split('_')[0][:2]
+                    if current_hour_str.isdigit() and int(current_hour_str) == visit_hour:
+                        staff_increase = special_day_info.staff_increase
+    
                 # 夜勤帯はハード制約、それ以外はソフト制約
                 if key == "2000_next_0700":
                     req_staff_count = self.constraints.get(f"min_staff_{day_type}_2000_next_0700", 2)
@@ -177,9 +187,9 @@ class ShiftGenerator:
                         actual_staff = pulp.lpSum(
                             x[emp["id"], d_str, s] for emp in employees_data for s in shifts_for_hour
                         )
-                        # ハード制約として等式で定義
+                        # ハード制約として等式で定義 (夜勤に通院者加算はしない)
                         prob += (
-                            actual_staff == req_staff_count + staff_increase,
+                            actual_staff == req_staff_count,
                             f"HardMinStaff_{day_type}_{key}_{d_str}",
                         )
                 else:
@@ -188,24 +198,24 @@ class ShiftGenerator:
                     shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
                     
                     if shifts_for_hour_with_offset:
-                        staff_terms = []
-                        for s_name, offset in shifts_for_hour_with_offset:
-                            if offset == 0:
-                                staff_terms.append(pulp.lpSum(x[emp["id"], d_str, s_name] for emp in employees_data))
-                            elif offset == 1 and d_idx > 0:
-                                prev_d_str = date_strs[d_idx-1]
-                                staff_terms.append(pulp.lpSum(x[emp["id"], prev_d_str, s_name] for emp in employees_data))
-                        
-                        actual_staff = pulp.lpSum(staff_terms)
-
-                        # 不足人数を表す変数を追加（ソフト制約）
-                        shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
-                        prob += (
-                            actual_staff + shortfall >= req_staff_count + staff_increase,
-                            f"SoftMinStaff_{day_type}_{key}_{d_str}",
-                        )
-                        # 目的関数に不足分に対する巨大なペナルティを追加
-                        objective_terms.append(shortfall * 10000000)
+                                staff_terms = []
+                                for s_name, offset in shifts_for_hour_with_offset:
+                                    if offset == 0:
+                                        staff_terms.append(pulp.lpSum(x[emp["id"], d_str, s_name] for emp in employees_data))
+                                    elif offset == 1 and d_idx > 0:
+                                        prev_d_str = date_strs[d_idx-1]
+                                        staff_terms.append(pulp.lpSum(x[emp["id"], prev_d_str, s_name] for emp in employees_data))
+                                
+                                actual_staff = pulp.lpSum(staff_terms)
+            
+                                # 不足人数を表す変数を追加（ソフト制約）
+                                shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
+                                prob += (
+                                    actual_staff + shortfall >= req_staff_count + staff_increase,
+                                    f"SoftMinStaff_{day_type}_{key}_{d_str}",
+                                )
+                                # 目的関数に不足分に対する巨大なペナルティを追加
+                                objective_terms.append(shortfall * 10000000)
 
         # 3.2 従業員ごとの制約 (従業員ごとのループ)
         for emp in employees_data:
@@ -455,8 +465,15 @@ class ShiftGenerator:
             current_date = date.fromisoformat(d_str)
             day_type = "sunday" if current_date.weekday() == 6 else "weekday"
             special_day_info = special_days_map.get(d_str)
-            staff_increase = special_day_info.staff_increase if special_day_info else 0
             for key in hourly_req_keys:
+                # 時間帯ごとに staff_increase を決定する
+                staff_increase = 0
+                if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
+                    visit_hour = int(special_day_info.visit_time.split(':')[0])
+                    current_hour_str = key.split('_')[0][:2]
+                    if current_hour_str.isdigit() and int(current_hour_str) == visit_hour:
+                        staff_increase = special_day_info.staff_increase
+
                 if key == "2000_next_0700":
                     continue  # 夜勤帯はハード制約で超過がないためスキップ
 
@@ -633,7 +650,7 @@ class ShiftGenerator:
             for emp in employees_data:
                 for d_str in date_strs:
                     for s_name in all_shift_names:
-                        if pulp.value(x[emp["id"], d_str, s_name]) == 1:
+                        if round(pulp.value(x[emp["id"], d_str, s_name])) == 1:
                             shift_type = self.shift_types_by_name.get(s_name)
                             if shift_type is not None:
                                 assignments_to_add.append(
