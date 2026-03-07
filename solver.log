@@ -2,41 +2,40 @@ Welcome to the CBC MILP Solver
 Version: 2.10.3 
 Build Date: Dec 15 2019 
 
-command line - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/7cce5fd6f1ee45c5b2baeefda0a89824-pulp.mps -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/7cce5fd6f1ee45c5b2baeefda0a89824-pulp.sol (default strategy 1)
+command line - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/360ea87cb9bf450bbff51bfbeaa10291-pulp.mps -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/360ea87cb9bf450bbff51bfbeaa10291-pulp.sol (default strategy 1)
 At line 2 NAME          MODEL
 At line 3 ROWS
 At line 13214 COLUMNS
-At line 236427 RHS
-At line 249637 BOUNDS
-At line 260747 ENDATA
-Problem MODEL has 13209 rows, 11109 columns and 198689 elements
+At line 236855 RHS
+At line 250065 BOUNDS
+At line 261175 ENDATA
+Problem MODEL has 13209 rows, 11109 columns and 198621 elements
 Coin0008I MODEL read with 0 errors
 Option for timeMode changed from cpu to elapsed
-Continuous objective value is 900 - 0.12 seconds
+Continuous objective value is 90 - 0.12 seconds
 Cgl0002I 6287 variables fixed
-Cgl0003I 72 fixed, 67 tightened bounds, 4932 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 1756 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 4242 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 4167 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 4115 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 3636 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 2362 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 1210 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 570 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 481 strengthened rows, 0 substitutions
-Cgl0004I processed model has 4603 rows, 3262 columns (3262 integer (3195 of which binary)) and 67096 elements
+Cgl0003I 72 fixed, 67 tightened bounds, 4899 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 1877 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 4254 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 4168 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 4108 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 3658 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 2301 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 1156 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 559 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 466 strengthened rows, 0 substitutions
+Cgl0004I processed model has 4603 rows, 3252 columns (3252 integer (3185 of which binary)) and 66966 elements
 Cutoff increment increased from 1e-05 to 0.9999
-Cbc0038I Initial state - 32 integers unsatisfied sum - 13.3333
-Cbc0038I Pass   1: (1.93 seconds) suminf.    0.00000 (0) obj. 900 iterations 467
-Cbc0038I Solution found of 900
-Cbc0038I Cleaned solution of 900
-Cbc0038I Before mini branch and bound, 3224 integers at bound fixed and 0 continuous
-Cbc0038I Mini branch and bound did not improve solution (1.94 seconds)
-Cbc0038I After 1.94 seconds - Feasibility pump exiting with objective of 900 - took 0.05 seconds
-Cbc0012I Integer solution of 900 found by feasibility pump after 0 iterations and 0 nodes (1.94 seconds)
-Cbc0001I Search completed - best objective 900, took 0 iterations and 0 nodes (1.95 seconds)
+Cbc0038I Initial state - 0 integers unsatisfied sum - 3.39728e-14
+Cbc0038I Solution found of 90
+Cbc0038I Cleaned solution of 90
+Cbc0038I Before mini branch and bound, 3252 integers at bound fixed and 0 continuous
+Cbc0038I Mini branch and bound did not improve solution (1.97 seconds)
+Cbc0038I After 1.97 seconds - Feasibility pump exiting with objective of 90 - took 0.02 seconds
+Cbc0012I Integer solution of 90 found by feasibility pump after 0 iterations and 0 nodes (1.97 seconds)
+Cbc0001I Search completed - best objective 90, took 0 iterations and 0 nodes (1.98 seconds)
 Cbc0035I Maximum depth 0, 0 variables fixed on reduced cost
-Cuts at root node changed objective from 900 to 900
+Cuts at root node changed objective from 90 to 90
 Probing was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
 Gomory was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
 Knapsack was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
@@ -48,12 +47,12 @@ ZeroHalf was tried 0 times and created 0 cuts of which 0 were active after addin
 
 Result - Optimal solution found
 
-Objective value:                900.00000000
+Objective value:                90.00000000
 Enumerated nodes:               0
 Total iterations:               0
-Time (CPU seconds):             1.83
-Time (Wallclock seconds):       2.06
+Time (CPU seconds):             1.87
+Time (Wallclock seconds):       2.09
 
 Option for printingOptions changed from normal to all
-Total time (CPU seconds):       1.93   (Wallclock seconds):       2.19
+Total time (CPU seconds):       1.96   (Wallclock seconds):       2.20
 

@@ -55,7 +55,12 @@ class ShiftGenerator:
             start_h = st.start_time.hour
             end_h = st.end_time.hour
 
-            if start_h < end_h:  # 日中シフト
+            # 「夜2」シフトを「完全翌日勤務」として特別扱いする
+            if "夜2" in st.name:
+                for h in range(start_h, end_h):
+                    # 常にオフセット1（翌日扱い）とする
+                    self.hourly_groups[h].append((st.name, 1))
+            elif start_h < end_h:  # 日中シフト
                 for h in range(start_h, end_h):
                     self.hourly_groups[h].append((st.name, 0))
             else:  # 夜勤など日をまたぐシフト

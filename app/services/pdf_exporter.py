@@ -32,7 +32,7 @@ class PDFExporter:
             return check_time >= shift_start or check_time < shift_end
 
     def generate(
-        self, year: int, month: int, employees: list, assignments: list, shift_types: dict
+        self, year: int, month: int, employees: list, assignments: list, shift_types: dict, hourly_groups: dict, highlight_cells: set
     ) -> bytes:
         """PDFを生成してバイト列として返します。
 
@@ -42,6 +42,8 @@ class PDFExporter:
             employees (list): 従業員リスト [{'id': 1, 'name': '...'}, ...]
             assignments (list): シフト割当 [{'date': 'YYYY-MM-DD', 'employee_id': 1, 'shift_type': '早1'}, ...]
             shift_types (dict): キーがシフト名、値がShiftTypeオブジェクトの辞書
+            hourly_groups (dict): キーが時間、値が(シフト名, オフセット)のタプルリストの辞書
+            highlight_cells (set): 文字色を赤くするセルの(user_id, date)タプルのセット
 
         Returns:
             bytes: PDFファイルのバイナリデータ
@@ -109,7 +111,7 @@ class PDFExporter:
                     work_days += 1
                 if shift_name == "有":
                     paid_holidays += 1
-                if shift_name == "休":
+                if shift_name in ["休", "明"]:
                     holidays += 1
                 if "夜" in shift_name:
                     night_shifts += 1
@@ -118,68 +120,55 @@ class PDFExporter:
             row = [emp["name"]] + row_shifts + [str(work_days), str(paid_holidays), str(total_work_days), str(holidays), str(night_shifts)]
             data.append(row)
 
-        # --- 集計行の作成 ---
-        # ハード制約で定義されているチェック時刻
-        constraint_hours = [7, 8, 9, 12, 13, 14, 16, 18, 19]
-        summary_labels = {h: f"{h:02d}:00時点" for h in constraint_hours}
-        summary_labels["night"] = "夜勤帯(20-7時)"
+        # --- 集計行の作成 (hourly_groups を参照する新ロジック) ---
         summary_counts = {
             label: {d: 0 for d in dates} for label in summary_labels.values()
         }
-
-        # 日付文字列とインデックスのマッピング
         date_to_idx = {d: i for i, d in enumerate(dates)}
+
+        # hourly_groups を逆引きしやすいように変形: { shift_name: { hour: offset, ... }, ... }
+        shift_to_hours_map = {}
+        if hourly_groups:
+            for hour, shifts_with_offset in hourly_groups.items():
+                for s_name, offset in shifts_with_offset:
+                    if s_name not in shift_to_hours_map:
+                        shift_to_hours_map[s_name] = {}
+                    shift_to_hours_map[s_name][hour] = offset
 
         for assignment in assignments:
             shift_name = assignment["shift_type"]
-            shift_type = shift_types.get(shift_name)
-            d_str = assignment["date"]
 
-            # 「休」と「明」は勤務時間がないため、集計から除外する
-            if shift_name in ["休", "明"]:
-                continue
-            
-            if not shift_type or not shift_type.start_time or not shift_type.end_time:
+            # 「休」「明」「有」は勤務時間がない、または人員配置に含めないため、カウントから除外する
+            if shift_name in ["休", "明", "有"]:
                 continue
 
-            # 夜勤帯ラベルのカウント
+            d_str = assignment["date"]  # シフトが割り当てられた日
+
+            # 夜勤帯ラベルのカウント (これは単純な名称ベースなので変更なし)
             if "夜" in shift_name:
                 summary_counts[summary_labels["night"]][d_str] += 1
 
-            # 時間帯別の人員数カウント
-            start_time = shift_type.start_time
-            end_time = shift_type.end_time
-
-            # 日またぎではないシフト (e.g., 07:00-16:00)
-            if start_time < end_time:
-                for hour in constraint_hours:
-                    interval_start = datetime.time(hour, 0)
-                    # constraint_hours は最大でも19なので、hour+1が24を超えることはない
-                    interval_end = datetime.time(hour + 1, 0)
-                    if start_time <= interval_start and end_time >= interval_end:
-                        summary_counts[summary_labels[hour]][d_str] += 1
-            # 日またぎシフト (e.g., 15:00-24:00 or 23:00-08:00)
-            else:
-                # 当日分のカウント
-                end_time_today = datetime.time(23, 59, 59) # 便宜上の「今日の終わり」
-                for hour in constraint_hours:
-                    interval_start = datetime.time(hour, 0)
-                    interval_end = datetime.time(hour + 1, 0)
-                    # 今日の勤務時間帯 [start_time, 24:00) が [hour:00, hour+1:00) を含むか
-                    if start_time <= interval_start and end_time_today >= interval_end:
-                        summary_counts[summary_labels[hour]][d_str] += 1
+            if shift_name not in shift_to_hours_map:
+                continue
+            
+            # このシフトが貢献する時間を hourly_groups から調べる
+            hours_with_offset = shift_to_hours_map[shift_name]
+            for hour, offset in hours_with_offset.items():
+                if hour not in constraint_hours:  # PDFで表示する時間帯でなければスキップ
+                    continue
                 
-                # 翌日分のカウント
-                current_date_idx = date_to_idx.get(d_str)
-                if current_date_idx is not None and current_date_idx + 1 < len(dates):
-                    next_d_str = dates[current_date_idx + 1]
-                    start_time_next_day = datetime.time(0, 0)
-                    for hour in constraint_hours:
-                        interval_start = datetime.time(hour, 0)
-                        interval_end = datetime.time(hour + 1, 0)
-                        # 翌日の勤務時間帯 [00:00, end_time) が [hour:00, hour+1:00) を含むか
-                        if start_time_next_day <= interval_start and end_time >= interval_end:
-                             summary_counts[summary_labels[hour]][next_d_str] += 1
+                target_date_str = None
+                if offset == 0:
+                    # 当日勤務
+                    target_date_str = d_str
+                elif offset == 1:
+                    # 翌日勤務
+                    current_date_idx = date_to_idx.get(d_str)
+                    if current_date_idx is not None and current_date_idx + 1 < len(dates):
+                        target_date_str = dates[current_date_idx + 1]
+
+                if target_date_str:
+                    summary_counts[summary_labels[hour]][target_date_str] += 1
 
         summary_rows = []
         for label in sorted(summary_labels.values()):
@@ -233,12 +222,20 @@ class PDFExporter:
         # シフトタイプに応じた色付け
         num_employees = len(employees)
         for row_idx in range(1, num_employees + 1):
+            user_id = employees[row_idx - 1]["id"]
             row_data = data[row_idx]
             for col_idx, cell_value in enumerate(row_data[1 : len(dates) + 1], start=1):
-                if "休" in cell_value:
-                    style.add("TEXTCOLOR", (col_idx, row_idx), (col_idx, row_idx), colors.red)
+                date_str = dates[col_idx - 1]
+
+                # 背景色の設定
+                if cell_value in ["休", "明", "有"]:
+                    style.add("BACKGROUND", (col_idx, row_idx), (col_idx, row_idx), colors.pink)
                 elif "夜" in cell_value:
                     style.add("BACKGROUND", (col_idx, row_idx), (col_idx, row_idx), colors.lightyellow)
+
+                # 希望が通った申請は文字色を赤にする
+                if (user_id, date_str) in highlight_cells:
+                    style.add("TEXTCOLOR", (col_idx, row_idx), (col_idx, row_idx), colors.red)
 
         table.setStyle(style)
         elements.append(table)

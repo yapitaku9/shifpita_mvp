@@ -1,3 +1,4 @@
+import calendar
 from flask import render_template, flash, redirect, url_for, Blueprint, request, current_app, send_from_directory, jsonify
 from flask_login import login_required, current_user
 from wtforms import BooleanField
@@ -184,9 +185,56 @@ def generate_shifts():
             all_shift_types = db.session.query(ShiftType).all()
             shift_types_map = {st.name: st for st in all_shift_types}
             
+            # --- PDF生成用に、希望が通った申請を特定する ---
+            start_date = datetime.date(year, month, 1)
+            last_day = calendar.monthrange(year, month)[1]
+            end_date = datetime.date(year, month, last_day)
+
+            # 承認済みの希望休と有給休暇を取得
+            day_off_reqs = {}
+            paid_leave_reqs = {}
+            approved_day_offs = DayOffRequest.query.filter(
+                DayOffRequest.date.between(start_date, end_date), DayOffRequest.status == "approved"
+            ).all()
+            for req in approved_day_offs:
+                if req.request_type == 'paid_leave':
+                    paid_leave_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
+                else: # 'day_off'
+                    day_off_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
+
+            # 承認済みの希望勤務を取得
+            work_req_map = {}
+            approved_work_reqs = WorkRequest.query.filter(
+                WorkRequest.date.between(start_date, end_date), WorkRequest.status == "approved"
+            ).all()
+            for req in approved_work_reqs:
+                shift_names = [st.name for st in req.shift_types]
+                if shift_names:
+                    work_req_map[(req.user_id, req.date.isoformat())] = shift_names
+            
+            # 実際に希望が叶ったセルを特定する
+            highlight_cells = set()
+            for assignment in assignments_for_pdf:
+                user_id = assignment["employee_id"]
+                date_str = assignment["date"]
+                shift_name = assignment["shift_type"]
+                
+                # 休日/有給申請が叶ったか
+                if date_str in day_off_reqs.get(user_id, []) and shift_name == "休":
+                    highlight_cells.add((user_id, date_str))
+                elif date_str in paid_leave_reqs.get(user_id, []) and shift_name == "有":
+                    highlight_cells.add((user_id, date_str))
+                
+                # 勤務申請が叶ったか
+                if (user_id, date_str) in work_req_map:
+                    if shift_name in work_req_map.get((user_id, date_str), []):
+                        highlight_cells.add((user_id, date_str))
+
             pdf_exporter = PDFExporter()
             pdf_data = pdf_exporter.generate(
-                year, month, employees_for_pdf, assignments_for_pdf, shift_types=shift_types_map
+                year, month, employees_for_pdf, assignments_for_pdf, 
+                shift_types=shift_types_map, hourly_groups=generator.hourly_groups,
+                highlight_cells=highlight_cells
             )
             
             # PDF保存
