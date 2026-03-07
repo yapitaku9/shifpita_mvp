@@ -230,11 +230,22 @@ def generate_shifts():
                     if shift_name in work_req_map.get((user_id, date_str), []):
                         highlight_cells.add((user_id, date_str))
 
+            # --- PDF生成用に、人員配置条件と特別日を取得 ---
+            constraints = {c.name: c.value for c in ShiftConstraint.query.all()}
+            
+            special_days_query = SpecialDay.query.filter(
+                db.extract('year', SpecialDay.date) == year,
+                db.extract('month', SpecialDay.date) == month
+            ).all()
+            special_days_map = {day.date.isoformat(): day for day in special_days_query}
+
             pdf_exporter = PDFExporter()
             pdf_data = pdf_exporter.generate(
                 year, month, employees_for_pdf, assignments_for_pdf, 
                 shift_types=shift_types_map, hourly_groups=generator.hourly_groups,
-                highlight_cells=highlight_cells
+                highlight_cells=highlight_cells,
+                staffing_requirements=constraints,
+                special_days=special_days_map
             )
             
             # PDF保存
