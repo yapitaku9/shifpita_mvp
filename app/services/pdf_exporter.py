@@ -79,7 +79,7 @@ class PDFExporter:
             day_part = d_str.split("-")[-1]
             header_date_cells.append(f"{day_part}\n({weekdays_ja[wd]})")
 
-        header_row = ["氏名"] + header_date_cells + ["出勤日数", "夜勤回数"]
+        header_row = ["氏名"] + header_date_cells + ["勤務日", "有給休暇", "総勤務日数", "休日", "夜勤日数"]
         data = [header_row]
 
         # --- 集計処理 ---
@@ -94,21 +94,28 @@ class PDFExporter:
 
         # 従業員ごとの行を作成
         for emp in employees:
-            work_days_count = 0
-            night_shift_count = 0
+            work_days = 0
+            paid_holidays = 0
+            holidays = 0
+            night_shifts = 0
             row_shifts = []
 
             for d in dates:
                 shift_name = assignment_map.get((emp["id"], d), "")
                 row_shifts.append(shift_name)
 
-                # 勤務日数と夜勤回数のカウント
-                if shift_name and shift_name not in ["休", "明"]:
-                    work_days_count += 1
+                # 新しい集計ロジック
+                if shift_name and shift_name not in ["有", "休", "明"]:
+                    work_days += 1
+                if shift_name == "有":
+                    paid_holidays += 1
+                if shift_name == "休":
+                    holidays += 1
                 if "夜" in shift_name:
-                    night_shift_count += 1
+                    night_shifts += 1
             
-            row = [emp["name"]] + row_shifts + [str(work_days_count), str(night_shift_count)]
+            total_work_days = work_days + paid_holidays
+            row = [emp["name"]] + row_shifts + [str(work_days), str(paid_holidays), str(total_work_days), str(holidays), str(night_shifts)]
             data.append(row)
 
         # --- 集計行の作成 ---
@@ -176,18 +183,18 @@ class PDFExporter:
 
         summary_rows = []
         for label in sorted(summary_labels.values()):
-            row = [label] + [str(summary_counts[label][d]) for d in dates] + ["", ""]
+            row = [label] + [str(summary_counts[label][d]) for d in dates] + ["", "", "", "", ""]
             summary_rows.append(row)
         data.extend(summary_rows)
 
         # テーブル作成
         page_width = landscape(A4)[0] - 60
-        total_units = 2.5 + len(dates) + 1.5 + 1.5
+        total_units = 2.5 + len(dates) + 5 # 5 summary columns
         unit_width = page_width / total_units
         col_widths = (
             [unit_width * 2.5]
             + [unit_width] * len(dates)
-            + [unit_width * 1.5, unit_width * 1.5]
+            + [unit_width] * 5
         )
         table = Table(data, colWidths=col_widths)
 
