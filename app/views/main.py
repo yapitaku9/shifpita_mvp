@@ -22,6 +22,10 @@ def index():
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     """ログインページ"""
+    # 管理者アカウントが1つもなければ、管理者登録ページにリダイレクト
+    if not db.session.query(User).filter_by(is_admin=True).first():
+        return redirect(url_for('main.register'))
+
     if current_user.is_authenticated:
         return redirect(url_for("main.index"))
 
@@ -49,8 +53,8 @@ def login():
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
     """管理者初回登録ページ"""
-    # 既にユーザーが存在する場合はログインページへリダイレクト
-    if db.session.query(User).first() is not None:
+    # 既に管理者アカウントが存在する場合はログインページへリダイレクト
+    if db.session.query(User).filter_by(is_admin=True).first() is not None:
         return redirect(url_for('main.login'))
 
     form = RegistrationForm()
