@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone, timedelta
 from flask import Flask
 from config import Config
 from flask_sqlalchemy import SQLAlchemy
@@ -26,6 +27,16 @@ login_manager.login_view = 'main.login'  # ログインが必要なページに�
 login_manager.login_message = "このページにアクセスするにはログインが必要です。"
 
 
+def to_jst(utc_dt):
+    """Jinja2 filter to convert a naive UTC datetime to JST."""
+    if utc_dt is None:
+        return ""
+    # Create a JST timezone object (UTC+9)
+    jst = timezone(timedelta(hours=9), 'JST')
+    # Assume the naive datetime is in UTC, make it timezone-aware, then convert to JST
+    return utc_dt.replace(tzinfo=timezone.utc).astimezone(jst)
+
+
 def create_app(test_config=None) -> Flask:
     """アプリケーションファクトリ関数。"""
     app = Flask(__name__, instance_relative_config=True)
@@ -45,6 +56,9 @@ def create_app(test_config=None) -> Flask:
     migrate.init_app(app, db, render_as_batch=True)  # Add render_as_batch=True
     login_manager.init_app(app)
     mail.init_app(app)
+
+    # Register custom Jinja filter
+    app.jinja_env.filters['jst'] = to_jst
 
     # Blueprintの登録
     from app.views import main, admin, employee

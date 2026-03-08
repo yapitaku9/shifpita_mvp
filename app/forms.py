@@ -297,6 +297,21 @@ class ShiftGenerationForm(FlaskForm):
     submit = SubmitField("シフトを生成")
 
 
+class ShiftConfirmationForm(FlaskForm):
+    """シフト確定フォーム"""
+    year = IntegerField(
+        "年",
+        validators=[DataRequired(), NumberRange(min=2024, max=2100)],
+        default=datetime.date.today().year
+    )
+    month = IntegerField(
+        "月",
+        validators=[DataRequired(), NumberRange(min=1, max=12)],
+        default=datetime.date.today().month
+    )
+    submit = SubmitField("この月のシフトを確定")
+
+
 def create_shift_constraint_form():
     """DBから制約を読み込み、動的にフォームクラスを生成するファクトリ関数"""
     from app.models.master import ShiftConstraint

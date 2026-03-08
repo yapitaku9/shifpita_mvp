@@ -1,403 +1,85 @@
-2026-03-07 21:14:39,162 - INFO - Shift generation started.
-2026-03-07 21:14:39,169 - INFO - Generating for 31 days.
-2026-03-07 21:14:39,189 - INFO - Processing 17 employees.
-2026-03-07 21:14:39,264 - INFO - PuLP problem initialized.
-2026-03-07 21:14:39,349 - DEBUG - Defining constraints for employee 2 (大和鈴子).
-2026-03-07 21:14:39,353 - DEBUG - Emp 2: max_consecutive=5
-2026-03-07 21:14:39,356 - DEBUG - Emp 2: max_consecutive_night=4
-2026-03-07 21:14:39,357 - DEBUG - Emp 2: max_consecutive_late_night=4
-2026-03-07 21:14:39,377 - DEBUG - Defining constraints for employee 3 (工藤麻紀子).
-2026-03-07 21:14:39,381 - DEBUG - Emp 3: max_consecutive=5
-2026-03-07 21:14:39,384 - DEBUG - Emp 3: max_consecutive_night=4
-2026-03-07 21:14:39,385 - DEBUG - Emp 3: max_consecutive_late_night=4
-2026-03-07 21:14:39,400 - DEBUG - Defining constraints for employee 4 (坂本好子).
-2026-03-07 21:14:39,404 - DEBUG - Emp 4: max_consecutive=5
-2026-03-07 21:14:39,407 - DEBUG - Emp 4: max_consecutive_night=4
-2026-03-07 21:14:39,408 - DEBUG - Emp 4: max_consecutive_late_night=4
-2026-03-07 21:14:39,424 - DEBUG - Defining constraints for employee 5 (清水翔太).
-2026-03-07 21:14:39,427 - DEBUG - Emp 5: max_consecutive=5
-2026-03-07 21:14:39,430 - DEBUG - Emp 5: max_consecutive_night=4
-2026-03-07 21:14:39,431 - DEBUG - Emp 5: max_consecutive_late_night=4
-2026-03-07 21:14:39,447 - DEBUG - Defining constraints for employee 6 (金子和代).
-2026-03-07 21:14:39,450 - DEBUG - Emp 6: max_consecutive=5
-2026-03-07 21:14:39,452 - DEBUG - Emp 6: max_consecutive_night=4
-2026-03-07 21:14:39,453 - DEBUG - Emp 6: max_consecutive_late_night=4
-2026-03-07 21:14:39,467 - DEBUG - Defining constraints for employee 7 (清水真寿美).
-2026-03-07 21:14:39,471 - DEBUG - Emp 7: max_consecutive=5
-2026-03-07 21:14:39,473 - DEBUG - Emp 7: max_consecutive_night=4
-2026-03-07 21:14:39,474 - DEBUG - Emp 7: max_consecutive_late_night=4
-2026-03-07 21:14:39,489 - DEBUG - Defining constraints for employee 8 (奥寺恵子).
-2026-03-07 21:14:39,492 - DEBUG - Emp 8: max_consecutive=4
-2026-03-07 21:14:39,494 - DEBUG - Emp 8: max_consecutive_night=4
-2026-03-07 21:14:39,495 - DEBUG - Emp 8: max_consecutive_late_night=4
-2026-03-07 21:14:39,498 - DEBUG - Defining constraints for employee 9 (大澤亜湖).
-2026-03-07 21:14:39,502 - DEBUG - Emp 9: max_consecutive=5
-2026-03-07 21:14:39,505 - DEBUG - Emp 9: max_consecutive_night=4
-2026-03-07 21:14:39,506 - DEBUG - Emp 9: max_consecutive_late_night=4
-2026-03-07 21:14:39,510 - DEBUG - Defining constraints for employee 10 (外浦千代美).
-2026-03-07 21:14:39,514 - DEBUG - Emp 10: max_consecutive=5
-2026-03-07 21:14:39,516 - DEBUG - Emp 10: max_consecutive_night=4
-2026-03-07 21:14:39,517 - DEBUG - Emp 10: max_consecutive_late_night=4
-2026-03-07 21:14:39,521 - DEBUG - Defining constraints for employee 11 (宇部順子).
-2026-03-07 21:14:39,524 - DEBUG - Emp 11: max_consecutive=5
-2026-03-07 21:14:39,527 - DEBUG - Emp 11: max_consecutive_night=4
-2026-03-07 21:14:39,528 - DEBUG - Emp 11: max_consecutive_late_night=4
-2026-03-07 21:14:39,531 - DEBUG - Defining constraints for employee 12 (大宮莉奈).
-2026-03-07 21:14:39,535 - DEBUG - Emp 12: max_consecutive=3
-2026-03-07 21:14:39,537 - DEBUG - Emp 12: max_consecutive_night=4
-2026-03-07 21:14:39,537 - DEBUG - Emp 12: max_consecutive_late_night=4
-2026-03-07 21:14:39,541 - DEBUG - Defining constraints for employee 13 (橋場由香).
-2026-03-07 21:14:39,544 - DEBUG - Emp 13: max_consecutive=5
-2026-03-07 21:14:39,547 - DEBUG - Emp 13: max_consecutive_night=4
-2026-03-07 21:14:39,548 - DEBUG - Emp 13: max_consecutive_late_night=4
-2026-03-07 21:14:39,551 - DEBUG - Defining constraints for employee 14 (大沢愛).
-2026-03-07 21:14:39,555 - DEBUG - Emp 14: max_consecutive=5
-2026-03-07 21:14:39,557 - DEBUG - Emp 14: max_consecutive_night=4
-2026-03-07 21:14:39,558 - DEBUG - Emp 14: max_consecutive_late_night=4
-2026-03-07 21:14:39,565 - DEBUG - Defining constraints for employee 15 (上戸鎖絵里).
-2026-03-07 21:14:39,569 - DEBUG - Emp 15: max_consecutive=3
-2026-03-07 21:14:39,571 - DEBUG - Emp 15: max_consecutive_night=4
-2026-03-07 21:14:39,572 - DEBUG - Emp 15: max_consecutive_late_night=4
-2026-03-07 21:14:39,576 - DEBUG - Defining constraints for employee 16 (中田秋子).
-2026-03-07 21:14:39,579 - DEBUG - Emp 16: max_consecutive=5
-2026-03-07 21:14:39,582 - DEBUG - Emp 16: max_consecutive_night=4
-2026-03-07 21:14:39,582 - DEBUG - Emp 16: max_consecutive_late_night=4
-2026-03-07 21:14:39,586 - DEBUG - Defining constraints for employee 17 (柏木あゆみ).
-2026-03-07 21:14:39,589 - DEBUG - Emp 17: max_consecutive=3
-2026-03-07 21:14:39,591 - DEBUG - Emp 17: max_consecutive_night=4
-2026-03-07 21:14:39,592 - DEBUG - Emp 17: max_consecutive_late_night=4
-2026-03-07 21:14:39,595 - DEBUG - Defining constraints for employee 18 (金城里子).
-2026-03-07 21:14:39,599 - DEBUG - Emp 18: max_consecutive=5
-2026-03-07 21:14:39,602 - DEBUG - Emp 18: max_consecutive_night=4
-2026-03-07 21:14:39,603 - DEBUG - Emp 18: max_consecutive_late_night=4
-2026-03-07 21:14:39,619 - INFO - Defining soft constraints.
-2026-03-07 21:14:39,755 - INFO - Solving problem...
-2026-03-07 21:14:40,602 - DEBUG - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/92b8c549d321475698e376458641f9a4-pulp.mps -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/92b8c549d321475698e376458641f9a4-pulp.sol 
-2026-03-07 21:14:44,086 - INFO - Solver finished with status: Optimal
-2026-03-07 21:14:44,087 - INFO - Analyzing results for constraint violations.
-2026-03-07 21:14:44,115 - INFO - Processing results.
-2026-03-07 21:14:44,123 - WARNING - Shift type '有' not in master; skipping DB save for emp 2 on 2026-03-02.
-2026-03-07 21:14:44,123 - WARNING - Shift type '有' not in master; skipping DB save for emp 2 on 2026-03-27.
-2026-03-07 21:14:44,125 - WARNING - Shift type '有' not in master; skipping DB save for emp 5 on 2026-03-29.
-2026-03-07 21:14:44,125 - WARNING - Shift type '有' not in master; skipping DB save for emp 6 on 2026-03-12.
-2026-03-07 21:14:44,126 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-07.
-2026-03-07 21:14:44,126 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-12.
-2026-03-07 21:14:44,126 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-16.
-2026-03-07 21:14:44,127 - WARNING - Shift type '有' not in master; skipping DB save for emp 8 on 2026-03-17.
-2026-03-07 21:14:44,127 - WARNING - Shift type '有' not in master; skipping DB save for emp 8 on 2026-03-28.
-2026-03-07 21:14:44,128 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-24.
-2026-03-07 21:14:44,128 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-25.
-2026-03-07 21:14:44,128 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-26.
-2026-03-07 21:14:44,129 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-27.
-2026-03-07 21:14:44,129 - WARNING - Shift type '有' not in master; skipping DB save for emp 11 on 2026-03-22.
-2026-03-07 21:14:44,130 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-06.
-2026-03-07 21:14:44,130 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-07.
-2026-03-07 21:14:44,130 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-09.
-2026-03-07 21:14:44,131 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-25.
-2026-03-07 21:14:44,134 - WARNING - Shift type '有' not in master; skipping DB save for emp 18 on 2026-03-19.
-2026-03-07 21:14:44,152 - INFO - Shift generation successful.
-2026-03-07 21:14:44,342 - INFO - 127.0.0.1 - - [07/Mar/2026 21:14:44] "[32mPOST /admin/generate HTTP/1.1[0m" 302 -
-2026-03-07 21:14:44,360 - INFO - 127.0.0.1 - - [07/Mar/2026 21:14:44] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:14:44,382 - INFO - 127.0.0.1 - - [07/Mar/2026 21:14:44] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:14:47,439 - INFO - 127.0.0.1 - - [07/Mar/2026 21:14:47] "GET /admin/download_pdf/133 HTTP/1.1" 200 -
-2026-03-07 21:19:00,716 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:00] "GET /admin/edit_employee/15 HTTP/1.1" 200 -
-2026-03-07 21:19:00,739 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:00] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:19:03,400 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:03] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:19:03,423 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:03] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:19:07,447 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:07] "GET /admin/edit_employee/16 HTTP/1.1" 200 -
-2026-03-07 21:19:07,471 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:07] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:19:34,909 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:34] "[32mPOST /admin/edit_employee/16 HTTP/1.1[0m" 302 -
-2026-03-07 21:19:34,928 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:34] "GET /admin/edit_employee/16 HTTP/1.1" 200 -
-2026-03-07 21:19:34,959 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:34] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:19:40,783 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:40] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:19:40,804 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:40] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:19:46,261 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:46] "GET /admin/edit_employee/10 HTTP/1.1" 200 -
-2026-03-07 21:19:46,282 - INFO - 127.0.0.1 - - [07/Mar/2026 21:19:46] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:20:16,919 - INFO - 127.0.0.1 - - [07/Mar/2026 21:20:16] "[32mPOST /admin/edit_employee/10 HTTP/1.1[0m" 302 -
-2026-03-07 21:20:16,944 - INFO - 127.0.0.1 - - [07/Mar/2026 21:20:16] "GET /admin/edit_employee/10 HTTP/1.1" 200 -
-2026-03-07 21:20:16,966 - INFO - 127.0.0.1 - - [07/Mar/2026 21:20:16] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:20:19,679 - INFO - 127.0.0.1 - - [07/Mar/2026 21:20:19] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:20:19,701 - INFO - 127.0.0.1 - - [07/Mar/2026 21:20:19] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:20:26,891 - INFO - 127.0.0.1 - - [07/Mar/2026 21:20:26] "GET /admin/edit_employee/12 HTTP/1.1" 200 -
-2026-03-07 21:20:26,917 - INFO - 127.0.0.1 - - [07/Mar/2026 21:20:26] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:21:01,833 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:01] "[32mPOST /admin/edit_employee/12 HTTP/1.1[0m" 302 -
-2026-03-07 21:21:01,858 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:01] "GET /admin/edit_employee/12 HTTP/1.1" 200 -
-2026-03-07 21:21:01,885 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:01] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:21:04,382 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:04] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:21:04,409 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:04] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:21:07,563 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:07] "GET /admin/edit_employee/14 HTTP/1.1" 200 -
-2026-03-07 21:21:07,585 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:07] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:21:57,323 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:57] "[32mPOST /admin/edit_employee/14 HTTP/1.1[0m" 302 -
-2026-03-07 21:21:57,345 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:57] "GET /admin/edit_employee/14 HTTP/1.1" 200 -
-2026-03-07 21:21:57,370 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:57] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:21:59,856 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:59] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:21:59,879 - INFO - 127.0.0.1 - - [07/Mar/2026 21:21:59] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:22:03,655 - INFO - 127.0.0.1 - - [07/Mar/2026 21:22:03] "GET /admin/edit_employee/9 HTTP/1.1" 200 -
-2026-03-07 21:22:03,683 - INFO - 127.0.0.1 - - [07/Mar/2026 21:22:03] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:22:25,546 - INFO - 127.0.0.1 - - [07/Mar/2026 21:22:25] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:22:25,575 - INFO - 127.0.0.1 - - [07/Mar/2026 21:22:25] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:22:32,670 - INFO - 127.0.0.1 - - [07/Mar/2026 21:22:32] "GET /admin/edit_employee/8 HTTP/1.1" 200 -
-2026-03-07 21:22:32,692 - INFO - 127.0.0.1 - - [07/Mar/2026 21:22:32] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:23:45,706 - INFO - 127.0.0.1 - - [07/Mar/2026 21:23:45] "[32mPOST /admin/edit_employee/8 HTTP/1.1[0m" 302 -
-2026-03-07 21:23:45,725 - INFO - 127.0.0.1 - - [07/Mar/2026 21:23:45] "GET /admin/edit_employee/8 HTTP/1.1" 200 -
-2026-03-07 21:23:45,749 - INFO - 127.0.0.1 - - [07/Mar/2026 21:23:45] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:23:48,353 - INFO - 127.0.0.1 - - [07/Mar/2026 21:23:48] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:23:48,375 - INFO - 127.0.0.1 - - [07/Mar/2026 21:23:48] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:23:52,206 - INFO - 127.0.0.1 - - [07/Mar/2026 21:23:52] "GET /admin/edit_employee/11 HTTP/1.1" 200 -
-2026-03-07 21:23:52,235 - INFO - 127.0.0.1 - - [07/Mar/2026 21:23:52] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:24:24,723 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:24] "[32mPOST /admin/edit_employee/11 HTTP/1.1[0m" 302 -
-2026-03-07 21:24:24,742 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:24] "GET /admin/edit_employee/11 HTTP/1.1" 200 -
-2026-03-07 21:24:24,769 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:24] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:24:27,368 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:27] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:24:27,394 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:27] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:24:42,098 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:42] "GET /admin/edit_employee/17 HTTP/1.1" 200 -
-2026-03-07 21:24:42,121 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:42] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:24:49,075 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:49] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:24:49,104 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:49] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:24:53,239 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:53] "GET /admin/edit_employee/13 HTTP/1.1" 200 -
-2026-03-07 21:24:53,266 - INFO - 127.0.0.1 - - [07/Mar/2026 21:24:53] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:25:22,255 - INFO - 127.0.0.1 - - [07/Mar/2026 21:25:22] "[32mPOST /admin/edit_employee/13 HTTP/1.1[0m" 302 -
-2026-03-07 21:25:22,274 - INFO - 127.0.0.1 - - [07/Mar/2026 21:25:22] "GET /admin/edit_employee/13 HTTP/1.1" 200 -
-2026-03-07 21:25:22,298 - INFO - 127.0.0.1 - - [07/Mar/2026 21:25:22] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:25:25,001 - INFO - 127.0.0.1 - - [07/Mar/2026 21:25:25] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:25:25,026 - INFO - 127.0.0.1 - - [07/Mar/2026 21:25:25] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:25:36,131 - INFO - Shift generation started.
-2026-03-07 21:25:36,135 - INFO - Generating for 31 days.
-2026-03-07 21:25:36,141 - INFO - Processing 17 employees.
-2026-03-07 21:25:36,212 - INFO - PuLP problem initialized.
-2026-03-07 21:25:36,282 - DEBUG - Defining constraints for employee 2 (大和鈴子).
-2026-03-07 21:25:36,285 - DEBUG - Emp 2: max_consecutive=5
-2026-03-07 21:25:36,287 - DEBUG - Emp 2: max_consecutive_night=4
-2026-03-07 21:25:36,287 - DEBUG - Emp 2: max_consecutive_late_night=4
-2026-03-07 21:25:36,301 - DEBUG - Defining constraints for employee 3 (工藤麻紀子).
-2026-03-07 21:25:36,304 - DEBUG - Emp 3: max_consecutive=5
-2026-03-07 21:25:36,306 - DEBUG - Emp 3: max_consecutive_night=4
-2026-03-07 21:25:36,307 - DEBUG - Emp 3: max_consecutive_late_night=4
-2026-03-07 21:25:36,320 - DEBUG - Defining constraints for employee 4 (坂本好子).
-2026-03-07 21:25:36,323 - DEBUG - Emp 4: max_consecutive=5
-2026-03-07 21:25:36,326 - DEBUG - Emp 4: max_consecutive_night=4
-2026-03-07 21:25:36,326 - DEBUG - Emp 4: max_consecutive_late_night=4
-2026-03-07 21:25:36,343 - DEBUG - Defining constraints for employee 5 (清水翔太).
-2026-03-07 21:25:36,347 - DEBUG - Emp 5: max_consecutive=5
-2026-03-07 21:25:36,349 - DEBUG - Emp 5: max_consecutive_night=4
-2026-03-07 21:25:36,350 - DEBUG - Emp 5: max_consecutive_late_night=4
-2026-03-07 21:25:36,364 - DEBUG - Defining constraints for employee 6 (金子和代).
-2026-03-07 21:25:36,367 - DEBUG - Emp 6: max_consecutive=5
-2026-03-07 21:25:36,369 - DEBUG - Emp 6: max_consecutive_night=4
-2026-03-07 21:25:36,370 - DEBUG - Emp 6: max_consecutive_late_night=4
-2026-03-07 21:25:36,384 - DEBUG - Defining constraints for employee 7 (清水真寿美).
-2026-03-07 21:25:36,386 - DEBUG - Emp 7: max_consecutive=5
-2026-03-07 21:25:36,389 - DEBUG - Emp 7: max_consecutive_night=4
-2026-03-07 21:25:36,390 - DEBUG - Emp 7: max_consecutive_late_night=4
-2026-03-07 21:25:36,403 - DEBUG - Defining constraints for employee 8 (奥寺恵子).
-2026-03-07 21:25:36,406 - DEBUG - Emp 8: max_consecutive=4
-2026-03-07 21:25:36,408 - DEBUG - Emp 8: max_consecutive_night=4
-2026-03-07 21:25:36,408 - DEBUG - Emp 8: max_consecutive_late_night=4
-2026-03-07 21:25:36,412 - DEBUG - Defining constraints for employee 9 (大澤亜湖).
-2026-03-07 21:25:36,415 - DEBUG - Emp 9: max_consecutive=5
-2026-03-07 21:25:36,417 - DEBUG - Emp 9: max_consecutive_night=4
-2026-03-07 21:25:36,418 - DEBUG - Emp 9: max_consecutive_late_night=4
-2026-03-07 21:25:36,421 - DEBUG - Defining constraints for employee 10 (外浦千代美).
-2026-03-07 21:25:36,424 - DEBUG - Emp 10: max_consecutive=5
-2026-03-07 21:25:36,427 - DEBUG - Emp 10: max_consecutive_night=4
-2026-03-07 21:25:36,428 - DEBUG - Emp 10: max_consecutive_late_night=4
-2026-03-07 21:25:36,431 - DEBUG - Defining constraints for employee 11 (宇部順子).
-2026-03-07 21:25:36,434 - DEBUG - Emp 11: max_consecutive=5
-2026-03-07 21:25:36,437 - DEBUG - Emp 11: max_consecutive_night=4
-2026-03-07 21:25:36,437 - DEBUG - Emp 11: max_consecutive_late_night=4
-2026-03-07 21:25:36,440 - DEBUG - Defining constraints for employee 12 (大宮莉奈).
-2026-03-07 21:25:36,443 - DEBUG - Emp 12: max_consecutive=3
-2026-03-07 21:25:36,445 - DEBUG - Emp 12: max_consecutive_night=4
-2026-03-07 21:25:36,446 - DEBUG - Emp 12: max_consecutive_late_night=4
-2026-03-07 21:25:36,449 - DEBUG - Defining constraints for employee 13 (橋場由香).
-2026-03-07 21:25:36,452 - DEBUG - Emp 13: max_consecutive=5
-2026-03-07 21:25:36,454 - DEBUG - Emp 13: max_consecutive_night=4
-2026-03-07 21:25:36,455 - DEBUG - Emp 13: max_consecutive_late_night=4
-2026-03-07 21:25:36,458 - DEBUG - Defining constraints for employee 14 (大沢愛).
-2026-03-07 21:25:36,461 - DEBUG - Emp 14: max_consecutive=5
-2026-03-07 21:25:36,464 - DEBUG - Emp 14: max_consecutive_night=4
-2026-03-07 21:25:36,465 - DEBUG - Emp 14: max_consecutive_late_night=4
-2026-03-07 21:25:36,468 - DEBUG - Defining constraints for employee 15 (上戸鎖絵里).
-2026-03-07 21:25:36,471 - DEBUG - Emp 15: max_consecutive=3
-2026-03-07 21:25:36,473 - DEBUG - Emp 15: max_consecutive_night=4
-2026-03-07 21:25:36,473 - DEBUG - Emp 15: max_consecutive_late_night=4
-2026-03-07 21:25:36,476 - DEBUG - Defining constraints for employee 16 (中田秋子).
-2026-03-07 21:25:36,480 - DEBUG - Emp 16: max_consecutive=5
-2026-03-07 21:25:36,482 - DEBUG - Emp 16: max_consecutive_night=4
-2026-03-07 21:25:36,483 - DEBUG - Emp 16: max_consecutive_late_night=4
-2026-03-07 21:25:36,487 - DEBUG - Defining constraints for employee 17 (柏木あゆみ).
-2026-03-07 21:25:36,490 - DEBUG - Emp 17: max_consecutive=3
-2026-03-07 21:25:36,492 - DEBUG - Emp 17: max_consecutive_night=4
-2026-03-07 21:25:36,492 - DEBUG - Emp 17: max_consecutive_late_night=4
-2026-03-07 21:25:36,496 - DEBUG - Defining constraints for employee 18 (金城里子).
-2026-03-07 21:25:36,499 - DEBUG - Emp 18: max_consecutive=5
-2026-03-07 21:25:36,501 - DEBUG - Emp 18: max_consecutive_night=4
-2026-03-07 21:25:36,501 - DEBUG - Emp 18: max_consecutive_late_night=4
-2026-03-07 21:25:36,514 - INFO - Defining soft constraints.
-2026-03-07 21:25:36,635 - INFO - Solving problem...
-2026-03-07 21:25:37,502 - DEBUG - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/77b6b0284e5c41de8301544f74fd0ac2-pulp.mps -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/77b6b0284e5c41de8301544f74fd0ac2-pulp.sol 
-2026-03-07 21:25:40,933 - INFO - Solver finished with status: Optimal
-2026-03-07 21:25:40,933 - INFO - Analyzing results for constraint violations.
-2026-03-07 21:25:40,958 - INFO - Processing results.
-2026-03-07 21:25:40,963 - WARNING - Shift type '有' not in master; skipping DB save for emp 2 on 2026-03-02.
-2026-03-07 21:25:40,963 - WARNING - Shift type '有' not in master; skipping DB save for emp 2 on 2026-03-27.
-2026-03-07 21:25:40,965 - WARNING - Shift type '有' not in master; skipping DB save for emp 5 on 2026-03-29.
-2026-03-07 21:25:40,965 - WARNING - Shift type '有' not in master; skipping DB save for emp 6 on 2026-03-12.
-2026-03-07 21:25:40,966 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-07.
-2026-03-07 21:25:40,966 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-12.
-2026-03-07 21:25:40,966 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-16.
-2026-03-07 21:25:40,967 - WARNING - Shift type '有' not in master; skipping DB save for emp 8 on 2026-03-17.
-2026-03-07 21:25:40,967 - WARNING - Shift type '有' not in master; skipping DB save for emp 8 on 2026-03-28.
-2026-03-07 21:25:40,968 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-24.
-2026-03-07 21:25:40,969 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-25.
-2026-03-07 21:25:40,969 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-26.
-2026-03-07 21:25:40,969 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-27.
-2026-03-07 21:25:40,969 - WARNING - Shift type '有' not in master; skipping DB save for emp 11 on 2026-03-22.
-2026-03-07 21:25:40,970 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-06.
-2026-03-07 21:25:40,970 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-07.
-2026-03-07 21:25:40,970 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-09.
-2026-03-07 21:25:40,971 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-25.
-2026-03-07 21:25:40,975 - WARNING - Shift type '有' not in master; skipping DB save for emp 18 on 2026-03-19.
-2026-03-07 21:25:40,987 - INFO - Shift generation successful.
-2026-03-07 21:25:41,099 - INFO - 127.0.0.1 - - [07/Mar/2026 21:25:41] "[32mPOST /admin/generate HTTP/1.1[0m" 302 -
-2026-03-07 21:25:41,114 - INFO - 127.0.0.1 - - [07/Mar/2026 21:25:41] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:25:41,136 - INFO - 127.0.0.1 - - [07/Mar/2026 21:25:41] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:25:43,249 - INFO - 127.0.0.1 - - [07/Mar/2026 21:25:43] "GET /admin/download_pdf/134 HTTP/1.1" 200 -
-2026-03-07 21:27:11,609 - INFO - 127.0.0.1 - - [07/Mar/2026 21:27:11] "GET /admin/constraints HTTP/1.1" 200 -
-2026-03-07 21:27:11,625 - INFO - 127.0.0.1 - - [07/Mar/2026 21:27:11] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:36:43,238 - INFO - 127.0.0.1 - - [07/Mar/2026 21:36:43] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:36:43,261 - INFO - 127.0.0.1 - - [07/Mar/2026 21:36:43] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:36:48,180 - INFO - 127.0.0.1 - - [07/Mar/2026 21:36:48] "GET /admin/edit_employee/2 HTTP/1.1" 200 -
-2026-03-07 21:36:48,202 - INFO - 127.0.0.1 - - [07/Mar/2026 21:36:48] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:36:53,106 - INFO - 127.0.0.1 - - [07/Mar/2026 21:36:53] "[32mPOST /admin/edit_employee/2 HTTP/1.1[0m" 302 -
-2026-03-07 21:36:53,125 - INFO - 127.0.0.1 - - [07/Mar/2026 21:36:53] "GET /admin/edit_employee/2 HTTP/1.1" 200 -
-2026-03-07 21:36:53,148 - INFO - 127.0.0.1 - - [07/Mar/2026 21:36:53] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:36:55,256 - INFO - 127.0.0.1 - - [07/Mar/2026 21:36:55] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:36:55,279 - INFO - 127.0.0.1 - - [07/Mar/2026 21:36:55] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:06,001 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:06] "GET /admin/edit_employee/11 HTTP/1.1" 200 -
-2026-03-07 21:37:06,029 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:06] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:13,438 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:13] "[32mPOST /admin/edit_employee/11 HTTP/1.1[0m" 302 -
-2026-03-07 21:37:13,458 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:13] "GET /admin/edit_employee/11 HTTP/1.1" 200 -
-2026-03-07 21:37:13,483 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:13] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:15,716 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:15] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:37:15,742 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:15] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:22,299 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:22] "GET /admin/edit_employee/10 HTTP/1.1" 200 -
-2026-03-07 21:37:22,323 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:22] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:31,423 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:31] "[32mPOST /admin/edit_employee/10 HTTP/1.1[0m" 302 -
-2026-03-07 21:37:31,442 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:31] "GET /admin/edit_employee/10 HTTP/1.1" 200 -
-2026-03-07 21:37:31,467 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:31] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:34,303 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:34] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:37:34,331 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:34] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:38,222 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:38] "GET /admin/edit_employee/8 HTTP/1.1" 200 -
-2026-03-07 21:37:38,244 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:38] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:41,082 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:41] "[32mPOST /admin/edit_employee/8 HTTP/1.1[0m" 302 -
-2026-03-07 21:37:41,100 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:41] "GET /admin/edit_employee/8 HTTP/1.1" 200 -
-2026-03-07 21:37:41,123 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:41] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:43,247 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:43] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:37:43,272 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:43] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:49,190 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:49] "GET /admin/edit_employee/9 HTTP/1.1" 200 -
-2026-03-07 21:37:49,218 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:49] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:52,786 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:52] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:37:52,818 - INFO - 127.0.0.1 - - [07/Mar/2026 21:37:52] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:37:56,299 - INFO - Shift generation started.
-2026-03-07 21:37:56,301 - INFO - Generating for 31 days.
-2026-03-07 21:37:56,309 - INFO - Processing 17 employees.
-2026-03-07 21:37:56,379 - INFO - PuLP problem initialized.
-2026-03-07 21:37:56,449 - DEBUG - Defining constraints for employee 2 (大和鈴子).
-2026-03-07 21:37:56,452 - DEBUG - Emp 2: max_consecutive=5
-2026-03-07 21:37:56,455 - DEBUG - Emp 2: max_consecutive_night=4
-2026-03-07 21:37:56,455 - DEBUG - Emp 2: max_consecutive_late_night=4
-2026-03-07 21:37:56,469 - DEBUG - Defining constraints for employee 3 (工藤麻紀子).
-2026-03-07 21:37:56,472 - DEBUG - Emp 3: max_consecutive=5
-2026-03-07 21:37:56,475 - DEBUG - Emp 3: max_consecutive_night=4
-2026-03-07 21:37:56,476 - DEBUG - Emp 3: max_consecutive_late_night=4
-2026-03-07 21:37:56,490 - DEBUG - Defining constraints for employee 4 (坂本好子).
-2026-03-07 21:37:56,493 - DEBUG - Emp 4: max_consecutive=5
-2026-03-07 21:37:56,495 - DEBUG - Emp 4: max_consecutive_night=4
-2026-03-07 21:37:56,496 - DEBUG - Emp 4: max_consecutive_late_night=4
-2026-03-07 21:37:56,509 - DEBUG - Defining constraints for employee 5 (清水翔太).
-2026-03-07 21:37:56,512 - DEBUG - Emp 5: max_consecutive=5
-2026-03-07 21:37:56,515 - DEBUG - Emp 5: max_consecutive_night=4
-2026-03-07 21:37:56,516 - DEBUG - Emp 5: max_consecutive_late_night=4
-2026-03-07 21:37:56,530 - DEBUG - Defining constraints for employee 6 (金子和代).
-2026-03-07 21:37:56,533 - DEBUG - Emp 6: max_consecutive=5
-2026-03-07 21:37:56,535 - DEBUG - Emp 6: max_consecutive_night=4
-2026-03-07 21:37:56,535 - DEBUG - Emp 6: max_consecutive_late_night=4
-2026-03-07 21:37:56,549 - DEBUG - Defining constraints for employee 7 (清水真寿美).
-2026-03-07 21:37:56,552 - DEBUG - Emp 7: max_consecutive=5
-2026-03-07 21:37:56,555 - DEBUG - Emp 7: max_consecutive_night=4
-2026-03-07 21:37:56,556 - DEBUG - Emp 7: max_consecutive_late_night=4
-2026-03-07 21:37:56,569 - DEBUG - Defining constraints for employee 8 (奥寺恵子).
-2026-03-07 21:37:56,572 - DEBUG - Emp 8: max_consecutive=4
-2026-03-07 21:37:56,574 - DEBUG - Emp 8: max_consecutive_night=4
-2026-03-07 21:37:56,575 - DEBUG - Emp 8: max_consecutive_late_night=4
-2026-03-07 21:37:56,578 - DEBUG - Defining constraints for employee 9 (大澤亜湖).
-2026-03-07 21:37:56,580 - DEBUG - Emp 9: max_consecutive=5
-2026-03-07 21:37:56,583 - DEBUG - Emp 9: max_consecutive_night=4
-2026-03-07 21:37:56,583 - DEBUG - Emp 9: max_consecutive_late_night=4
-2026-03-07 21:37:56,586 - DEBUG - Defining constraints for employee 10 (外浦千代美).
-2026-03-07 21:37:56,590 - DEBUG - Emp 10: max_consecutive=5
-2026-03-07 21:37:56,593 - DEBUG - Emp 10: max_consecutive_night=4
-2026-03-07 21:37:56,593 - DEBUG - Emp 10: max_consecutive_late_night=4
-2026-03-07 21:37:56,596 - DEBUG - Defining constraints for employee 11 (宇部順子).
-2026-03-07 21:37:56,599 - DEBUG - Emp 11: max_consecutive=5
-2026-03-07 21:37:56,601 - DEBUG - Emp 11: max_consecutive_night=4
-2026-03-07 21:37:56,602 - DEBUG - Emp 11: max_consecutive_late_night=4
-2026-03-07 21:37:56,609 - DEBUG - Defining constraints for employee 12 (大宮莉奈).
-2026-03-07 21:37:56,612 - DEBUG - Emp 12: max_consecutive=3
-2026-03-07 21:37:56,614 - DEBUG - Emp 12: max_consecutive_night=4
-2026-03-07 21:37:56,615 - DEBUG - Emp 12: max_consecutive_late_night=4
-2026-03-07 21:37:56,618 - DEBUG - Defining constraints for employee 13 (橋場由香).
-2026-03-07 21:37:56,622 - DEBUG - Emp 13: max_consecutive=5
-2026-03-07 21:37:56,624 - DEBUG - Emp 13: max_consecutive_night=4
-2026-03-07 21:37:56,625 - DEBUG - Emp 13: max_consecutive_late_night=4
-2026-03-07 21:37:56,628 - DEBUG - Defining constraints for employee 14 (大沢愛).
-2026-03-07 21:37:56,632 - DEBUG - Emp 14: max_consecutive=5
-2026-03-07 21:37:56,634 - DEBUG - Emp 14: max_consecutive_night=4
-2026-03-07 21:37:56,635 - DEBUG - Emp 14: max_consecutive_late_night=4
-2026-03-07 21:37:56,638 - DEBUG - Defining constraints for employee 15 (上戸鎖絵里).
-2026-03-07 21:37:56,641 - DEBUG - Emp 15: max_consecutive=3
-2026-03-07 21:37:56,643 - DEBUG - Emp 15: max_consecutive_night=4
-2026-03-07 21:37:56,643 - DEBUG - Emp 15: max_consecutive_late_night=4
-2026-03-07 21:37:56,647 - DEBUG - Defining constraints for employee 16 (中田秋子).
-2026-03-07 21:37:56,649 - DEBUG - Emp 16: max_consecutive=5
-2026-03-07 21:37:56,653 - DEBUG - Emp 16: max_consecutive_night=4
-2026-03-07 21:37:56,654 - DEBUG - Emp 16: max_consecutive_late_night=4
-2026-03-07 21:37:56,657 - DEBUG - Defining constraints for employee 17 (柏木あゆみ).
-2026-03-07 21:37:56,661 - DEBUG - Emp 17: max_consecutive=3
-2026-03-07 21:37:56,662 - DEBUG - Emp 17: max_consecutive_night=4
-2026-03-07 21:37:56,664 - DEBUG - Emp 17: max_consecutive_late_night=4
-2026-03-07 21:37:56,667 - DEBUG - Defining constraints for employee 18 (金城里子).
-2026-03-07 21:37:56,670 - DEBUG - Emp 18: max_consecutive=5
-2026-03-07 21:37:56,673 - DEBUG - Emp 18: max_consecutive_night=4
-2026-03-07 21:37:56,673 - DEBUG - Emp 18: max_consecutive_late_night=4
-2026-03-07 21:37:56,685 - INFO - Defining soft constraints.
-2026-03-07 21:37:56,802 - INFO - Solving problem...
-2026-03-07 21:37:57,919 - DEBUG - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/6450ae82e3624e85acbd00fce1a06c67-pulp.mps -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/6450ae82e3624e85acbd00fce1a06c67-pulp.sol 
-2026-03-07 21:38:00,959 - INFO - Solver finished with status: Optimal
-2026-03-07 21:38:00,959 - INFO - Analyzing results for constraint violations.
-2026-03-07 21:38:00,992 - INFO - Processing results.
-2026-03-07 21:38:00,998 - WARNING - Shift type '有' not in master; skipping DB save for emp 2 on 2026-03-02.
-2026-03-07 21:38:00,999 - WARNING - Shift type '有' not in master; skipping DB save for emp 2 on 2026-03-27.
-2026-03-07 21:38:01,001 - WARNING - Shift type '有' not in master; skipping DB save for emp 5 on 2026-03-29.
-2026-03-07 21:38:01,002 - WARNING - Shift type '有' not in master; skipping DB save for emp 6 on 2026-03-12.
-2026-03-07 21:38:01,002 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-07.
-2026-03-07 21:38:01,003 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-12.
-2026-03-07 21:38:01,003 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-16.
-2026-03-07 21:38:01,003 - WARNING - Shift type '有' not in master; skipping DB save for emp 8 on 2026-03-17.
-2026-03-07 21:38:01,004 - WARNING - Shift type '有' not in master; skipping DB save for emp 8 on 2026-03-28.
-2026-03-07 21:38:01,005 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-24.
-2026-03-07 21:38:01,005 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-25.
-2026-03-07 21:38:01,005 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-26.
-2026-03-07 21:38:01,005 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-27.
-2026-03-07 21:38:01,006 - WARNING - Shift type '有' not in master; skipping DB save for emp 11 on 2026-03-22.
-2026-03-07 21:38:01,007 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-06.
-2026-03-07 21:38:01,007 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-07.
-2026-03-07 21:38:01,007 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-09.
-2026-03-07 21:38:01,008 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-25.
-2026-03-07 21:38:01,011 - WARNING - Shift type '有' not in master; skipping DB save for emp 18 on 2026-03-19.
-2026-03-07 21:38:01,021 - INFO - Shift generation successful.
-2026-03-07 21:38:01,128 - INFO - 127.0.0.1 - - [07/Mar/2026 21:38:01] "[32mPOST /admin/generate HTTP/1.1[0m" 302 -
-2026-03-07 21:38:01,150 - INFO - 127.0.0.1 - - [07/Mar/2026 21:38:01] "GET /admin/ HTTP/1.1" 200 -
-2026-03-07 21:38:01,173 - INFO - 127.0.0.1 - - [07/Mar/2026 21:38:01] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-07 21:38:03,870 - INFO - 127.0.0.1 - - [07/Mar/2026 21:38:03] "GET /admin/download_pdf/135 HTTP/1.1" 200 -
+2026-03-08 23:08:39,790 - INFO - Shift generation started.
+2026-03-08 23:08:39,794 - INFO - Generating for 31 days.
+2026-03-08 23:08:39,798 - INFO - Loaded 0 records from previous month's history.
+2026-03-08 23:08:39,812 - INFO - Processing 17 employees.
+2026-03-08 23:08:39,892 - INFO - PuLP problem initialized.
+2026-03-08 23:08:39,973 - DEBUG - Defining constraints for employee 2 (大和鈴子).
+2026-03-08 23:08:39,976 - DEBUG - Emp 2: consecutive work days from previous month = 0
+2026-03-08 23:08:39,979 - DEBUG - Emp 2 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:39,994 - DEBUG - Defining constraints for employee 3 (工藤麻紀子).
+2026-03-08 23:08:39,998 - DEBUG - Emp 3: consecutive work days from previous month = 0
+2026-03-08 23:08:40,001 - DEBUG - Emp 3 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,015 - DEBUG - Defining constraints for employee 4 (坂本好子).
+2026-03-08 23:08:40,018 - DEBUG - Emp 4: consecutive work days from previous month = 0
+2026-03-08 23:08:40,021 - DEBUG - Emp 4 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,038 - DEBUG - Defining constraints for employee 5 (清水翔太).
+2026-03-08 23:08:40,042 - DEBUG - Emp 5: consecutive work days from previous month = 0
+2026-03-08 23:08:40,045 - DEBUG - Emp 5 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,060 - DEBUG - Defining constraints for employee 6 (金子和代).
+2026-03-08 23:08:40,063 - DEBUG - Emp 6: consecutive work days from previous month = 0
+2026-03-08 23:08:40,067 - DEBUG - Emp 6 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,082 - DEBUG - Defining constraints for employee 7 (清水真寿美).
+2026-03-08 23:08:40,085 - DEBUG - Emp 7: consecutive work days from previous month = 0
+2026-03-08 23:08:40,087 - DEBUG - Emp 7 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,102 - DEBUG - Defining constraints for employee 8 (奥寺恵子).
+2026-03-08 23:08:40,105 - DEBUG - Emp 8: consecutive work days from previous month = 0
+2026-03-08 23:08:40,108 - DEBUG - Emp 8 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,111 - DEBUG - Defining constraints for employee 9 (大澤亜湖).
+2026-03-08 23:08:40,116 - DEBUG - Emp 9: consecutive work days from previous month = 0
+2026-03-08 23:08:40,119 - DEBUG - Emp 9 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,122 - DEBUG - Defining constraints for employee 10 (外浦千代美).
+2026-03-08 23:08:40,126 - DEBUG - Emp 10: consecutive work days from previous month = 0
+2026-03-08 23:08:40,129 - DEBUG - Emp 10 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,132 - DEBUG - Defining constraints for employee 11 (宇部順子).
+2026-03-08 23:08:40,135 - DEBUG - Emp 11: consecutive work days from previous month = 0
+2026-03-08 23:08:40,139 - DEBUG - Emp 11 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,142 - DEBUG - Defining constraints for employee 12 (大宮莉奈).
+2026-03-08 23:08:40,145 - DEBUG - Emp 12: consecutive work days from previous month = 0
+2026-03-08 23:08:40,147 - DEBUG - Emp 12 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,151 - DEBUG - Defining constraints for employee 13 (橋場由香).
+2026-03-08 23:08:40,156 - DEBUG - Emp 13: consecutive work days from previous month = 0
+2026-03-08 23:08:40,159 - DEBUG - Emp 13 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,162 - DEBUG - Defining constraints for employee 14 (大沢愛).
+2026-03-08 23:08:40,166 - DEBUG - Emp 14: consecutive work days from previous month = 0
+2026-03-08 23:08:40,169 - DEBUG - Emp 14 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,172 - DEBUG - Defining constraints for employee 15 (上戸鎖絵里).
+2026-03-08 23:08:40,176 - DEBUG - Emp 15: consecutive work days from previous month = 0
+2026-03-08 23:08:40,178 - DEBUG - Emp 15 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,181 - DEBUG - Defining constraints for employee 16 (中田秋子).
+2026-03-08 23:08:40,184 - DEBUG - Emp 16: consecutive work days from previous month = 0
+2026-03-08 23:08:40,187 - DEBUG - Emp 16 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,189 - DEBUG - Defining constraints for employee 17 (柏木あゆみ).
+2026-03-08 23:08:40,193 - DEBUG - Emp 17: consecutive work days from previous month = 0
+2026-03-08 23:08:40,196 - DEBUG - Emp 17 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,199 - DEBUG - Defining constraints for employee 18 (金城里子).
+2026-03-08 23:08:40,201 - DEBUG - Emp 18: consecutive work days from previous month = 0
+2026-03-08 23:08:40,204 - DEBUG - Emp 18 on 2026-03-01: previous day shift from history is None
+2026-03-08 23:08:40,218 - INFO - Defining soft constraints.
+2026-03-08 23:08:40,347 - INFO - Solving problem...
+2026-03-08 23:08:41,334 - DEBUG - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/1136c579d35e4a3182e15a359f4855b4-pulp.mps -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/1136c579d35e4a3182e15a359f4855b4-pulp.sol 
+2026-03-08 23:08:43,892 - INFO - Solver finished with status: Optimal
+2026-03-08 23:08:43,892 - INFO - Analyzing results for constraint violations.
+2026-03-08 23:08:43,916 - INFO - Processing results.
+2026-03-08 23:08:43,922 - WARNING - Shift type '有' not in master; skipping DB save for emp 2 on 2026-03-02.
+2026-03-08 23:08:43,922 - WARNING - Shift type '有' not in master; skipping DB save for emp 2 on 2026-03-27.
+2026-03-08 23:08:43,924 - WARNING - Shift type '有' not in master; skipping DB save for emp 5 on 2026-03-29.
+2026-03-08 23:08:43,924 - WARNING - Shift type '有' not in master; skipping DB save for emp 6 on 2026-03-12.
+2026-03-08 23:08:43,925 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-07.
+2026-03-08 23:08:43,925 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-12.
+2026-03-08 23:08:43,925 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-16.
+2026-03-08 23:08:43,926 - WARNING - Shift type '有' not in master; skipping DB save for emp 8 on 2026-03-17.
+2026-03-08 23:08:43,926 - WARNING - Shift type '有' not in master; skipping DB save for emp 8 on 2026-03-28.
+2026-03-08 23:08:43,927 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-24.
+2026-03-08 23:08:43,927 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-25.
+2026-03-08 23:08:43,928 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-26.
+2026-03-08 23:08:43,928 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-27.
+2026-03-08 23:08:43,928 - WARNING - Shift type '有' not in master; skipping DB save for emp 11 on 2026-03-22.
+2026-03-08 23:08:43,929 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-06.
+2026-03-08 23:08:43,929 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-07.
+2026-03-08 23:08:43,929 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-09.
+2026-03-08 23:08:43,930 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-25.
+2026-03-08 23:08:43,932 - WARNING - Shift type '有' not in master; skipping DB save for emp 18 on 2026-03-19.
+2026-03-08 23:08:43,945 - INFO - Shift generation successful.
+2026-03-08 23:08:44,119 - INFO - 127.0.0.1 - - [08/Mar/2026 23:08:44] "[32mPOST /admin/generate HTTP/1.1[0m" 302 -
+2026-03-08 23:08:44,137 - INFO - 127.0.0.1 - - [08/Mar/2026 23:08:44] "GET /admin/ HTTP/1.1" 200 -
+2026-03-08 23:08:44,160 - INFO - 127.0.0.1 - - [08/Mar/2026 23:08:44] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -

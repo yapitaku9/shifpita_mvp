@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card text-center">
+                <div class="card-header fw-bold">
+                    上書き確認
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ year }}年{{ month }}月のシフトはすでに存在しています。</p>
+                    <p class="card-text">新しく上書きしますか？</p>
+                    <form action="{{ url_for('admin.confirm_shifts') }}" method="post" class="d-inline" novalidate>
+                        {{ form.hidden_tag() }}
+                        <input type="hidden" name="overwrite" value="true">
+                        <button type="submit" class="btn btn-danger">上書きする</button>
+                    </form>
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">キャンセル</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -6,6 +6,7 @@ from .user import User
 from .master import ShiftType
 from .day_off_request import DayOffRequest
 from .shift import ShiftAssignment
+from .shift_history import ShiftHistory
 from .history import ShiftGenerationHistory
 from .special_day import SpecialDay
 from .work_request import WorkRequest

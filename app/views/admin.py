@@ -1,20 +1,25 @@
-import calendar
-from flask import render_template, flash, redirect, url_for, Blueprint, request, current_app, send_from_directory, jsonify
+from flask import render_template, flash, redirect, url_for, Blueprint, request, current_app, send_from_directory, jsonify, send_file
 from flask_login import login_required, current_user
+from sqlalchemy import func, case
 from wtforms import BooleanField
 from app import db
-from app.forms import EmployeeForm, ShiftGenerationForm, create_shift_constraint_form, SpecialDayForm, EmailEditForm, PasswordChangeForm, UsernameChangeForm
+from app.forms import EmployeeForm, ShiftGenerationForm, ShiftConfirmationForm, create_shift_constraint_form, SpecialDayForm, EmailEditForm, PasswordChangeForm, UsernameChangeForm
 from app.models.user import User, EmploymentType, get_selectable_shift_choices
 from app.models.master import ShiftConstraint, ShiftType
 from app.models.history import ShiftGenerationHistory
+from app.models.shift import ShiftAssignment
+from app.models.shift_history import ShiftHistory
 from app.models.special_day import SpecialDay
 from app.models.day_off_request import DayOffRequest
 from app.models.work_request import WorkRequest
 from app.services.generator import ShiftGenerator
 from app.services.pdf_exporter import PDFExporter
+from app.services.excel_exporter import ExcelExporter
 from app.email import send_email
 import datetime
 import os
+import io
+import calendar
 
 # URLプレフィックス '/admin' を持つブループリントを作成
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -38,6 +43,7 @@ def dashboard():
     # 追加フォーム: 雇用形態の初期値でシフト選択肢を設定
     form = EmployeeForm(employment_type=EmploymentType.FULL_TIME)
     gen_form = ShiftGenerationForm()  # シフト生成フォーム
+    confirm_form = ShiftConfirmationForm() # シフト確定フォーム
 
     # 従業員追加フォームのPOSTリクエストを処理
     # テンプレート側で form.submit の name 属性を 'submit_employee' などに設定して区別する想定
@@ -73,6 +79,7 @@ def dashboard():
                     title="管理者ダッシュボード",
                     form=form,
                     gen_form=gen_form,
+                    confirm_form=confirm_form,
                     users=user_list,
                     history_list=history_list
                 )
@@ -111,6 +118,7 @@ def dashboard():
         title="管理者ダッシュボード",
         form=form,
         gen_form=gen_form,
+        confirm_form=confirm_form,
         users=user_list,
         history_list=history_list,
         pending_day_off_count=pending_day_off_count,
@@ -178,7 +186,15 @@ def generate_shifts():
             assignments_for_pdf = result # 成功時はPDF用データ
             
             # PDF生成
-            all_users = User.query.filter_by(is_admin=False).all()
+            sort_order = case(
+                (User.employment_type == EmploymentType.MANAGER, 1),
+                (User.employment_type == EmploymentType.SUPPORT, 2),
+                (User.employment_type == EmploymentType.FULL_TIME, 3),
+                (User.employment_type == EmploymentType.PART_TIME_8H, 4),
+                (User.employment_type == EmploymentType.PART_TIME_SHORT, 5),
+                else_=6
+            )
+            all_users = User.query.filter_by(is_admin=False).order_by(sort_order, User.full_name).all()
             employees_for_pdf = [{"id": u.id, "name": u.full_name} for u in all_users]
 
             # PDF生成用にシフト定義を取得
@@ -279,6 +295,82 @@ def generate_shifts():
     return redirect(url_for("admin.dashboard"))
 
 
+@admin_bp.route("/confirm_overwrite/<int:year>/<int:month>", methods=['GET'])
+@login_required
+def confirm_overwrite(year, month):
+    """Render the overwrite confirmation page."""
+    form = ShiftConfirmationForm(year=year, month=month)
+    return render_template("admin/confirm_overwrite.html", form=form, year=year, month=month, title="上書き確認")
+
+
+@admin_bp.route("/confirm", methods=["POST"])
+def confirm_shifts():
+    """生成されたシフトを履歴に保存して確定する"""
+    form = ShiftConfirmationForm()
+    overwrite = request.form.get('overwrite') == 'true'
+    
+    if not form.validate_on_submit():
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f"{getattr(form, field).label.text}: {error}", "danger")
+        return redirect(url_for("admin.dashboard"))
+
+    year = form.year.data
+    month = form.month.data
+    
+    start_date = datetime.date(year, month, 1)
+    end_date = datetime.date(year, month, calendar.monthrange(year, month)[1])
+
+    if not overwrite:
+        existing_history = ShiftHistory.query.filter(
+            ShiftHistory.date >= start_date,
+            ShiftHistory.date <= end_date
+        ).first()
+        if existing_history:
+            return redirect(url_for('admin.confirm_overwrite', year=year, month=month))
+
+    try:
+        # この月の既存の履歴を削除
+        ShiftHistory.query.filter(
+            ShiftHistory.date >= start_date,
+            ShiftHistory.date <= end_date
+        ).delete(synchronize_session=False)
+
+        # 現在の割り当てを取得
+        assignments_to_confirm = ShiftAssignment.query.filter(
+            ShiftAssignment.date >= start_date,
+            ShiftAssignment.date <= end_date
+        ).all()
+
+        if not assignments_to_confirm:
+            flash(f"{year}年{month}月には確定できるシフトがありません。", "warning")
+            return redirect(url_for("admin.dashboard"))
+
+        # 履歴にコピー
+        history_entries = []
+        for assign in assignments_to_confirm:
+            history_entries.append(
+                ShiftHistory(
+                    date=assign.date,
+                    user_id=assign.user_id,
+                    shift_type_id=assign.shift_type_id,
+                )
+            )
+        
+        db.session.bulk_save_objects(history_entries)
+        db.session.commit()
+        
+        if overwrite:
+            flash(f"{year}年{month}月のシフトを上書きしました。", "success")
+        else:
+            flash(f"{year}年{month}月のシフトを確定しました。", "success")
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"シフトの確定中にエラーが発生しました: {e}", "danger")
+        current_app.logger.error(f"Shift confirmation failed: {e}", exc_info=True)
+
+    return redirect(url_for("admin.dashboard"))
 
 
 @admin_bp.route("/constraints", methods=["GET", "POST"])
@@ -782,3 +874,160 @@ def change_password():
                  flash(f"{getattr(form, field).label.text}: {error}", "danger")
     
     return render_template("admin/change_password.html", title="パスワード変更", form=form)
+
+
+@admin_bp.route("/confirmed_shifts", methods=["GET"])
+def confirmed_shifts():
+    """確定済みシフトの一覧を表示する"""
+    
+    # ShiftHistoryテーブルから年月でグループ化して確定済みシフトのリストを取得
+    confirmed_shifts_info_query = db.session.query(
+        func.extract('year', ShiftHistory.date).label('year'),
+        func.extract('month', ShiftHistory.date).label('month')
+    ).group_by('year', 'month').order_by(
+        func.extract('year', ShiftHistory.date).desc(),
+        func.extract('month', ShiftHistory.date).desc()
+    )
+    
+    confirmed_shifts_raw = confirmed_shifts_info_query.all()
+    
+    confirmed_shifts_list = []
+    for year, month in confirmed_shifts_raw:
+        # 最新の成功した生成履歴（PDF）を探す
+        generation_history = ShiftGenerationHistory.query.filter_by(
+            target_year=year,
+            target_month=month,
+            status="Success"
+        ).order_by(ShiftGenerationHistory.generation_timestamp.desc()).first()
+        
+        confirmed_shifts_list.append({
+            "year": int(year),
+            "month": int(month),
+            "generation_history": generation_history
+        })
+
+    return render_template(
+        "admin/confirmed_shifts.html",
+        title="確定済みシフト一覧",
+        shifts_list=confirmed_shifts_list
+    )
+
+@admin_bp.route("/delete_confirmed_shift/<int:year>/<int:month>", methods=['POST'])
+def delete_confirmed_shift(year, month):
+    """指定された年月の確定済みシフトと関連データを削除する"""
+    try:
+        # 1. 該当する月のShiftHistoryレコードを削除
+        start_date = datetime.date(year, month, 1)
+        end_date = datetime.date(year, month, calendar.monthrange(year, month)[1])
+        
+        ShiftHistory.query.filter(
+            ShiftHistory.date >= start_date,
+            ShiftHistory.date <= end_date
+        ).delete(synchronize_session=False)
+
+        # 2. 該当する月のShiftGenerationHistoryレコードを検索してPDFファイルを削除
+        histories_to_delete = ShiftGenerationHistory.query.filter_by(
+            target_year=year,
+            target_month=month
+        ).all()
+
+        pdf_dir = os.path.join(current_app.instance_path, 'pdfs')
+        for history in histories_to_delete:
+            if history.pdf_file_path:
+                pdf_path = os.path.join(pdf_dir, history.pdf_file_path)
+                if os.path.exists(pdf_path):
+                    os.remove(pdf_path)
+            db.session.delete(history)
+
+        db.session.commit()
+        flash(f"{year}年{month}月の確定済みシフトを削除しました。", "success")
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"削除中にエラーが発生しました: {e}", "danger")
+        current_app.logger.error(f"Error deleting confirmed shift for {year}-{month}: {e}", exc_info=True)
+
+    return redirect(url_for('admin.confirmed_shifts'))
+
+@admin_bp.route("/download_excel/<int:year>/<int:month>")
+def download_excel(year, month):
+    """指定された年月の確定済みシフトをExcelファイルでダウンロードする"""
+    try:
+        start_date = datetime.date(year, month, 1)
+        end_date = datetime.date(year, month, calendar.monthrange(year, month)[1])
+
+        # データを取得
+        all_shifts = ShiftHistory.query.filter(
+            ShiftHistory.date.between(start_date, end_date)
+        ).options(db.joinedload(ShiftHistory.user), db.joinedload(ShiftHistory.shift_type)).all()
+        
+        approved_day_offs = DayOffRequest.query.filter(
+            DayOffRequest.date.between(start_date, end_date),
+            DayOffRequest.status == "approved"
+        ).all()
+
+        day_off_reqs = {req.user_id: [r.date for r in approved_day_offs if r.user_id == req.user_id and r.request_type != 'paid_leave'] for req in approved_day_offs}
+        paid_leave_reqs = {req.user_id: [r.date for r in approved_day_offs if r.user_id == req.user_id and r.request_type == 'paid_leave'] for req in approved_day_offs}
+
+        work_req_map = {}
+        approved_work_reqs = WorkRequest.query.filter(
+            WorkRequest.date.between(start_date, end_date), WorkRequest.status == "approved"
+        ).all()
+        for req in approved_work_reqs:
+            shift_names = [st.name for st in req.shift_types]
+            if shift_names:
+                work_req_map[(req.user_id, req.date)] = shift_names
+
+        if not all_shifts and not paid_leave_reqs:
+            flash(f"{year}年{month}月の確定済みシフトデータがありません。", "warning")
+            return redirect(url_for('admin.confirmed_shifts'))
+            
+        sort_order = case(
+            (User.employment_type == EmploymentType.MANAGER, 1),
+            (User.employment_type == EmploymentType.SUPPORT, 2),
+            (User.employment_type == EmploymentType.FULL_TIME, 3),
+            (User.employment_type == EmploymentType.PART_TIME_8H, 4),
+            (User.employment_type == EmploymentType.PART_TIME_SHORT, 5),
+            else_=6
+        )
+        employees = User.query.filter_by(is_admin=False).order_by(sort_order, User.full_name).all()
+
+        # PDFと同様の集計情報を取得
+        generator = ShiftGenerator()
+        staffing_requirements = {c.name: c.value for c in ShiftConstraint.query.all()}
+        special_days_query = SpecialDay.query.filter(
+            db.extract('year', SpecialDay.date) == year,
+            db.extract('month', SpecialDay.date) == month
+        ).all()
+        special_days = {day.date: day for day in special_days_query}
+
+        # Excelを生成
+        exporter = ExcelExporter()
+        workbook = exporter.generate(
+            year, month, employees, all_shifts,
+            day_off_reqs=day_off_reqs,
+            paid_leave_reqs=paid_leave_reqs,
+            work_req_map=work_req_map,
+            hourly_groups=generator.hourly_groups,
+            staffing_requirements=staffing_requirements,
+            special_days=special_days
+        )
+        
+        # メモリ上でファイルを作成
+        output = io.BytesIO()
+        workbook.save(output)
+        output.seek(0)
+        
+        filename = f"shift_{year}_{month:02d}.xlsx"
+        
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+    except Exception as e:
+        flash(f"Excelファイルの生成中にエラーが発生しました: {e}", "danger")
+        current_app.logger.error(f"Excel generation for {year}-{month} failed: {e}", exc_info=True)
+        return redirect(url_for('admin.confirmed_shifts'))

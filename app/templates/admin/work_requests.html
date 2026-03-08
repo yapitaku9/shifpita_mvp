@@ -52,7 +52,7 @@
                             <span class="badge rounded-pill bg-info text-dark me-1">{{ st.name }}</span>
                             {% endfor %}
                         </td>
-                        <td>{{ req.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ (req.created_at | jst).strftime('%Y-%m-%d %H:%M') }}</td>
                         <td class="text-center">
                             <span class="badge
                                 {% if req.status == 'approved' %} bg-success

@@ -2,51 +2,40 @@ Welcome to the CBC MILP Solver
 Version: 2.10.3 
 Build Date: Dec 15 2019 
 
-command line - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/6450ae82e3624e85acbd00fce1a06c67-pulp.mps -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/6450ae82e3624e85acbd00fce1a06c67-pulp.sol (default strategy 1)
+command line - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/1136c579d35e4a3182e15a359f4855b4-pulp.mps -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/1136c579d35e4a3182e15a359f4855b4-pulp.sol (default strategy 1)
 At line 2 NAME          MODEL
 At line 3 ROWS
-At line 13217 COLUMNS
-At line 217979 RHS
-At line 231192 BOUNDS
-At line 242302 ENDATA
-Problem MODEL has 13212 rows, 11109 columns and 181230 elements
+At line 12192 COLUMNS
+At line 206382 RHS
+At line 218570 BOUNDS
+At line 229680 ENDATA
+Problem MODEL has 12187 rows, 11109 columns and 170658 elements
 Coin0008I MODEL read with 0 errors
 Option for timeMode changed from cpu to elapsed
-Continuous objective value is 90 - 0.21 seconds
+Continuous objective value is 90 - 0.22 seconds
 Cgl0002I 6287 variables fixed
-Cgl0003I 72 fixed, 279 tightened bounds, 5065 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 1722 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 4275 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 4196 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 4100 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 3659 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 2379 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 1214 strengthened rows, 0 substitutions
-Cgl0003I 0 fixed, 0 tightened bounds, 577 strengthened rows, 0 substitutions
+Cgl0003I 72 fixed, 279 tightened bounds, 4888 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 1321 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 4070 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 4006 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 3955 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 3580 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 2385 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 1284 strengthened rows, 0 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 547 strengthened rows, 0 substitutions
 Cgl0003I 0 fixed, 0 tightened bounds, 487 strengthened rows, 0 substitutions
-Cgl0004I processed model has 4835 rows, 3456 columns (3456 integer (3177 of which binary)) and 68943 elements
+Cgl0004I processed model has 4386 rows, 3456 columns (3456 integer (3177 of which binary)) and 63388 elements
 Cutoff increment increased from 1e-05 to 0.9999
-Cbc0038I Initial state - 137 integers unsatisfied sum - 17.36
-Cbc0038I Pass   1: (2.41 seconds) suminf.    4.75000 (18) obj. 3.25001e+07 iterations 656
-Cbc0038I Pass   2: (2.42 seconds) suminf.    4.50000 (9) obj. 3.50001e+07 iterations 72
-Cbc0038I Pass   3: (2.44 seconds) suminf.    0.00000 (0) obj. 4.00001e+07 iterations 137
-Cbc0038I Solution found of 4.00001e+07
-Cbc0038I Cleaned solution of 4.00001e+07
-Cbc0038I Before mini branch and bound, 3192 integers at bound fixed and 117 continuous
-Cbc0038I Full problem 4835 rows 3456 columns, reduced to 147 rows 80 columns
-Cbc0038I Mini branch and bound improved solution from 4.00001e+07 to 100 (2.49 seconds)
-Cbc0038I Round again with cutoff of 98.1001
-Cbc0038I Reduced cost fixing fixed 535 variables on major pass 2
-Cbc0038I Pass   4: (2.52 seconds) suminf.    4.50000 (17) obj. 90 iterations 74
-Cbc0038I Pass   5: (2.54 seconds) suminf.    4.00000 (16) obj. 90 iterations 123
-Cbc0038I Pass   6: (2.61 seconds) suminf.    0.00000 (0) obj. 90 iterations 448
-Cbc0038I Solution found of 90
-Cbc0038I Cleaned solution of 90
-Cbc0038I Before mini branch and bound, 3190 integers at bound fixed and 116 continuous
-Cbc0038I Mini branch and bound did not improve solution (2.62 seconds)
-Cbc0038I After 2.63 seconds - Feasibility pump exiting with objective of 90 - took 0.26 seconds
-Cbc0012I Integer solution of 90 found by feasibility pump after 0 iterations and 0 nodes (2.63 seconds)
-Cbc0001I Search completed - best objective 90, took 0 iterations and 0 nodes (2.64 seconds)
+Cbc0038I Initial state - 24 integers unsatisfied sum - 12
+Cbc0038I Pass   1: (2.18 seconds) suminf.    0.00000 (0) obj. 3.00001e+07 iterations 615
+Cbc0038I Solution found of 3.00001e+07
+Cbc0038I Cleaned solution of 3.00001e+07
+Cbc0038I Before mini branch and bound, 3315 integers at bound fixed and 110 continuous
+Cbc0038I Full problem 4386 rows 3456 columns, reduced to 13 rows 12 columns
+Cbc0038I Mini branch and bound improved solution from 3.00001e+07 to 90 (2.22 seconds)
+Cbc0038I After 2.22 seconds - Feasibility pump exiting with objective of 90 - took 0.09 seconds
+Cbc0012I Integer solution of 90 found by feasibility pump after 0 iterations and 0 nodes (2.23 seconds)
+Cbc0001I Search completed - best objective 90, took 0 iterations and 0 nodes (2.23 seconds)
 Cbc0035I Maximum depth 0, 0 variables fixed on reduced cost
 Cuts at root node changed objective from 90 to 90
 Probing was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
@@ -63,9 +52,9 @@ Result - Optimal solution found
 Objective value:                90.00000000
 Enumerated nodes:               0
 Total iterations:               0
-Time (CPU seconds):             2.44
-Time (Wallclock seconds):       2.77
+Time (CPU seconds):             2.06
+Time (Wallclock seconds):       2.34
 
 Option for printingOptions changed from normal to all
-Total time (CPU seconds):       2.55   (Wallclock seconds):       2.91
+Total time (CPU seconds):       2.15   (Wallclock seconds):       2.45
 
