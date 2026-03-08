@@ -22,10 +22,6 @@ def index():
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     """ログインページ"""
-    # ユーザーが一人もいなければ、管理者登録ページにリダイレクト
-    if db.session.query(User).first() is None:
-        return redirect(url_for('main.register'))
-
     if current_user.is_authenticated:
         return redirect(url_for("main.index"))
 
