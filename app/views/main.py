@@ -22,9 +22,7 @@ def index():
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     """ログインページ"""
-    # 管理者アカウントが1つもなければ、管理者登録ページにリダイレクト
-    if not db.session.query(User).filter_by(is_admin=True).first():
-        return redirect(url_for('main.register'))
+    admin_exists = db.session.query(User).filter_by(is_admin=True).first() is not None
 
     if current_user.is_authenticated:
         return redirect(url_for("main.index"))
@@ -47,28 +45,34 @@ def login():
             next_page = url_for("main.index")
         return redirect(next_page)
 
-    return render_template("login.html", title="ログイン", form=form)
+    return render_template(
+        "login.html", title="ログイン", form=form, admin_exists=admin_exists
+    )
 
 
-@bp.route('/register', methods=['GET', 'POST'])
+@bp.route("/register", methods=["GET", "POST"])
 def register():
     """管理者初回登録ページ"""
-    # 既に管理者アカウントが存在する場合はログインページへリダイレクト
-    if db.session.query(User).filter_by(is_admin=True).first() is not None:
-        return redirect(url_for('main.login'))
+    if db.session.query(User).filter_by(is_admin=True).first():
+        flash("既に管理者が登録されています")
+        return render_template("register_admin.html", title="管理者アカウント作成", admin_exists=True)
 
     form = RegistrationForm()
     if form.validate_on_submit():
-        user = User(username=form.username.data, full_name=form.username.data, is_admin=True)
+        user = User(
+            username=form.username.data, full_name=form.username.data, is_admin=True
+        )
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
-        flash('管理者アカウントが作成されました。ログインしてください。')
+        flash("管理者アカウントが作成されました。ログインしてください。")
         # 作成後、自動的にログインさせる
         login_user(user)
-        return redirect(url_for('main.index'))
-    
-    return render_template('register_admin.html', title='管理者アカウント作成', form=form)
+        return redirect(url_for("main.index"))
+
+    return render_template(
+        "register_admin.html", title="管理者アカウント作成", form=form, admin_exists=False
+    )
 
 
 @bp.route("/logout")

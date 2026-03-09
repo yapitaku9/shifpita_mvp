@@ -8,6 +8,14 @@
                 <h4 class="mb-0">{{ title }}</h4>
             </div>
             <div class="card-body p-4">
+                {% if admin_exists %}
+                    <div class="alert alert-warning text-center" role="alert">
+                        既に管理者が登録されています。
+                    </div>
+                    <div class="text-center mt-3">
+                        <a href="{{ url_for('main.login') }}">ログインページに戻る</a>
+                    </div>
+                {% else %}
                 <p class="text-center text-muted">データベースに管理者が存在しません。最初の管理者アカウントを作成してください。</p>
                 <form action="" method="post" novalidate>
                     {{ form.hidden_tag() }}
@@ -36,6 +44,7 @@
                         {{ form.submit(class="btn btn-danger btn-lg") }}
                     </div>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>
