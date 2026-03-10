@@ -183,6 +183,13 @@ def generate_shifts():
         success, result = generator.run(year, month)
 
         if success:
+            # タイムアウト調査のため、PDF生成をスキップして即時リターン
+            history.status = "Success"
+            history.pdf_file_path = None
+            flash(f"シフト計算成功。PDF生成をスキップしました（調査のため）。", "info")
+            db.session.commit()
+            return redirect(url_for("admin.dashboard"))
+            
             assignments_for_pdf = result # 成功時はPDF用データ
             
             # PDF生成
