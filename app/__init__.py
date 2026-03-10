@@ -55,7 +55,10 @@ def create_app(test_config=None) -> Flask:
     db.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)  # Add render_as_batch=True
     login_manager.init_app(app)
-    mail.init_app(app)
+    
+    # Conditionally initialize Mail to prevent crash if not configured
+    if app.config.get('MAIL_SERVER'):
+        mail.init_app(app)
 
     # Register custom Jinja filter
     app.jinja_env.filters['jst'] = to_jst
