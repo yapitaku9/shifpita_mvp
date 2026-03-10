@@ -693,65 +693,94 @@ def action_day_off_request(request_id, action):
 
 @admin_bp.route("/day_off/bulk_action", methods=['POST'])
 def bulk_action_day_off():
-    """選択された希望休申請を一括で承認する"""
+    """選択された希望休申請を一括で処理する（承認・却下）"""
     request_ids = request.form.getlist('request_ids')
     status_filter = request.form.get('status_filter', 'pending')
+    action = request.form.get('action') # 'approve' or 'reject'
 
     if not request_ids:
         flash('一括操作の対象となる申請が選択されていません。', 'warning')
         return redirect(url_for('admin.manage_day_off_requests', status=status_filter))
 
+    if not action or action not in ['approve', 'reject']:
+        flash('無効な操作です。', 'danger')
+        return redirect(url_for('admin.manage_day_off_requests', status=status_filter))
+
+    action_map = {
+        'approve': {'new_status': 'approved', 'verb_jp': '承認'},
+        'reject': {'new_status': 'rejected', 'verb_jp': '却下'}
+    }
+    new_status = action_map[action]['new_status']
+    verb_jp = action_map[action]['verb_jp']
+
     try:
-        requests_to_approve = DayOffRequest.query.filter(DayOffRequest.id.in_(request_ids)).all()
+        # 現在のフィルタ（'pending' or 'approved'）に合致する申請のみを対象
+        requests_to_update = DayOffRequest.query.filter(
+            DayOffRequest.id.in_(request_ids),
+            DayOffRequest.status == status_filter 
+        ).all()
         
-        approved_count = 0
-        for req in requests_to_approve:
-            # 念のため、'pending' のものだけを対象とする
-            if req.status == 'pending':
-                req.status = 'approved'
-                approved_count += 1
+        updated_count = 0
+        for req in requests_to_update:
+            req.status = new_status
+            updated_count += 1
         
-        if approved_count > 0:
+        if updated_count > 0:
             db.session.commit()
-            flash(f'{approved_count}件の希望休申請を一括で承認しました。', 'success')
+            flash(f'{updated_count}件の希望休申請を一括で{verb_jp}しました。', 'success')
         else:
-            flash('承認対象の申請（申請中）がありませんでした。', 'info')
+            flash(f'{verb_jp}対象の申請がありませんでした。', 'info')
 
     except Exception as e:
         db.session.rollback()
-        flash(f"一括承認処理中にエラーが発生しました: {e}", "danger")
+        flash(f"一括処理中にエラーが発生しました: {e}", "danger")
 
     return redirect(url_for('admin.manage_day_off_requests', status=status_filter))
 
 
 @admin_bp.route("/work_requests/bulk_action", methods=['POST'])
 def bulk_action_work_request():
-    """選択された希望勤務申請を一括で承認する"""
+    """選択された希望勤務申請を一括で処理する（承認・却下）"""
     request_ids = request.form.getlist('request_ids')
     status_filter = request.form.get('status_filter', 'pending')
+    action = request.form.get('action') # 'approve' or 'reject'
 
     if not request_ids:
         flash('一括操作の対象となる申請が選択されていません。', 'warning')
         return redirect(url_for('admin.manage_work_requests', status=status_filter))
+        
+    if not action or action not in ['approve', 'reject']:
+        flash('無効な操作です。', 'danger')
+        return redirect(url_for('admin.manage_work_requests', status=status_filter))
+
+    action_map = {
+        'approve': {'new_status': 'approved', 'verb_jp': '承認'},
+        'reject': {'new_status': 'rejected', 'verb_jp': '却下'}
+    }
+    new_status = action_map[action]['new_status']
+    verb_jp = action_map[action]['verb_jp']
 
     try:
-        requests_to_approve = WorkRequest.query.filter(WorkRequest.id.in_(request_ids)).all()
+        # 現在のフィルタ（'pending' or 'approved'）に合致する申請のみを対象
+        requests_to_update = WorkRequest.query.filter(
+            WorkRequest.id.in_(request_ids),
+            WorkRequest.status == status_filter
+        ).all()
         
-        approved_count = 0
-        for req in requests_to_approve:
-            if req.status == 'pending':
-                req.status = 'approved'
-                approved_count += 1
+        updated_count = 0
+        for req in requests_to_update:
+            req.status = new_status
+            updated_count += 1
         
-        if approved_count > 0:
+        if updated_count > 0:
             db.session.commit()
-            flash(f'{approved_count}件の希望勤務申請を一括で承認しました。', 'success')
+            flash(f'{updated_count}件の希望勤務申請を一括で{verb_jp}しました。', 'success')
         else:
-            flash('承認対象の申請（申請中）がありませんでした。', 'info')
+            flash(f'{verb_jp}対象の申請がありませんでした。', 'info')
 
     except Exception as e:
         db.session.rollback()
-        flash(f"一括承認処理中にエラーが発生しました: {e}", "danger")
+        flash(f"一括処理中にエラーが発生しました: {e}", "danger")
 
     return redirect(url_for('admin.manage_work_requests', status=status_filter))
 

@@ -36,7 +36,7 @@
             <table class="table table-hover align-middle">
                 <thead>
                     <tr>
-                        {% if current_status == 'pending' %}
+                        {% if current_status in ['pending', 'approved'] %}
                         <th style="width: 5%;"><input class="form-check-input" type="checkbox" id="select-all"></th>
                         {% endif %}
                         <th>申請者</th>
@@ -50,7 +50,7 @@
                 <tbody>
                     {% for req in requests %}
                     <tr>
-                        {% if current_status == 'pending' %}
+                        {% if current_status in ['pending', 'approved'] %}
                         <td><input class="form-check-input" type="checkbox" name="request_ids" value="{{ req.id }}"></td>
                         {% endif %}
                         <td>{{ req.user.full_name }}</td>
@@ -77,20 +77,16 @@
                             </span>
                         </td>
                         <td class="text-center">
+                            <div class="btn-group" role="group">
                             {% if req.status == 'pending' %}
-                            <form action="{{ url_for('admin.action_day_off_request', request_id=req.id, action='approve', status=current_status) }}" method="post" class="d-inline individual-form">
-                                <button type="button" onclick="this.closest('form').submit()" class="btn btn-sm btn-success">承認</button>
-                            </form>
-                            <form action="{{ url_for('admin.action_day_off_request', request_id=req.id, action='reject', status=current_status) }}" method="post" class="d-inline individual-form">
-                                <button type="button" onclick="this.closest('form').submit()" class="btn btn-sm btn-danger">却下</button>
-                            </form>
+                                <button type="submit" formmethod="post" formaction="{{ url_for('admin.action_day_off_request', request_id=req.id, action='approve', status=current_status) }}" class="btn btn-sm btn-success">承認</button>
+                                <button type="submit" formmethod="post" formaction="{{ url_for('admin.action_day_off_request', request_id=req.id, action='reject', status=current_status) }}" class="btn btn-sm btn-danger">却下</button>
                             {% elif req.status == 'approved' %}
-                            <form action="{{ url_for('admin.action_day_off_request', request_id=req.id, action='reject', status=current_status) }}" method="post" class="d-inline individual-form">
-                                <button type="button" onclick="this.closest('form').submit()" class="btn btn-sm btn-warning">却下に変更</button>
-                            </form>
+                                <button type="submit" formmethod="post" formaction="{{ url_for('admin.action_day_off_request', request_id=req.id, action='reject', status=current_status) }}" class="btn btn-sm btn-warning">却下に変更</button>
                             {% else %}
                             -
                             {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -100,13 +96,18 @@
             <p class="text-center text-muted mb-0">対象の希望休申請はありません。</p>
             {% endif %}
         </div>
-        {% if current_status == 'pending' and requests %}
+        {% if requests and current_status in ['pending', 'approved'] %}
         <div class="card-footer text-end">
-            <button type="submit" class="btn btn-primary">選択した申請を一括承認</button>
+            {% if current_status == 'pending' %}
+            <button type="submit" name="action" value="approve" class="btn btn-primary">選択した申請を承認</button>
+            <button type="submit" name="action" value="reject" class="btn btn-danger">選択した申請を却下</button>
+            {% elif current_status == 'approved' %}
+            <button type="submit" name="action" value="reject" class="btn btn-warning">選択した申請を却下</button>
+            {% endif %}
         </div>
-        {% elif current_status != 'pending' %}
+        {% else %}
         <div class="card-footer text-muted">
-            一括操作は「申請中」タブでのみ行えます。
+             一括操作は「申請中」または「承認済み」タブでのみ行えます。
         </div>
         {% endif %}
     </div>
@@ -140,14 +141,6 @@
             });
         });
     }
-
-    // Prevent bulk form submission if an individual action is taken
-    const individualForms = document.querySelectorAll('.individual-form');
-    individualForms.forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.stopPropagation();
-        });
-    });
 });
 </script>
 {% endblock %}
