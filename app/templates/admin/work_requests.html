@@ -75,14 +75,14 @@
                             <td class="text-center">
                                 {% if req.status == 'pending' %}
                                 <form action="{{ url_for('admin.action_work_request', request_id=req.id, action='approve', status=current_status) }}" method="post" class="d-inline individual-form">
-                                    <button type="submit" class="btn btn-sm btn-success">承認</button>
+                                    <button type="button" onclick="this.closest('form').submit()" class="btn btn-sm btn-success">承認</button>
                                 </form>
                                 <form action="{{ url_for('admin.action_work_request', request_id=req.id, action='reject', status=current_status) }}" method="post" class="d-inline individual-form">
-                                    <button type="submit" class="btn btn-sm btn-danger">却下</button>
+                                    <button type="button" onclick="this.closest('form').submit()" class="btn btn-sm btn-danger">却下</button>
                                 </form>
                                 {% elif req.status == 'approved' %}
                                 <form action="{{ url_for('admin.action_work_request', request_id=req.id, action='reject', status=current_status) }}" method="post" class="d-inline individual-form">
-                                    <button type="submit" class="btn btn-sm btn-warning">却下に変更</button>
+                                    <button type="button" onclick="this.closest('form').submit()" class="btn btn-sm btn-warning">却下に変更</button>
                                 </form>
                                 {% else %}
                                 -
