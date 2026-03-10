@@ -255,29 +255,30 @@ def generate_shifts():
             ).all()
             special_days_map = {day.date.isoformat(): day for day in special_days_query}
 
-            pdf_exporter = PDFExporter()
-            pdf_data = pdf_exporter.generate(
-                year, month, employees_for_pdf, assignments_for_pdf, 
-                shift_types=shift_types_map, hourly_groups=generator.hourly_groups,
-                highlight_cells=highlight_cells,
-                staffing_requirements=constraints,
-                special_days=special_days_map
-            )
+            # --- PDF生成処理を一時的に無効化 ---
+            # pdf_exporter = PDFExporter()
+            # pdf_data = pdf_exporter.generate(
+            #     year, month, employees_for_pdf, assignments_for_pdf, 
+            #     shift_types=shift_types_map, hourly_groups=generator.hourly_groups,
+            #     highlight_cells=highlight_cells,
+            #     staffing_requirements=constraints,
+            #     special_days=special_days_map
+            # )
             
-            # PDF保存
-            pdf_dir = os.path.join(current_app.instance_path, 'pdfs')
-            os.makedirs(pdf_dir, exist_ok=True)
-            timestamp = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-            pdf_filename = f"shift_{year}_{month:02d}_{timestamp}.pdf"
-            pdf_path = os.path.join(pdf_dir, pdf_filename)
+            # # PDF保存
+            # pdf_dir = os.path.join(current_app.instance_path, 'pdfs')
+            # os.makedirs(pdf_dir, exist_ok=True)
+            # timestamp = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+            # pdf_filename = f"shift_{year}_{month:02d}_{timestamp}.pdf"
+            # pdf_path = os.path.join(pdf_dir, pdf_filename)
             
-            with open(pdf_path, 'wb') as f:
-                f.write(pdf_data)
+            # with open(pdf_path, 'wb') as f:
+            #     f.write(pdf_data)
 
-            # 履歴を更新
+            # 履歴を更新 (PDFパスは一時的にNoneに)
             history.status = "Success"
-            history.pdf_file_path = pdf_filename # Store relative path from pdf_dir
-            flash(f"{year}年{month}月のシフトが正常に作成・保存されました。", "success")
+            history.pdf_file_path = None # pdf_filename を None に変更
+            flash(f"{year}年{month}月のシフトが正常に作成されました。(PDF生成はスキップ)", "success")
         else:
             # 失敗時は result がエラーメッセージ
             error_message = result
