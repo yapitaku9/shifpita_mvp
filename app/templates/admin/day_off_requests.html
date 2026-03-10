@@ -84,6 +84,10 @@
                             <form action="{{ url_for('admin.action_day_off_request', request_id=req.id, action='reject', status=current_status) }}" method="post" class="d-inline individual-form">
                                 <button type="submit" class="btn btn-sm btn-danger">却下</button>
                             </form>
+                            {% elif req.status == 'approved' %}
+                            <form action="{{ url_for('admin.action_day_off_request', request_id=req.id, action='reject', status=current_status) }}" method="post" class="d-inline individual-form">
+                                <button type="submit" class="btn btn-sm btn-warning">却下に変更</button>
+                            </form>
                             {% else %}
                             -
                             {% endif %}

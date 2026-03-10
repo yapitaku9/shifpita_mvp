@@ -724,6 +724,38 @@ def bulk_action_day_off():
     return redirect(url_for('admin.manage_day_off_requests', status=status_filter))
 
 
+@admin_bp.route("/work_requests/bulk_action", methods=['POST'])
+def bulk_action_work_request():
+    """選択された希望勤務申請を一括で承認する"""
+    request_ids = request.form.getlist('request_ids')
+    status_filter = request.form.get('status_filter', 'pending')
+
+    if not request_ids:
+        flash('一括操作の対象となる申請が選択されていません。', 'warning')
+        return redirect(url_for('admin.manage_work_requests', status=status_filter))
+
+    try:
+        requests_to_approve = WorkRequest.query.filter(WorkRequest.id.in_(request_ids)).all()
+        
+        approved_count = 0
+        for req in requests_to_approve:
+            if req.status == 'pending':
+                req.status = 'approved'
+                approved_count += 1
+        
+        if approved_count > 0:
+            db.session.commit()
+            flash(f'{approved_count}件の希望勤務申請を一括で承認しました。', 'success')
+        else:
+            flash('承認対象の申請（申請中）がありませんでした。', 'info')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"一括承認処理中にエラーが発生しました: {e}", "danger")
+
+    return redirect(url_for('admin.manage_work_requests', status=status_filter))
+
+
 @admin_bp.route("/work_requests")
 def manage_work_requests():
     """希望勤務の申請を一覧表示し、管理する"""
