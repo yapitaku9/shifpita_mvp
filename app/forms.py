@@ -310,39 +310,29 @@ class ShiftConfirmationForm(FlaskForm):
     submit = SubmitField("この月のシフトを確定")
 
 
-def create_shift_constraint_form():
-    """DBから制約を読み込み、動的にフォームクラスを生成するファクトリ関数"""
-    from app.models.master import ShiftConstraint
+from wtforms import Form, HiddenField, FieldList, FormField
+
+
+class SingleConstraintForm(Form):
+    """単一の制約を編集するためのサブフォーム（CSRF無効）"""
+    class Meta:
+        csrf = False  # サブフォームではCSRFは不要
     
-    class DynamicShiftConstraintForm(FlaskForm):
-        pass
+    name = HiddenField()
+    description = StringField("説明", render_kw={'readonly': True})
+    value = IntegerField(
+        "値",
+        validators=[
+            DataRequired(message="値は必須です。"),
+            NumberRange(min=0, message="0以上の数値を入力してください。")
+        ]
+    )
+    is_boolean = HiddenField() # BooleanFieldとして扱うかのフラグ
 
-    # DBからすべての制約を取得
-    constraints = ShiftConstraint.query.order_by(ShiftConstraint.display_order, ShiftConstraint.id).all()
-
-    # 各制約に対してフォームフィールドを動的に追加
-    for constraint in constraints:
-        # 説明が「【シフト構成】」で始まる場合はBooleanFieldを使用
-        if constraint.description.startswith('【シフト構成】'):
-            field = BooleanField(
-                label=constraint.description,
-                default=bool(constraint.value)
-            )
-        else:
-            field = IntegerField(
-                label=constraint.description,
-                validators=[
-                    DataRequired(message=f"{constraint.description}は必須です。"),
-                    NumberRange(min=0, message="0以上の数値を入力してください。")
-                ],
-                default=constraint.value
-            )
-        setattr(DynamicShiftConstraintForm, constraint.name, field)
-
-    # 最後にSubmitボタンを追加
-    setattr(DynamicShiftConstraintForm, 'submit', SubmitField("更新する"))
-    
-    return DynamicShiftConstraintForm
+class ShiftConstraintForm(FlaskForm):
+    """制約のリストを管理するためのメインフォーム"""
+    constraints = FieldList(FormField(SingleConstraintForm))
+    submit_constraints = SubmitField("制約を更新する")
 
 
 class EmailEditForm(FlaskForm):

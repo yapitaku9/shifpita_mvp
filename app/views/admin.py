@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import func, case
 from wtforms import BooleanField
 from app import db
-from app.forms import EmployeeForm, ShiftGenerationForm, ShiftConfirmationForm, create_shift_constraint_form, SpecialDayForm, EmailEditForm, PasswordChangeForm, UsernameChangeForm
+from app.forms import EmployeeForm, ShiftGenerationForm, ShiftConfirmationForm, ShiftConstraintForm, SpecialDayForm, EmailEditForm, PasswordChangeForm, UsernameChangeForm
 from app.models.user import User, EmploymentType, get_selectable_shift_choices
 from app.models.master import ShiftConstraint, ShiftType
 from app.models.history import ShiftGenerationHistory
@@ -449,138 +449,59 @@ def confirm_shifts():
 @admin_bp.route("/constraints", methods=["GET", "POST"])
 def manage_constraints():
     """シフト作成の制約条件と特別日を編集する"""
-    ShiftConstraintForm = create_shift_constraint_form()
     form = ShiftConstraintForm()
     special_day_form = SpecialDayForm()
 
-    # POSTリクエストの判別
-    if request.method == 'POST':
-        # name属性でどちらのフォームが送信されたかを判断
-        if 'submit_constraints' in request.form and form.validate_on_submit():
-            try:
-                for field_name, field_value in form.data.items():
-                    if field_name not in ['csrf_token', 'submit', 'submit_constraints']:
-                        constraint = ShiftConstraint.query.filter_by(name=field_name).first()
-                        if constraint:
-                            current_value = constraint.value
-                            new_value = field_value
-                            
-                            # BooleanFieldの場合、boolをintに変換して比較・更新
-                            field = getattr(form, field_name)
-                            if isinstance(field, BooleanField):
-                                new_value = int(field_value)
-
-                            if current_value != new_value:
-                                constraint.value = new_value
-                db.session.commit()
-                flash("制約条件を更新しました。", "success")
-            except Exception as e:
-                db.session.rollback()
-                flash(f"制約条件の更新中にエラーが発生しました: {e}", "danger")
-            return redirect(url_for("admin.manage_constraints"))
-
-        elif 'submit_special_day' in request.form and special_day_form.validate_on_submit():
-            try:
-                special_day = SpecialDay(
-                    date=special_day_form.date.data,
-                    staff_increase=special_day_form.staff_increase.data,
-                    description=special_day_form.description.data,
-                    visit_time=special_day_form.visit_time.data or None
-                )
-                db.session.add(special_day)
-                db.session.commit()
-                flash(f"{special_day.date.strftime('%Y-%m-%d')}を特別日として設定しました。", "success")
-            except Exception as e:
-                db.session.rollback()
-                flash(f"特別日の設定中にエラーが発生しました: {e}", "danger")
-            return redirect(url_for("admin.manage_constraints"))
-
-    # GETリクエストの場合、またはフォームバリデーションが失敗した場合の処理
-    # --- 制約条件の処理 ---
-    if request.method == "GET":
-        default_constraints = {
-            # 人員配置基準（日曜日以外）
-            "min_staff_weekday_0700": {"description": "【人員配置_平日】07時", "value": 3},
-            "min_staff_weekday_0800": {"description": "【人員配置_平日】08時", "value": 4},
-            "min_staff_weekday_0900": {"description": "【人員配置_平日】09時", "value": 3},
-            "min_staff_weekday_1200": {"description": "【人員配置_平日】12時", "value": 3},
-            "min_staff_weekday_1300": {"description": "【人員配置_平日】13時", "value": 3},
-            "min_staff_weekday_1400": {"description": "【人員配置_平日】14時", "value": 3},
-            "min_staff_weekday_1600": {"description": "【人員配置_平日】16時", "value": 3},
-            "min_staff_weekday_1800": {"description": "【人員配置_平日】18時", "value": 3},
-            "min_staff_weekday_1900": {"description": "【人員配置_平日】19時", "value": 3},
-            "min_staff_weekday_2000_next_0700": {"description": "【人員配置_平日】20時-翌7時", "value": 2},
-            # 人員配置基準（日曜日）
-            "min_staff_sunday_0700": {"description": "【人員配置_日曜】07時", "value": 3},
-            "min_staff_sunday_0800": {"description": "【人員配置_日曜】08時", "value": 4},
-            "min_staff_sunday_0900": {"description": "【人員配置_日曜】09時", "value": 3},
-            "min_staff_sunday_1200": {"description": "【人員配置_日曜】12時", "value": 4},
-            "min_staff_sunday_1300": {"description": "【人員配置_日曜】13時", "value": 4},
-            "min_staff_sunday_1400": {"description": "【人員配置_日曜】14時", "value": 4},
-            "min_staff_sunday_1600": {"description": "【人員配置_日曜】16時", "value": 4},
-            "min_staff_sunday_1800": {"description": "【人員配置_日曜】18時", "value": 4},
-            "min_staff_sunday_1900": {"description": "【人員配置_日曜】19時", "value": 3},
-            "min_staff_sunday_2000_next_0700": {"description": "【人員配置_日曜】20時-翌7時", "value": 2},
-            # 連勤制約
-            "max_consecutive_work_days": {"description": "【連勤制約】最大連勤日数", "value": 5},
-            "max_consecutive_night_shifts": {"description": "【連勤制約】夜勤の最大連勤日数", "value": 4},
-            "max_consecutive_late_and_night": {"description": "【連勤制約】遅番・夜勤の最大連勤日数", "value": 4},
-            # シフト構成
-            "require_day_off_after_ake": {"description": "【シフト構成】明けの翌日は休み", "value": 1},
-            "disallow_specific_shifts_after_night": {"description": "【シフト構成】夜勤翌日の禁止シフト(遅日早)", "value": 1},
-            "disallow_specific_shifts_after_late": {"description": "【シフト構成】遅番翌日の禁止シフト(日早)", "value": 1},
-            "disallow_specific_shifts_after_day": {"description": "【シフト構成】日勤翌日の禁止シフト(早)", "value": 1},
-            # ソフト制約の重み
-            "weight_avoid_charge_support": {"description": "【重み】責任者とサポの同日勤務回避 (ペナルティ)", "value": 1},
-            "weight_ensure_main_staff": {"description": "【重み】正職員の早番/日勤確保 (ペナルティ)", "value": 50},
-            "weight_avoid_4_night_streak": {"description": "【重み】4連続夜勤の回避 (ペナルティ)", "value": 10},
-            "penalty_missed_preferred_shift": {"description": "【重み】優先シフト非採用(勤務日) (ペナルティ)", "value": 10},
-            "weight_exceed_staffing_1": {"description": "【重み】人員超過ペナルティ（1人）", "value": 10},
-            "weight_exceed_staffing_2": {"description": "【重み】人員超過ペナルティ（2人）", "value": 30},
-            "weight_exceed_staffing_3_plus": {"description": "【重み】人員超過ペナルティ（3人以上）", "value": 100},
-        }
+    if 'submit_constraints' in request.form and form.validate_on_submit():
         try:
-            with db.session.begin_nested():
-                # 不要になった古い制約をDBから削除
-                old_constraint_names = [
-                    "avoid_charge_and_support_same_day", 
-                    "ensure_main_staff_in_day_shift",
-                    "max_part3_late_shifts", # 過去の遺物があれば削除
-                    "weight_exceed_staffing_A", # 旧ペナルティ
-                    "weight_exceed_staffing_B", # 旧ペナルティ
-                    "weight_preferred_shift", # 報酬からペナルティへの移行
-                ]
-                for name in old_constraint_names:
-                    old_constraint = db.session.query(ShiftConstraint).filter_by(name=name).first()
-                    if old_constraint:
-                        db.session.delete(old_constraint)
-
-                # デフォルト制約をDBに同期
-                for name, data in default_constraints.items():
-                    constraint = db.session.query(ShiftConstraint).filter_by(name=name).first()
-                    if constraint:
-                        # 存在する場合は説明を更新
-                        if constraint.description != data["description"]:
-                            constraint.description = data["description"]
-                    else:
-                        # 存在しない場合は追加
-                        db.session.add(ShiftConstraint(name=name, description=data["description"], value=data["value"]))
+            for item in form.constraints.data:
+                constraint = ShiftConstraint.query.filter_by(name=item['name']).first()
+                if constraint:
+                    # is_booleanフラグはテンプレートでの表示にのみ使用
+                    # 値は常にIntegerFieldから来るので、Noneかどうかでチェックボックスの状態を判断
+                    new_value = item['value'] if item['value'] is not None else 0
+                    if constraint.value != new_value:
+                        constraint.value = new_value
             db.session.commit()
+            flash("制約条件を更新しました。", "success")
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f"Error setting default constraints: {e}")
+            flash(f"制約条件の更新中にエラーが発生しました: {e}", "danger")
+        return redirect(url_for("admin.manage_constraints"))
 
-        # フォームを再生成してDBの値を反映
-        ShiftConstraintForm = create_shift_constraint_form()
-        form = ShiftConstraintForm()
-        for constraint in ShiftConstraint.query.all():
-            if hasattr(form, constraint.name):
-                field = getattr(form, constraint.name)
-                # BooleanFieldの場合は、DBの値(0 or 1)をboolに変換して設定
-                if isinstance(field, BooleanField):
-                    field.data = bool(constraint.value)
-                else:
-                    field.data = constraint.value
+    elif 'submit_special_day' in request.form and special_day_form.validate_on_submit():
+        try:
+            special_day = SpecialDay(
+                date=special_day_form.date.data,
+                staff_increase=special_day_form.staff_increase.data,
+                description=special_day_form.description.data,
+                visit_time=special_day_form.visit_time.data or None
+            )
+            db.session.add(special_day)
+            db.session.commit()
+            flash(f"{special_day.date.strftime('%Y-%m-%d')}を特別日として設定しました。", "success")
+        except Exception as e:
+            db.session.rollback()
+            flash(f"特別日の設定中にエラーが発生しました: {e}", "danger")
+        return redirect(url_for("admin.manage_constraints"))
+
+    # GETリクエスト、またはPOSTでバリデーション失敗時の処理
+    if not form.is_submitted():
+        # --- データベースの制約をフォームに設定 ---
+        # 既存のリストをクリア
+        while len(form.constraints) > 0:
+            form.constraints.pop_entry()
+        
+        # DBから読み込んでフォームに設定
+        all_constraints = ShiftConstraint.query.order_by(ShiftConstraint.display_order, ShiftConstraint.id).all()
+        for c in all_constraints:
+            is_bool = c.description.startswith('【シフト構成】')
+            form.constraints.append_entry({
+                'name': c.name,
+                'description': c.description,
+                'value': c.value,
+                'is_boolean': 'y' if is_bool else 'n'
+            })
 
     # --- 特別日のリストを取得 ---
     special_days = SpecialDay.query.order_by(SpecialDay.date.asc()).all()

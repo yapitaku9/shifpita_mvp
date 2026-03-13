@@ -7,17 +7,30 @@
     <form method="POST" action="{{ url_for('admin.manage_constraints') }}">
         {{ form.hidden_tag() }}
 
+        {# Loop through all constraints and categorize them #}
+        {% set categorized_fields = {'平日': [], '日曜': [], '連勤': [], '構成': [], '重み': [], 'その他': []} %}
+        {% for constraint_field in form.constraints %}
+            {% if constraint_field.description.data.startswith('【人員配置_平日】') %}{% set _ = categorized_fields['平日'].append(constraint_field) %}
+            {% elif constraint_field.description.data.startswith('【人員配置_日曜】') %}{% set _ = categorized_fields['日曜'].append(constraint_field) %}
+            {% elif constraint_field.description.data.startswith('【連勤制約】') %}{% set _ = categorized_fields['連勤'].append(constraint_field) %}
+            {% elif constraint_field.description.data.startswith('【シフト構成】') %}{% set _ = categorized_fields['構成'].append(constraint_field) %}
+            {% elif constraint_field.description.data.startswith('【重み】') %}{% set _ = categorized_fields['重み'].append(constraint_field) %}
+            {% else %}{% set _ = categorized_fields['その他'].append(constraint_field) %}
+            {% endif %}
+        {% endfor %}
+
         {# Card 1: 人員配置（平日） #}
         <div class="card mb-3">
             <div class="card-header">人員配置（日曜日以外）</div>
             <div class="card-body">
-                {% for field in form if field.label.text.startswith('【人員配置_平日】') %}
-                    {% set label_text = field.label.text.split('】')[1] %}
+                {% for c in categorized_fields['平日'] %}
+                    {{ c.form.hidden_tag() }} {# Renders name and is_boolean hidden fields #}
+                    {% set label_text = c.description.data.split('】')[1] %}
                     <div class="mb-3 row">
-                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
+                        <label for="{{ c.value.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
                         <div class="col-sm-6">
-                            {{ field(class="form-control") }}
-                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            {{ c.value(class="form-control") }}
+                            {% if c.value.errors %}<div class="invalid-feedback d-block">{% for error in c.value.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                         </div>
                     </div>
                 {% endfor %}
@@ -28,13 +41,14 @@
         <div class="card mb-3">
             <div class="card-header">人員配置（日曜日）</div>
             <div class="card-body">
-                {% for field in form if field.label.text.startswith('【人員配置_日曜】') %}
-                    {% set label_text = field.label.text.split('】')[1] %}
+                {% for c in categorized_fields['日曜'] %}
+                    {{ c.form.hidden_tag() }}
+                    {% set label_text = c.description.data.split('】')[1] %}
                     <div class="mb-3 row">
-                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
+                        <label for="{{ c.value.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
                         <div class="col-sm-6">
-                            {{ field(class="form-control") }}
-                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            {{ c.value(class="form-control") }}
+                            {% if c.value.errors %}<div class="invalid-feedback d-block">{% for error in c.value.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                         </div>
                     </div>
                 {% endfor %}
@@ -45,13 +59,14 @@
         <div class="card mb-3">
             <div class="card-header">連勤制約</div>
             <div class="card-body">
-                {% for field in form if field.label.text.startswith('【連勤制約】') %}
-                    {% set label_text = field.label.text.split('】')[1] %}
+                {% for c in categorized_fields['連勤'] %}
+                    {{ c.form.hidden_tag() }}
+                    {% set label_text = c.description.data.split('】')[1] %}
                     <div class="mb-3 row">
-                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
+                        <label for="{{ c.value.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
                         <div class="col-sm-6">
-                            {{ field(class="form-control") }}
-                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                           {{ c.value(class="form-control") }}
+                           {% if c.value.errors %}<div class="invalid-feedback d-block">{% for error in c.value.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                         </div>
                     </div>
                 {% endfor %}
@@ -62,18 +77,18 @@
         <div class="card mb-3">
             <div class="card-header">シフト構成</div>
             <div class="card-body">
-                {% for field in form if field.label.text.startswith('【シフト構成】') %}
-                    {% set label_text = field.label.text.split('】')[1] %}
+                {% for c in categorized_fields['構成'] %}
+                    {{ c.form.hidden_tag() }}
+                    {% set label_text = c.description.data.split('】')[1] %}
                     <div class="mb-3 row">
                         <div class="col-sm-6">
-                            {# BooleanFieldはラベルの表示方法が異なるため、手動で設定 #}
-                            <label class="form-check-label" for="{{ field.id }}">{{ label_text }}</label>
+                            <label class="form-check-label" for="{{ c.value.id }}">{{ label_text }}</label>
                         </div>
                         <div class="col-sm-6">
                             <div class="form-check">
-                                {{ field(class="form-check-input") }}
+                                <input class="form-check-input" type="checkbox" id="{{ c.value.id }}" name="{{ c.value.name }}" value="1" {% if c.value.data == 1 %}checked{% endif %}>
                             </div>
-                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            {% if c.value.errors %}<div class="invalid-feedback d-block">{% for error in c.value.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                         </div>
                     </div>
                 {% endfor %}
@@ -84,13 +99,14 @@
         <div class="card mb-3">
             <div class="card-header">その他</div>
             <div class="card-body">
-                {% for field in form if field.label.text.startswith('【その他】') %}
-                    {% set label_text = field.label.text.split('】')[1] %}
+                {% for c in categorized_fields['その他'] %}
+                    {{ c.form.hidden_tag() }}
+                     {% set label_text = c.description.data.split('】')[1] %}
                     <div class="mb-3 row">
-                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
+                        <label for="{{ c.value.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
                         <div class="col-sm-6">
-                            {{ field(class="form-control") }}
-                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            {{ c.value(class="form-control") }}
+                           {% if c.value.errors %}<div class="invalid-feedback d-block">{% for error in c.value.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                         </div>
                     </div>
                 {% endfor %}
@@ -102,13 +118,14 @@
             <div class="card-header">【ソフト制約】 重み設定</div>
             <div class="card-body">
                 <p class="card-text text-muted small">各項目に対するペナルティ（または報酬）の大きさを設定します。数値が大きいほど影響が強くなります。</p>
-                {% for field in form if field.label.text.startswith('【重み】') %}
-                    {% set label_text = field.label.text.split('】')[1] %}
+                {% for c in categorized_fields['重み'] %}
+                    {{ c.form.hidden_tag() }}
+                    {% set label_text = c.description.data.split('】')[1] %}
                     <div class="mb-3 row">
-                        <label for="{{ field.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
+                        <label for="{{ c.value.id }}" class="col-sm-6 col-form-label">{{ label_text }}</label>
                         <div class="col-sm-6">
-                            {{ field(class="form-control") }}
-                            {% if field.errors %}<div class="invalid-feedback d-block">{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                            {{ c.value(class="form-control") }}
+                            {% if c.value.errors %}<div class="invalid-feedback d-block">{% for error in c.value.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                         </div>
                     </div>
                 {% endfor %}
