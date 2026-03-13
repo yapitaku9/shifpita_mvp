@@ -328,6 +328,26 @@ class ShiftGenerator:
                 for i in range(len(dates) - max_consecutive_late):
                     prob += (pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i, i + max_consecutive_late + 1) for s in self.SHIFTS_LATE) <= max_consecutive_late, f"MaxConsecutiveLate_MidMonth_{emp_id}_{i}")
 
+            # 夜勤5連勤の禁止 (上限4連勤)
+            max_consecutive_night = 4
+            if self.SHIFTS_NIGHT:
+                # 前月末からの夜勤連勤日数を計算
+                consecutive_night_from_prev_month = 0
+                for i in range(max_consecutive_night):
+                    d = prev_month_last_day - timedelta(days=i)
+                    if shift_history_map.get((emp_id, d.isoformat())) in self.SHIFTS_NIGHT:
+                        consecutive_night_from_prev_month += 1
+                    else:
+                        break
+                # 月初から最大夜勤連勤日数までの期間の制約
+                if consecutive_night_from_prev_month > 0:
+                    for i in range(max_consecutive_night):
+                         prob += (pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i + 1) for s in self.SHIFTS_NIGHT) + consecutive_night_from_prev_month <= max_consecutive_night, f"MaxConsecutiveNight_StartOfMonth_{emp_id}_{i}")
+
+                # 月内の夜勤連勤制約
+                for i in range(len(dates) - max_consecutive_night):
+                    prob += (pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i, i + max_consecutive_night + 1) for s in self.SHIFTS_NIGHT) <= max_consecutive_night, f"MaxConsecutiveNight_MidMonth_{emp_id}_{i}")
+
 
             # --- シフト構成ルール ---
             all_dates_with_next = [(d.isoformat(), (d + timedelta(days=1)).isoformat()) for d in dates[:-1]]
