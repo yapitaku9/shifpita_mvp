@@ -141,7 +141,7 @@ def get_shift_choices(employment_type):
     })
 
 
-@admin_bp.route("/download/pdf/<int:history_id>")
+@admin_bp.route("/shifts/download/<int:history_id>")
 def download_pdf(history_id):
     """生成されたシフトPDFをダウンロードする"""
     history = db.get_or_404(ShiftGenerationHistory, history_id)
