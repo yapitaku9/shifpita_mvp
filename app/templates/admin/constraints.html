@@ -25,26 +25,26 @@
                 {% endif %}
 
                 {# Loop through constraints that match the current category prefix #}
-                {% for c in form.constraints if c.description.data.startswith(prefix) %}
+                {% for c in form.constraints if c.form.description.data.startswith(prefix) %}
                     {{ c.form.hidden_tag() }} {# Renders name and is_boolean hidden fields #}
-                    {% set label_text = c.description.data.split('】', 1)[1] %}
+                    {% set label_text = c.form.description.data.split('】', 1)[1] %}
 
                     <div class="mb-3 row">
                         <div class="col-sm-6">
-                            <label class="form-label" for="{{ c.value.id }}">{{ label_text }}</label>
+                            <label class="form-label" for="{{ c.form.value.id }}">{{ label_text }}</label>
                         </div>
                         <div class="col-sm-6">
-                            {% if c.is_boolean.data == 'y' %}
+                            {% if c.form.is_boolean.data == 'y' %}
                                 <div class="form-check pt-2">
-                                    <input class="form-check-input" type="checkbox" id="{{ c.value.id }}" name="{{ c.value.name }}" value="1" {% if c.value.data == 1 %}checked{% endif %}>
+                                    <input class="form-check-input" type="checkbox" id="{{ c.form.value.id }}" name="{{ c.form.value.name }}" value="1" {% if c.form.value.data == 1 %}checked{% endif %}>
                                 </div>
                             {% else %}
-                                {{ c.value(class="form-control") }}
+                                {{ c.form.value(class="form-control") }}
                             {% endif %}
 
-                            {% if c.value.errors %}
+                            {% if c.form.value.errors %}
                                 <div class="invalid-feedback d-block">
-                                    {% for error in c.value.errors %}<span>{{ error }}</span>{% endfor %}
+                                    {% for error in c.form.value.errors %}<span>{{ error }}</span>{% endfor %}
                                 </div>
                             {% endif %}
                         </div>

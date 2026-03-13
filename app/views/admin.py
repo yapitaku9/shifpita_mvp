@@ -141,9 +141,14 @@ def get_shift_choices(employment_type):
     })
 
 
-@admin_bp.route("/shifts/download/<int:history_id>")
-def download_pdf(history_id):
+@admin_bp.route("/shifts/download")
+def download_pdf():
     """生成されたシフトPDFをダウンロードする"""
+    history_id = request.args.get('id', type=int)
+    if not history_id:
+        flash("ダウンロード用のIDが指定されていません。", "danger")
+        return redirect(url_for('admin.dashboard'))
+
     history = db.get_or_404(ShiftGenerationHistory, history_id)
     if history.pdf_file_path and history.status == 'Success':
         pdf_dir = os.path.join(current_app.instance_path, 'pdfs')

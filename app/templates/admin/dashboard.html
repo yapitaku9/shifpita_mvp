@@ -110,7 +110,7 @@
                                     <small class="text-muted d-block">{{ (history.generation_timestamp | jst).strftime('%Y-%m-%d %H:%M') }}</small>
                                 </div>
                                 {% if history.status == 'Success' and history.pdf_file_path %}
-                                    <a href="{{ url_for('admin.download_pdf', history_id=history.id) }}" class="btn btn-sm btn-outline-success">
+                                    <a href="{{ url_for('admin.download_pdf', id=history.id) }}" class="btn btn-sm btn-outline-success">
                                         <i class="bi bi-download"></i>
                                     </a>
                                 {% elif history.status == 'Failed' %}
