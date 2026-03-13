@@ -141,7 +141,7 @@ def get_shift_choices(employment_type):
     })
 
 
-@admin_bp.route("/download_pdf/<int:history_id>")
+@admin_bp.route("/download/pdf/<int:history_id>")
 def download_pdf(history_id):
     """生成されたシフトPDFをダウンロードする"""
     history = db.get_or_404(ShiftGenerationHistory, history_id)
@@ -1010,7 +1010,7 @@ def change_password():
     return render_template("admin/change_password.html", title="パスワード変更", form=form)
 
 
-@admin_bp.route("/confirmed_shifts", methods=["GET"])
+@admin_bp.route("/shifts-history", methods=["GET"])
 def confirmed_shifts():
     """確定済みシフトの一覧を表示する"""
     
