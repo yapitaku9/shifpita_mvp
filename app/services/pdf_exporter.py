@@ -47,7 +47,7 @@ class PDFExporter:
             for d in dates
         ]
         # 2列追加（時間、項目）
-        header_row = ["", "氏名"] + header_date_cells + ["勤務日", "有給休暇", "総勤務日数", "休日", "夜勤日数"]
+        header_row = ["", "氏名"] + header_date_cells + ["勤務日", "休日", "その他休日", "夜勤日数"]
         data = [header_row]
 
         assignment_map = {(a["employee_id"], a["date"]): a["shift_type"] for a in assignments}
@@ -65,9 +65,7 @@ class PDFExporter:
                     holidays += 1
                 if "夜" in shift_name:
                     night_shifts += 1
-            total_work_days = work_days + paid_holidays
-            # 2列追加に合わせて先頭に空セルを追加
-            row = ["", emp["name"]] + row_shifts + [str(work_days), str(paid_holidays), str(total_work_days), str(holidays), str(night_shifts)]
+            row = ["", emp["name"]] + row_shifts + [str(work_days), str(holidays), str(paid_holidays), str(night_shifts)]
             data.append(row)
 
         constraint_hours = [7, 8, 9, 12, 13, 14, 16, 18, 19]

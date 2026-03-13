@@ -67,7 +67,7 @@ class ExcelExporter:
                 cell.fill = PatternFill(start_color="DC143C", end_color="DC143C", fill_type="solid")
         
         # --- Employee Summary Headers ---
-        summary_headers = ["勤務日", "有給", "総勤務", "休日", "夜勤"]
+        summary_headers = ["勤務日", "休日", "その他休日", "夜勤"]
         summary_start_col = num_days + 2
         for i, header in enumerate(summary_headers):
             col = summary_start_col + i
@@ -114,7 +114,7 @@ class ExcelExporter:
                     elif day.weekday() == 6: cell.fill = sunday_fill
             
             # Write employee summary
-            emp_summary_data = [work_days, paid_holidays, work_days + paid_holidays, holidays, night_shifts]
+            emp_summary_data = [work_days, holidays, paid_holidays, night_shifts]
             for i, value in enumerate(emp_summary_data):
                 ws.cell(row=row_num, column=summary_start_col + i, value=value).border = thin_border
                 ws.cell(row=row_num, column=summary_start_col + i).alignment = center_alignment

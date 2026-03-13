@@ -31,13 +31,12 @@ class ShiftGenerator:
         self.SHIFTS_EARLY = [st.name for st in self.shift_types_by_id.values() if "早" in st.name]
         self.SHIFTS_DAY = [st.name for st in self.shift_types_by_id.values() if "日" in st.name]
 
-        # 総勤務日数計算用のシフト（休み、明け以外）
+        # 総勤務日数計算用のシフト（休み、明け、有給以外）
         self.SHIFTS_FOR_WORK_COUNT = [
-            s.name for s in self.shift_types_by_id.values() if s.name not in [self.SHIFT_KYU, self.SHIFT_AKE]
+            s.name for s in self.shift_types_by_id.values() if s.name not in [self.SHIFT_KYU, self.SHIFT_AKE, self.SHIFT_PAID_HOLIDAY]
         ]
-        self.SHIFTS_FOR_WORK_COUNT = list(set(self.SHIFTS_FOR_WORK_COUNT + [self.SHIFT_PAID_HOLIDAY]))
         # 連勤計算用の勤務シフト（休み、明け、有給以外）
-        self.SHIFTS_WORK = [s for s in self.SHIFTS_FOR_WORK_COUNT if s != self.SHIFT_PAID_HOLIDAY]
+        self.SHIFTS_WORK = self.SHIFTS_FOR_WORK_COUNT
 
         # 正社員の勤務シフト
         self.SHIFTS_FULL_TIME_WORK = [
@@ -45,6 +44,16 @@ class ShiftGenerator:
         ]
         # 遅番または夜勤
         self.SHIFTS_LATE_OR_NIGHT = self.SHIFTS_LATE + self.SHIFTS_NIGHT
+
+        # --- 禁止連続シフトペア (例: 早2 -> 早1) ---
+        self.forbidden_consecutive_pairs = []
+        shift_name_bases = ["早", "日", "遅", "夜"]
+        all_shift_names_in_db = self.shift_types_by_name.keys()
+        for base in shift_name_bases:
+            s2_name = f"{base}2"
+            s1_name = f"{base}1"
+            if s2_name in all_shift_names_in_db and s1_name in all_shift_names_in_db:
+                self.forbidden_consecutive_pairs.append((s2_name, s1_name))
 
         # --- 時間帯別人員配置のためのグループ ---
         self.hourly_groups = {h: [] for h in range(24)}
@@ -281,99 +290,111 @@ class ShiftGenerator:
 
             # 連勤制約
             max_consecutive = int(emp.get("max_consecutive_work_days") or self.constraints.get("max_consecutive_work_days", 5))
-            if max_consecutive <= 0: max_consecutive = 5
-            
-            # 前月末からの連勤日数を計算
-            consecutive_work_from_prev_month = 0
-            for i in range(max_consecutive):
-                d = prev_month_last_day - timedelta(days=i)
-                if shift_history_map.get((emp_id, d.isoformat())) in self.SHIFTS_WORK:
-                    consecutive_work_from_prev_month += 1
-                else:
-                    break
-            logging.debug(f"Emp {emp_id}: consecutive work days from previous month = {consecutive_work_from_prev_month}")
-
-            # 月初から最大連勤日数までの期間の制約
-            for i in range(max_consecutive):
-                # 前月からの連勤日数と、今月のi日目までの勤務日数の合計がmax_consecutiveを超えないようにする
-                prob += (pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i + 1) for s in self.SHIFTS_WORK) + consecutive_work_from_prev_month <= max_consecutive, f"MaxConsecutiveWork_StartOfMonth_{emp_id}_{i}")
-
-            # 月内の連勤制約 (従来通り)
-            for i in range(len(dates) - max_consecutive):
-                prob += (pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i, i + max_consecutive + 1) for s in self.SHIFTS_WORK) <= max_consecutive, f"MaxConsecutiveWork_MidMonth_{emp_id}_{i}")
-
-            # 他の連勤制約（夜勤、遅番＋夜勤）も同様に月またぎを考慮する必要があるが、一旦メインの連勤のみ対応
-
-            # シフト構成ルール
-            all_dates_with_prev = [(d.isoformat(), (d - timedelta(days=1)).isoformat()) for d in dates]
-
-            for d_str, prev_d_str in all_dates_with_prev:
-                prev_date = date.fromisoformat(prev_d_str)
-
-                # 前日が当月の場合
-                if prev_date.month == month:
-                    for night_shift in self.SHIFTS_NIGHT:
-                        # 夜勤の翌日は「明」か「夜勤」のみに修正
-                        prob += (x[emp_id, prev_d_str, night_shift] <= pulp.lpSum(x[emp_id, d_str, s] for s in [self.SHIFT_AKE] + self.SHIFTS_NIGHT), f"NightMustBeFollowedByAkeOrNight_{emp_id}_{prev_d_str}_{night_shift}")
-                    prob += (x[emp_id, d_str, self.SHIFT_AKE] <= pulp.lpSum(x[emp_id, prev_d_str, s] for s in self.SHIFTS_NIGHT), f"AkeOnlyAfterNight_{emp_id}_{d_str}")
-                    
-                    # 翌日への制約
-                    next_d_str = (date.fromisoformat(d_str) + timedelta(days=1)).isoformat()
-                    if next_d_str in date_strs:
-                        if self.constraints.get("require_day_off_after_ake", 1) == 1:
-                            prob += (x[emp_id, d_str, self.SHIFT_AKE] <= x[emp_id, next_d_str, self.SHIFT_KYU], f"RestAfterAke_{emp_id}_{d_str}")
-                        if is_full_timer:
-                            if self.constraints.get("disallow_specific_shifts_after_night", 1) == 1 and self.SHIFTS_NIGHT:
-                                forbidden = self.SHIFTS_LATE + self.SHIFTS_DAY + self.SHIFTS_EARLY
-                                for night_shift in self.SHIFTS_NIGHT:
-                                    for f_shift in forbidden:
-                                        prob += (x[emp_id, d_str, night_shift] + x[emp_id, next_d_str, f_shift] <= 1, f"No_{f_shift}_After_{night_shift}_{emp_id}_{d_str}")
-                            if self.constraints.get("disallow_specific_shifts_after_late", 1) == 1 and self.SHIFTS_LATE:
-                                forbidden = self.SHIFTS_DAY + self.SHIFTS_EARLY
-                                for late_shift in self.SHIFTS_LATE:
-                                    for f_shift in forbidden:
-                                        prob += (x[emp_id, d_str, late_shift] + x[emp_id, next_d_str, f_shift] <= 1, f"No_{f_shift}_After_{late_shift}_{emp_id}_{d_str}")
-                            if self.constraints.get("disallow_specific_shifts_after_day", 1) == 1 and self.SHIFTS_DAY:
-                                forbidden = self.SHIFTS_EARLY
-                                for day_shift in self.SHIFTS_DAY:
-                                    for f_shift in forbidden:
-                                        prob += (x[emp_id, d_str, day_shift] + x[emp_id, next_d_str, f_shift] <= 1, f"No_{f_shift}_After_{day_shift}_{emp_id}_{d_str}")
-                
-                # 前日が前月の場合 (月初日の処理)
-                else:
-                    prev_shift = shift_history_map.get((emp_id, prev_d_str))
-                    logging.debug(f"Emp {emp_id} on {d_str}: previous day shift from history is {prev_shift}")
-                    
-                    # --- 履歴がある場合の処理 ---
-                    if prev_shift:
-                        if prev_shift in self.SHIFTS_NIGHT:
-                            # 夜勤明けは「明」または「夜勤」のみ (休みは不可)
-                            prob += (pulp.lpSum(x[emp_id, d_str, s] for s in [self.SHIFT_AKE] + self.SHIFTS_NIGHT) == 1, f"History_NightFollowedBy_{emp_id}_{d_str}")
-                        
-                        # 「明」は夜勤の翌日のみ
-                        if prev_shift not in self.SHIFTS_NIGHT:
-                            prob += (x[emp_id, d_str, self.SHIFT_AKE] == 0, f"History_NoAkeWithoutNight_{emp_id}_{d_str}")
-                        
-                        # 履歴に基づいた当日の禁止シフト
-                        if is_full_timer:
-                            if prev_shift in self.SHIFTS_NIGHT and self.constraints.get("disallow_specific_shifts_after_night", 1) == 1:
-                                forbidden = self.SHIFTS_LATE + self.SHIFTS_DAY + self.SHIFTS_EARLY
-                                for f_shift in forbidden:
-                                    prob += (x[emp_id, d_str, f_shift] == 0, f"History_No_{f_shift}_After_Night_{emp_id}_{d_str}")
-                            if prev_shift in self.SHIFTS_LATE and self.constraints.get("disallow_specific_shifts_after_late", 1) == 1:
-                                forbidden = self.SHIFTS_DAY + self.SHIFTS_EARLY
-                                for f_shift in forbidden:
-                                    prob += (x[emp_id, d_str, f_shift] == 0, f"History_No_{f_shift}_After_Late_{emp_id}_{d_str}")
-                            if prev_shift in self.SHIFTS_DAY and self.constraints.get("disallow_specific_shifts_after_day", 1) == 1:
-                                forbidden = self.SHIFTS_EARLY
-                                for f_shift in forbidden:
-                                    prob += (x[emp_id, d_str, f_shift] == 0, f"History_No_{f_shift}_After_Day_{emp_id}_{d_str}")
-                    
-                    # --- 履歴がない場合のフォールバック処理 ---
+            if max_consecutive > 0:
+                # 前月末からの連勤日数を計算
+                consecutive_work_from_prev_month = 0
+                for i in range(max_consecutive):
+                    d = prev_month_last_day - timedelta(days=i)
+                    if shift_history_map.get((emp_id, d.isoformat())) in self.SHIFTS_WORK:
+                        consecutive_work_from_prev_month += 1
                     else:
-                        prob += (x[emp_id, d_str, self.SHIFT_AKE] == 0, f"NoAkeOnFirstDay_Fallback_{emp_id}")
+                        break
+                # 月初から最大連勤日数までの期間の制約
+                if consecutive_work_from_prev_month > 0:
+                    for i in range(max_consecutive):
+                        prob += (pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i + 1) for s in self.SHIFTS_WORK) + consecutive_work_from_prev_month <= max_consecutive, f"MaxConsecutiveWork_StartOfMonth_{emp_id}_{i}")
 
-            # 月初日の「明」禁止制約は、より詳細な履歴に基づく制約に置き換えるため削除済
+                # 月内の連勤制約
+                for i in range(len(dates) - max_consecutive):
+                    prob += (pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i, i + max_consecutive + 1) for s in self.SHIFTS_WORK) <= max_consecutive, f"MaxConsecutiveWork_MidMonth_{emp_id}_{i}")
+            
+            # 遅番5連勤の禁止 (上限4連勤)
+            max_consecutive_late = 4
+            if self.SHIFTS_LATE:
+                # 前月末からの遅番連勤日数を計算
+                consecutive_late_from_prev_month = 0
+                for i in range(max_consecutive_late):
+                    d = prev_month_last_day - timedelta(days=i)
+                    if shift_history_map.get((emp_id, d.isoformat())) in self.SHIFTS_LATE:
+                        consecutive_late_from_prev_month += 1
+                    else:
+                        break
+                # 月初から最大遅番連勤日数までの期間の制約
+                if consecutive_late_from_prev_month > 0:
+                    for i in range(max_consecutive_late):
+                         prob += (pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i + 1) for s in self.SHIFTS_LATE) + consecutive_late_from_prev_month <= max_consecutive_late, f"MaxConsecutiveLate_StartOfMonth_{emp_id}_{i}")
+
+                # 月内の遅番連勤制約
+                for i in range(len(dates) - max_consecutive_late):
+                    prob += (pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i, i + max_consecutive_late + 1) for s in self.SHIFTS_LATE) <= max_consecutive_late, f"MaxConsecutiveLate_MidMonth_{emp_id}_{i}")
+
+
+            # --- シフト構成ルール ---
+            all_dates_with_next = [(d.isoformat(), (d + timedelta(days=1)).isoformat()) for d in dates[:-1]]
+            
+            # 月初の処理 (前月最終日 -> 当月1日)
+            first_day_str = date_strs[0]
+            prev_to_first_day_str = (start_date - timedelta(days=1)).isoformat()
+            prev_shift = shift_history_map.get((emp_id, prev_to_first_day_str))
+            if prev_shift:
+                # 夜勤明け
+                if prev_shift in self.SHIFTS_NIGHT:
+                    prob += (pulp.lpSum(x[emp_id, first_day_str, s] for s in [self.SHIFT_AKE] + self.SHIFTS_NIGHT) == 1, f"History_NightFollowedBy_{emp_id}_{first_day_str}")
+                else:
+                    prob += (x[emp_id, first_day_str, self.SHIFT_AKE] == 0, f"History_NoAkeWithoutNight_{emp_id}_{first_day_str}")
+                # 履歴に基づいた禁止シフト (1日のシフトを制限)
+                if prev_shift in self.SHIFTS_NIGHT and self.constraints.get("disallow_specific_shifts_after_night", 1) == 1:
+                    forbidden = self.SHIFTS_LATE + self.SHIFTS_DAY + self.SHIFTS_EARLY
+                    prob += (pulp.lpSum(x[emp_id, first_day_str, s] for s in forbidden) == 0, f"History_NoShiftAfterNight_{emp_id}_{first_day_str}")
+                if prev_shift in self.SHIFTS_LATE and self.constraints.get("disallow_specific_shifts_after_late", 1) == 1:
+                    forbidden = self.SHIFTS_DAY + self.SHIFTS_EARLY
+                    prob += (pulp.lpSum(x[emp_id, first_day_str, s] for s in forbidden) == 0, f"History_NoShiftAfterLate_{emp_id}_{first_day_str}")
+                if prev_shift in self.SHIFTS_DAY and self.constraints.get("disallow_specific_shifts_after_day", 1) == 1:
+                    forbidden = self.SHIFTS_EARLY
+                    prob += (pulp.lpSum(x[emp_id, first_day_str, s] for s in forbidden) == 0, f"History_NoShiftAfterDay_{emp_id}_{first_day_str}")
+                
+                # 禁止連続ペア (例: 早2 -> 早1)
+                for prev_s, next_s in self.forbidden_consecutive_pairs:
+                    if prev_shift == prev_s:
+                        prob += (x[emp_id, first_day_str, next_s] == 0, f"History_ForbiddenPair_{prev_s}_{next_s}_{emp_id}_{first_day_str}")
+            else:
+                 # 履歴がない場合は、1日は明けにできない
+                prob += (x[emp_id, first_day_str, self.SHIFT_AKE] == 0, f"NoAkeOnFirstDay_Fallback_{emp_id}")
+
+            # 月内 (1日->2日, 2日->3日, ..., 最終日-1 -> 最終日)
+            for d_str, next_d_str in all_dates_with_next:
+                # 夜勤 -> 明け or 夜勤
+                for night_shift in self.SHIFTS_NIGHT:
+                    prob += (x[emp_id, d_str, night_shift] <= pulp.lpSum(x[emp_id, next_d_str, s] for s in [self.SHIFT_AKE] + self.SHIFTS_NIGHT), f"NightToAkeOrNight_{emp_id}_{d_str}_{night_shift}")
+                # 明け -> 夜勤の翌日のみ
+                # 2日目以降に適用する（1日目の分は月初の処理で対応済み）
+                if d_str != date_strs[0]:
+                    prob += (x[emp_id, d_str, self.SHIFT_AKE] <= pulp.lpSum(x[emp_id, (date.fromisoformat(d_str)-timedelta(days=1)).isoformat(), s] for s in self.SHIFTS_NIGHT), f"AkeOnlyAfterNight_{emp_id}_{d_str}")
+                
+                # 明け -> 休み
+                if self.constraints.get("require_day_off_after_ake", 1) == 1:
+                    prob += (x[emp_id, d_str, self.SHIFT_AKE] <= x[emp_id, next_d_str, self.SHIFT_KYU], f"RestAfterAke_{emp_id}_{d_str}")
+                
+                # 禁止シフトパターン
+                if self.constraints.get("disallow_specific_shifts_after_night", 1) == 1 and self.SHIFTS_NIGHT:
+                    forbidden = self.SHIFTS_LATE + self.SHIFTS_DAY + self.SHIFTS_EARLY
+                    for night_shift in self.SHIFTS_NIGHT:
+                        for f_shift in forbidden:
+                            prob += (x[emp_id, d_str, night_shift] + x[emp_id, next_d_str, f_shift] <= 1, f"No_{f_shift}_After_{night_shift}_{emp_id}_{d_str}")
+                if self.constraints.get("disallow_specific_shifts_after_late", 1) == 1 and self.SHIFTS_LATE:
+                    forbidden = self.SHIFTS_DAY + self.SHIFTS_EARLY
+                    for late_shift in self.SHIFTS_LATE:
+                        for f_shift in forbidden:
+                            prob += (x[emp_id, d_str, late_shift] + x[emp_id, next_d_str, f_shift] <= 1, f"No_{f_shift}_After_{late_shift}_{emp_id}_{d_str}")
+                if self.constraints.get("disallow_specific_shifts_after_day", 1) == 1 and self.SHIFTS_DAY:
+                    forbidden = self.SHIFTS_EARLY
+                    for day_shift in self.SHIFTS_DAY:
+                        for f_shift in forbidden:
+                            prob += (x[emp_id, d_str, day_shift] + x[emp_id, next_d_str, f_shift] <= 1, f"No_{f_shift}_After_{day_shift}_{emp_id}_{d_str}")
+
+                # 禁止連続ペア (例: 早2 -> 早1)
+                for prev_s, next_s in self.forbidden_consecutive_pairs:
+                    prob += (x[emp_id, d_str, prev_s] + x[emp_id, next_d_str, next_s] <= 1, f"ForbiddenPair_{prev_s}_{next_s}_{emp_id}_{d_str}")
 
         # --- 4. ソフト制約の定義 ---
         logging.info("Defining soft constraints.")
@@ -515,7 +536,7 @@ class ShiftGenerator:
         logging.info("Solving problem...")
         prob += pulp.lpSum(objective_terms), "Objective"
         prob.writeLP("ShiftProblem.lp")  # デバッグ用
-        solver = pulp.PULP_CBC_CMD(msg=True, logPath="solver.log")
+        solver = pulp.PULP_CBC_CMD(msg=True, logPath="solver.log", timeLimit=180)
         status = prob.solve(solver)
         logging.info(f"Solver finished with status: {pulp.LpStatus[status]}")
 
