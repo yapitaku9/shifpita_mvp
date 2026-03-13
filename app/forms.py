@@ -313,34 +313,49 @@ class ShiftConfirmationForm(FlaskForm):
 def create_shift_constraint_form():
     """DBから制約を読み込み、動的にフォームクラスを生成するファクトリ関数"""
     from app.models.master import ShiftConstraint
-    
+
     class DynamicShiftConstraintForm(FlaskForm):
-        pass
+        submit = SubmitField("更新する")
 
-    # DBからすべての制約を取得
-    constraints = ShiftConstraint.query.order_by(ShiftConstraint.display_order, ShiftConstraint.id).all()
+        def __init__(self, *args, **kwargs):
+            super(DynamicShiftConstraintForm, self).__init__(*args, **kwargs)
+            
+            # DBからすべての制約を取得
+            constraints = ShiftConstraint.query.order_by(ShiftConstraint.display_order, ShiftConstraint.id).all()
 
-    # 各制約に対してフォームフィールドを動的に追加
-    for constraint in constraints:
-        # 説明が「【シフト構成】」で始まる場合はBooleanFieldを使用
-        if constraint.description.startswith('【シフト構成】'):
-            field = BooleanField(
-                label=constraint.description,
-                default=bool(constraint.value)
-            )
-        else:
-            field = IntegerField(
-                label=constraint.description,
-                validators=[
-                    DataRequired(message=f"{constraint.description}は必須です。"),
-                    NumberRange(min=0, message="0以上の数値を入力してください。")
-                ],
-                default=constraint.value
-            )
-        setattr(DynamicShiftConstraintForm, constraint.name, field)
-
-    # 最後にSubmitボタンを追加
-    setattr(DynamicShiftConstraintForm, 'submit', SubmitField("更新する"))
+            # 各制約に対してフォームフィールドを動的に追加
+            for constraint in constraints:
+                field_name = constraint.name
+                
+                # BooleanFieldの場合
+                if constraint.description.startswith('【シフト構成】'):
+                    field = BooleanField(
+                        label=constraint.description,
+                        default=bool(constraint.value)
+                    )
+                # IntegerFieldの場合
+                else:
+                    field = IntegerField(
+                        label=constraint.description,
+                        validators=[
+                            DataRequired(message=f"{constraint.description}は必須です。"),
+                            NumberRange(min=0, message="0以上の数値を入力してください。")
+                        ],
+                        default=constraint.value
+                    )
+                
+                # フォームクラスにフィールドを追加
+                setattr(self.__class__, field_name, field)
+                
+                # フォームインスタンスにフィールドを追加して、現在の値を設定
+                self._fields[field_name] = field.__call__(id=field_name)
+                
+                # GETリクエストの場合、DBからの値を設定
+                if not self.is_submitted():
+                    if isinstance(field, BooleanField):
+                        self._fields[field_name].data = bool(constraint.value)
+                    else:
+                        self._fields[field_name].data = constraint.value
     
     return DynamicShiftConstraintForm
 

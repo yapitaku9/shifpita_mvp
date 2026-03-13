@@ -573,14 +573,6 @@ def manage_constraints():
         # フォームを再生成してDBの値を反映
         ShiftConstraintForm = create_shift_constraint_form()
         form = ShiftConstraintForm()
-        for constraint in ShiftConstraint.query.all():
-            if hasattr(form, constraint.name):
-                field = getattr(form, constraint.name)
-                # BooleanFieldの場合は、DBの値(0 or 1)をboolに変換して設定
-                if isinstance(field, BooleanField):
-                    field.data = bool(constraint.value)
-                else:
-                    field.data = constraint.value
 
     # --- 特別日のリストを取得 ---
     special_days = SpecialDay.query.order_by(SpecialDay.date.asc()).all()
