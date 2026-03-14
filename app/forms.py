@@ -313,7 +313,7 @@ class ShiftConfirmationForm(FlaskForm):
 from wtforms import Form, HiddenField, FieldList, FormField
 
 
-class SingleConstraintForm(Form):
+class SingleConstraintForm(FlaskForm):
     """単一の制約を編集するためのサブフォーム（CSRF無効）"""
     class Meta:
         csrf = False  # サブフォームではCSRFは不要

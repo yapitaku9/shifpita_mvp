@@ -26,7 +26,8 @@
 
                 {# Loop through constraints that match the current category prefix #}
                 {% for c in form.constraints if c.form.description.data.startswith(prefix) %}
-                    {{ c.form.hidden_tag() }} {# Renders name and is_boolean hidden fields #}
+                    {{ c.form.name() }}
+                    {{ c.form.is_boolean() }}
                     {% set label_text = c.form.description.data.split('】', 1)[1] %}
 
                     <div class="mb-3 row">
