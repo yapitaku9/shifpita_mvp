@@ -438,11 +438,25 @@ class SpecialDayForm(FlaskForm):
     )
     submit = SubmitField("特別日として設定")
 
-    def validate_date(self, date):
+    def validate(self, extra_validators=None):
+        if not super(SpecialDayForm, self).validate(extra_validators):
+            return False
+
         from app.models.special_day import SpecialDay
-        existing_day = SpecialDay.query.filter_by(date=date.data).first()
-        if existing_day:
-            raise ValidationError('この日付は既に特別日として設定されています。')
+        
+        date_obj = self.date.data
+        visit_time_val = self.visit_time.data or None
+
+        query = SpecialDay.query.filter_by(date=date_obj, visit_time=visit_time_val)
+        existing_entry = query.first()
+
+        if existing_entry:
+            time_str = f" {visit_time_val}" if visit_time_val else "（時間指定なし）"
+            message = f'{date_obj.strftime("%Y-%m-%d")}{time_str}は既に特別日として設定されています。'
+            self.date.errors.append(message)
+            return False
+        
+        return True
 
 
 class RegistrationForm(FlaskForm):
