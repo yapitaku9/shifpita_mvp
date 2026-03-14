@@ -188,10 +188,11 @@ class ExcelExporter:
                 final_req_list = []
                 ws.cell(row=current_row, column=2, value="通院者数").border = thin_border
                 for d in dates:
-                    special_day = special_days.get(d)
+                    special_day_list = special_days.get(d, [])
                     num_visitors = 0
-                    if special_day and special_day.visit_time and int(special_day.visit_time.split(':')[0]) == hour:
-                        num_visitors = special_day.staff_increase
+                    for special_day in special_day_list:
+                        if special_day and special_day.visit_time and int(special_day.visit_time.split(':')[0]) == hour:
+                            num_visitors += special_day.staff_increase
                     ws.cell(row=current_row, column=d.day + 1, value=num_visitors).border = thin_border
                     final_req_list.append(base_req[d] + num_visitors)
                 current_row += 1

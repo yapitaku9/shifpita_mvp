@@ -259,7 +259,9 @@ def generate_shifts():
                 db.extract('year', SpecialDay.date) == year,
                 db.extract('month', SpecialDay.date) == month
             ).all()
-            special_days_map = {day.date.isoformat(): day for day in special_days_query}
+            special_days_map = {}
+            for day in special_days_query:
+                special_days_map.setdefault(day.date.isoformat(), []).append(day)
 
             assignments_for_pdf = result # 成功時はPDF用データ
             
@@ -331,7 +333,9 @@ def generate_shifts():
                 db.extract('year', SpecialDay.date) == year,
                 db.extract('month', SpecialDay.date) == month
             ).all()
-            special_days_map = {day.date.isoformat(): day for day in special_days_query}
+            special_days_map = {}
+            for day in special_days_query:
+                special_days_map.setdefault(day.date.isoformat(), []).append(day)
 
             pdf_exporter = PDFExporter()
             pdf_data = pdf_exporter.generate(
@@ -1059,7 +1063,9 @@ def download_excel(year, month):
             db.extract('year', SpecialDay.date) == year,
             db.extract('month', SpecialDay.date) == month
         ).all()
-        special_days = {day.date: day for day in special_days_query}
+        special_days = {}
+        for day in special_days_query:
+            special_days.setdefault(day.date, []).append(day)
 
         # Excelを生成
         exporter = ExcelExporter()

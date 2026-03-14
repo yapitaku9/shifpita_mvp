@@ -133,12 +133,12 @@ class PDFExporter:
                 num_visitors_list = []
                 final_req_list = []
                 for d in dates:
-                    special_day = special_days.get(d)
+                    special_day_list = special_days.get(d, [])
                     num_visitors = 0
-                    if special_day and special_day.visit_time:
-                        # visit_timeは "HH:MM" 形式の文字列なので、時間部分を比較
-                        if int(special_day.visit_time.split(':')[0]) == hour:
-                            num_visitors = special_day.staff_increase
+                    for special_day in special_day_list:
+                        if special_day and special_day.visit_time:
+                            if int(special_day.visit_time.split(':')[0]) == hour:
+                                num_visitors += special_day.staff_increase
                     num_visitors_list.append(str(num_visitors) if num_visitors > 0 else "0")
                     final_req_list.append(base_req[d] + num_visitors)
                 
