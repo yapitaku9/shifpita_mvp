@@ -137,10 +137,12 @@ class ShiftGenerator:
                 work_req_map[(req.user_id, req.date.isoformat())] = shift_names
 
         # 特別日を取得
-        special_days_map = {
-            sd.date.isoformat(): sd
-            for sd in SpecialDay.query.filter(SpecialDay.date.between(start_date, end_date)).all()
-        }
+        special_days_list = SpecialDay.query.filter(
+            SpecialDay.date.between(start_date, end_date)
+        ).all()
+        special_days_map = {}
+        for sd in special_days_list:
+            special_days_map.setdefault(sd.date.isoformat(), []).append(sd)
 
         employees_data = [
             {
@@ -184,15 +186,16 @@ class ShiftGenerator:
         for d_idx, d_str in enumerate(date_strs):
             current_date = date.fromisoformat(d_str)
             day_type = "sunday" if current_date.weekday() == 6 else "weekday"
-            special_day_info = special_days_map.get(d_str)
+            special_day_infos = special_days_map.get(d_str, [])
 
             for key in hourly_req_keys:
                 staff_increase = 0
-                if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
-                    visit_hour = int(special_day_info.visit_time.split(':')[0])
-                    current_hour_str = key.split('_')[0][:2]
-                    if current_hour_str.isdigit() and int(current_hour_str) == visit_hour:
-                        staff_increase = special_day_info.staff_increase
+                for special_day_info in special_day_infos:
+                    if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
+                        visit_hour = int(special_day_info.visit_time.split(':')[0])
+                        current_hour_str = key.split('_')[0][:2]
+                        if current_hour_str.isdigit() and int(current_hour_str) == visit_hour:
+                            staff_increase += special_day_info.staff_increase
     
                 if key == "2000_next_0700":
                     req_staff_count = self.constraints.get(f"min_staff_{day_type}_2000_next_0700", 2)
@@ -425,15 +428,16 @@ class ShiftGenerator:
         for d_idx, d_str in enumerate(date_strs):
             current_date = date.fromisoformat(d_str)
             day_type = "sunday" if current_date.weekday() == 6 else "weekday"
-            special_day_info = special_days_map.get(d_str)
+            special_day_infos = special_days_map.get(d_str, [])
             for key in hourly_req_keys:
                 # 時間帯ごとに staff_increase を決定する
                 staff_increase = 0
-                if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
-                    visit_hour = int(special_day_info.visit_time.split(':')[0])
-                    current_hour_str = key.split('_')[0][:2]
-                    if current_hour_str.isdigit() and int(current_hour_str) == visit_hour:
-                        staff_increase = special_day_info.staff_increase
+                for special_day_info in special_day_infos:
+                    if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
+                        visit_hour = int(special_day_info.visit_time.split(':')[0])
+                        current_hour_str = key.split('_')[0][:2]
+                        if current_hour_str.isdigit() and int(current_hour_str) == visit_hour:
+                            staff_increase += special_day_info.staff_increase
 
                 if key == "2000_next_0700":
                     continue  # 夜勤帯はハード制約で超過がないためスキップ
