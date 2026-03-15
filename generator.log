@@ -1,51 +1,31 @@
-2026-03-13 09:42:41,323 - INFO - Shift generation started.
-2026-03-13 09:42:41,327 - INFO - Generating for 31 days.
-2026-03-13 09:42:41,331 - INFO - Loaded 0 records from previous month's history.
-2026-03-13 09:42:41,344 - INFO - Processing 17 employees.
-2026-03-13 09:42:41,425 - INFO - PuLP problem initialized.
-2026-03-13 09:42:41,504 - DEBUG - Defining constraints for employee 2 (大和鈴子).
-2026-03-13 09:42:41,526 - DEBUG - Defining constraints for employee 3 (工藤麻紀子).
-2026-03-13 09:42:41,552 - DEBUG - Defining constraints for employee 4 (坂本好子).
-2026-03-13 09:42:41,575 - DEBUG - Defining constraints for employee 5 (清水翔太).
-2026-03-13 09:42:41,597 - DEBUG - Defining constraints for employee 6 (金子和代).
-2026-03-13 09:42:41,619 - DEBUG - Defining constraints for employee 7 (清水真寿美).
-2026-03-13 09:42:41,639 - DEBUG - Defining constraints for employee 8 (奥寺恵子).
-2026-03-13 09:42:41,659 - DEBUG - Defining constraints for employee 9 (大澤亜湖).
-2026-03-13 09:42:41,681 - DEBUG - Defining constraints for employee 10 (外浦千代美).
-2026-03-13 09:42:41,705 - DEBUG - Defining constraints for employee 11 (宇部順子).
-2026-03-13 09:42:41,728 - DEBUG - Defining constraints for employee 12 (大宮莉奈).
-2026-03-13 09:42:41,750 - DEBUG - Defining constraints for employee 13 (橋場由香).
-2026-03-13 09:42:41,771 - DEBUG - Defining constraints for employee 14 (大沢愛).
-2026-03-13 09:42:41,793 - DEBUG - Defining constraints for employee 15 (上戸鎖絵里).
-2026-03-13 09:42:41,814 - DEBUG - Defining constraints for employee 16 (中田秋子).
-2026-03-13 09:42:41,836 - DEBUG - Defining constraints for employee 17 (柏木あゆみ).
-2026-03-13 09:42:41,859 - DEBUG - Defining constraints for employee 18 (金城里子).
-2026-03-13 09:42:41,941 - INFO - Defining soft constraints.
-2026-03-13 09:42:42,079 - INFO - Solving problem...
-2026-03-13 09:42:43,236 - DEBUG - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/b201a00c761a4935b268e9111482ead6-pulp.mps -sec 180 -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/b201a00c761a4935b268e9111482ead6-pulp.sol 
-2026-03-13 09:45:02,625 - INFO - Solver finished with status: Optimal
-2026-03-13 09:45:02,625 - INFO - Analyzing results for constraint violations.
-2026-03-13 09:45:02,655 - INFO - Processing results.
-2026-03-13 09:45:02,663 - WARNING - Shift type '有' not in master; skipping DB save for emp 2 on 2026-03-27.
-2026-03-13 09:45:02,670 - WARNING - Shift type '有' not in master; skipping DB save for emp 5 on 2026-03-29.
-2026-03-13 09:45:02,670 - WARNING - Shift type '有' not in master; skipping DB save for emp 6 on 2026-03-12.
-2026-03-13 09:45:02,671 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-07.
-2026-03-13 09:45:02,671 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-12.
-2026-03-13 09:45:02,671 - WARNING - Shift type '有' not in master; skipping DB save for emp 7 on 2026-03-16.
-2026-03-13 09:45:02,673 - WARNING - Shift type '有' not in master; skipping DB save for emp 8 on 2026-03-17.
-2026-03-13 09:45:02,673 - WARNING - Shift type '有' not in master; skipping DB save for emp 8 on 2026-03-28.
-2026-03-13 09:45:02,674 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-24.
-2026-03-13 09:45:02,674 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-25.
-2026-03-13 09:45:02,674 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-26.
-2026-03-13 09:45:02,675 - WARNING - Shift type '有' not in master; skipping DB save for emp 10 on 2026-03-27.
-2026-03-13 09:45:02,675 - WARNING - Shift type '有' not in master; skipping DB save for emp 11 on 2026-03-22.
-2026-03-13 09:45:02,676 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-06.
-2026-03-13 09:45:02,677 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-07.
-2026-03-13 09:45:02,677 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-09.
-2026-03-13 09:45:02,677 - WARNING - Shift type '有' not in master; skipping DB save for emp 13 on 2026-03-25.
-2026-03-13 09:45:02,681 - WARNING - Shift type '有' not in master; skipping DB save for emp 18 on 2026-03-19.
-2026-03-13 09:45:02,705 - INFO - Shift generation successful.
-2026-03-13 09:45:02,892 - INFO - 127.0.0.1 - - [13/Mar/2026 09:45:02] "[32mPOST /admin/generate HTTP/1.1[0m" 302 -
-2026-03-13 09:45:02,913 - INFO - 127.0.0.1 - - [13/Mar/2026 09:45:02] "GET /admin/ HTTP/1.1" 200 -
-2026-03-13 09:45:02,942 - INFO - 127.0.0.1 - - [13/Mar/2026 09:45:02] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-2026-03-13 09:45:08,963 - INFO - 127.0.0.1 - - [13/Mar/2026 09:45:08] "GET /admin/download_pdf/150 HTTP/1.1" 200 -
+2026-03-15 16:47:44,482 - INFO - Shift generation started.
+2026-03-15 16:47:44,487 - INFO - Generating for 31 days.
+2026-03-15 16:47:44,490 - INFO - Loaded 0 records from previous month's history.
+2026-03-15 16:47:44,504 - INFO - Processing 17 employees.
+2026-03-15 16:47:44,577 - INFO - PuLP problem initialized.
+2026-03-15 16:47:44,689 - DEBUG - Defining constraints for employee 2 (大和鈴子).
+2026-03-15 16:47:44,712 - DEBUG - Defining constraints for employee 3 (工藤麻紀子).
+2026-03-15 16:47:44,737 - DEBUG - Defining constraints for employee 4 (坂本好子).
+2026-03-15 16:47:44,759 - DEBUG - Defining constraints for employee 5 (清水翔太).
+2026-03-15 16:47:44,781 - DEBUG - Defining constraints for employee 6 (金子和代).
+2026-03-15 16:47:44,803 - DEBUG - Defining constraints for employee 7 (清水真寿美).
+2026-03-15 16:47:44,823 - DEBUG - Defining constraints for employee 8 (奥寺恵子).
+2026-03-15 16:47:44,845 - DEBUG - Defining constraints for employee 9 (大澤亜湖).
+2026-03-15 16:47:44,867 - DEBUG - Defining constraints for employee 10 (外浦千代美).
+2026-03-15 16:47:44,889 - DEBUG - Defining constraints for employee 11 (宇部順子).
+2026-03-15 16:47:44,913 - DEBUG - Defining constraints for employee 12 (大宮莉奈).
+2026-03-15 16:47:44,935 - DEBUG - Defining constraints for employee 13 (橋場由香).
+2026-03-15 16:47:44,957 - DEBUG - Defining constraints for employee 14 (大沢愛).
+2026-03-15 16:47:44,978 - DEBUG - Defining constraints for employee 15 (上戸鎖絵里).
+2026-03-15 16:47:45,000 - DEBUG - Defining constraints for employee 16 (中田秋子).
+2026-03-15 16:47:45,023 - DEBUG - Defining constraints for employee 17 (柏木あゆみ).
+2026-03-15 16:47:45,106 - DEBUG - Defining constraints for employee 18 (金城里子).
+2026-03-15 16:47:45,134 - INFO - Defining soft constraints.
+2026-03-15 16:47:45,266 - INFO - Solving problem...
+2026-03-15 16:47:46,354 - DEBUG - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/0ad5940b54264b5390ac74ba0449c2bd-pulp.mps -sec 300 -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/0ad5940b54264b5390ac74ba0449c2bd-pulp.sol 
+2026-03-15 16:47:47,015 - INFO - Solver finished with status: Infeasible
+2026-03-15 16:47:47,015 - INFO - Analyzing results for constraint violations.
+2026-03-15 16:47:47,695 - WARNING - シフト生成に失敗しました。解が見つかりませんでした (Status: Infeasible)
+2026-03-15 16:47:47,719 - INFO - 127.0.0.1 - - [15/Mar/2026 16:47:47] "[32mPOST /admin/generate HTTP/1.1[0m" 302 -
+2026-03-15 16:47:47,738 - INFO - 127.0.0.1 - - [15/Mar/2026 16:47:47] "GET /admin/ HTTP/1.1" 200 -
+2026-03-15 16:47:47,769 - INFO - 127.0.0.1 - - [15/Mar/2026 16:47:47] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -

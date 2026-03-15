@@ -180,8 +180,9 @@ class ShiftGenerator:
         # --- 3. 制約の定義 (構造を全面的に再設計) ---
         # 3.1 人員配置の制約 (日付ごとのループ)
         hourly_req_keys = [
-            "0700", "0800", "0900", "1200", "1300", "1400",
-            "1600", "1800", "1900", "2000_next_0700",
+            "0700", "0800", "0900", "1200", "1300", "1400", "1600", "1800", "1900",
+            #夜勤帯を時間ごとに分解
+            "2000", "2100", "2200", "2300", "0000", "0100", "0200", "0300", "0400", "0500", "0600"
         ]
         for d_idx, d_str in enumerate(date_strs):
             current_date = date.fromisoformat(d_str)
@@ -190,42 +191,45 @@ class ShiftGenerator:
 
             for key in hourly_req_keys:
                 staff_increase = 0
+                hour_for_special_day = int(key) // 100
                 for special_day_info in special_day_infos:
                     if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
                         visit_hour = int(special_day_info.visit_time.split(':')[0])
-                        current_hour_str = key.split('_')[0][:2]
-                        if current_hour_str.isdigit() and int(current_hour_str) == visit_hour:
+                        if visit_hour == hour_for_special_day:
                             staff_increase += special_day_info.staff_increase
-    
-                if key == "2000_next_0700":
-                    req_staff_count = self.constraints.get(f"min_staff_{day_type}_2000_next_0700", 2)
-                    shifts_for_hour = self.SHIFTS_NIGHT
-                    if shifts_for_hour:
-                        actual_staff = pulp.lpSum(
-                            x[emp["id"], d_str, s] for emp in employees_data for s in shifts_for_hour
-                        )
-                        prob += (actual_staff == req_staff_count, f"HardMinStaff_{day_type}_{key}_{d_str}")
-                else:
-                    hour = int(key) // 100
-                    req_staff_count = self.constraints.get(f"min_staff_{day_type}_{key}", 0)
-                    shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
-                    
-                    if shifts_for_hour_with_offset:
-                        staff_terms = []
-                        for s_name, offset in shifts_for_hour_with_offset:
-                            if offset == 0:
-                                staff_terms.append(pulp.lpSum(x[emp["id"], d_str, s_name] for emp in employees_data))
-                            elif offset == 1:
-                                target_date = current_date - timedelta(days=1)
-                                target_d_str = target_date.isoformat()
-                                if target_date.month == month: # 月内
-                                    staff_terms.append(pulp.lpSum(x[emp["id"], target_d_str, s_name] for emp in employees_data))
-                                else: # 月またぎ
-                                    # 履歴から前日の勤務者を集計
-                                    prev_day_workers = sum(1 for emp in employees_data if shift_history_map.get((emp["id"], target_d_str)) == s_name)
-                                    staff_terms.append(prev_day_workers)
 
-                        actual_staff = pulp.lpSum(staff_terms)
+                hour = int(key) // 100
+                
+                # 夜勤帯（20時～翌7時）とそれ以外で制約キーを振り分ける
+                is_night_hour_range = 20 <= hour <= 23 or 0 <= hour <= 6
+                if is_night_hour_range:
+                    constraint_key_suffix = "2000_next_0700"
+                    default_req = 2
+                else:
+                    constraint_key_suffix = key
+                    default_req = 0
+
+                req_staff_count = self.constraints.get(f"min_staff_{day_type}_{constraint_key_suffix}", default_req)
+                shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
+                
+                if shifts_for_hour_with_offset:
+                    staff_terms = []
+                    for s_name, offset in shifts_for_hour_with_offset:
+                        target_d_str = (current_date - timedelta(days=offset)).isoformat()
+                        
+                        if (current_date - timedelta(days=offset)).month == month: # 月内
+                             staff_terms.append(pulp.lpSum(x[emp["id"], target_d_str, s_name] for emp in employees_data))
+                        else: # 月またぎ
+                            # 履歴から前日の勤務者を集計
+                            prev_day_workers = sum(1 for emp in employees_data if shift_history_map.get((emp["id"], target_d_str)) == s_name)
+                            staff_terms.append(prev_day_workers)
+
+                    actual_staff = pulp.lpSum(staff_terms) if staff_terms else 0
+                    
+                    # 夜勤帯はハード制約、それ以外はソフト制約
+                    if is_night_hour_range:
+                        prob += (actual_staff == req_staff_count + staff_increase, f"HardMinStaff_{day_type}_{key}_{d_str}")
+                    else:
                         shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
                         prob += (actual_staff + shortfall >= req_staff_count + staff_increase, f"SoftMinStaff_{day_type}_{key}_{d_str}")
                         objective_terms.append(shortfall * 10000000)
@@ -429,42 +433,39 @@ class ShiftGenerator:
             current_date = date.fromisoformat(d_str)
             day_type = "sunday" if current_date.weekday() == 6 else "weekday"
             special_day_infos = special_days_map.get(d_str, [])
-            for key in hourly_req_keys:
-                # 時間帯ごとに staff_increase を決定する
+
+            for key in hourly_req_keys: # hourly_req_keysは更新済み
+                hour = int(key) // 100
+                is_night_hour_range = 20 <= hour <= 23 or 0 <= hour <= 6
+                
+                # 夜勤帯はハード制約で超過がないためペナルティ計算をスキップ
+                if is_night_hour_range:
+                    continue
+
+                # --- これ以降は日中帯のソフト制約のロジック ---
                 staff_increase = 0
                 for special_day_info in special_day_infos:
-                    if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
+                     if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
                         visit_hour = int(special_day_info.visit_time.split(':')[0])
-                        current_hour_str = key.split('_')[0][:2]
-                        if current_hour_str.isdigit() and int(current_hour_str) == visit_hour:
+                        if visit_hour == hour:
                             staff_increase += special_day_info.staff_increase
 
-                if key == "2000_next_0700":
-                    continue  # 夜勤帯はハード制約で超過がないためスキップ
-
-                hour = int(key) // 100
                 req_staff_count = self.constraints.get(f"min_staff_{day_type}_{key}", 0)
                 shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
 
                 if shifts_for_hour_with_offset:
                     staff_terms = []
                     for s_name, offset in shifts_for_hour_with_offset:
-                        if offset == 0:
-                            staff_terms.append(pulp.lpSum(x[emp["id"], d_str, s_name] for emp in employees_data))
-                        elif offset == 1:
-                            target_date = current_date - timedelta(days=1)
-                            target_d_str = target_date.isoformat()
-                            if target_date.month == month: # 月内
-                                staff_terms.append(pulp.lpSum(x[emp["id"], target_d_str, s_name] for emp in employees_data))
-                            else: # 月またぎ
-                                # 履歴から前日の勤務者を集計
-                                prev_day_workers = sum(1 for emp in employees_data if shift_history_map.get((emp["id"], target_d_str)) == s_name)
-                                staff_terms.append(prev_day_workers)
+                        target_d_str = (current_date - timedelta(days=offset)).isoformat()
+                        if (current_date - timedelta(days=offset)).month == month: # 月内
+                            staff_terms.append(pulp.lpSum(x[emp["id"], target_d_str, s_name] for emp in employees_data))
+                        else: # 月またぎ
+                            prev_day_workers = sum(1 for emp in employees_data if shift_history_map.get((emp["id"], target_d_str)) == s_name)
+                            staff_terms.append(prev_day_workers)
                     
                     actual_staff = pulp.lpSum(staff_terms) if staff_terms else 0
                     
                     over_staff = pulp.LpVariable(f"OverStaff_{d_str}_{key}", 0, None, pulp.LpInteger)
-                    # over_staff >= actual - required となるように制約を設定
                     prob += over_staff >= actual_staff - (req_staff_count + staff_increase)
 
                     is_1, is_2, is_3 = pulp.LpVariable.dicts(
