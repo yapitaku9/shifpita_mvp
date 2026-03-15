@@ -190,17 +190,15 @@ class ShiftGenerator:
             special_day_infos = special_days_map.get(d_str, [])
 
             for key in hourly_req_keys:
+                hour = int(key) // 100
                 staff_increase = 0
-                hour_for_special_day = int(key) // 100
                 for special_day_info in special_day_infos:
                     if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
                         visit_hour = int(special_day_info.visit_time.split(':')[0])
-                        if visit_hour == hour_for_special_day:
+                        if visit_hour == hour:
                             staff_increase += special_day_info.staff_increase
 
-                hour = int(key) // 100
-                
-                # 夜勤帯（20時～翌7時）とそれ以外で制約キーを振り分ける
+                # 時間帯に応じて制約キーとデフォルト値を設定
                 is_night_hour_range = 20 <= hour <= 23 or 0 <= hour <= 6
                 if is_night_hour_range:
                     constraint_key_suffix = "2000_next_0700"
@@ -208,31 +206,33 @@ class ShiftGenerator:
                 else:
                     constraint_key_suffix = key
                     default_req = 0
-
-                req_staff_count = self.constraints.get(f"min_staff_{day_type}_{constraint_key_suffix}", default_req)
-                shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
                 
+                req_staff_count = self.constraints.get(f"min_staff_{day_type}_{constraint_key_suffix}", default_req)
+                
+                # 実際の勤務者数を計算
+                shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
+                actual_staff = 0
                 if shifts_for_hour_with_offset:
                     staff_terms = []
                     for s_name, offset in shifts_for_hour_with_offset:
                         target_d_str = (current_date - timedelta(days=offset)).isoformat()
-                        
-                        if (current_date - timedelta(days=offset)).month == month: # 月内
+                        if (current_date - timedelta(days=offset)).month == month:
                              staff_terms.append(pulp.lpSum(x[emp["id"], target_d_str, s_name] for emp in employees_data))
-                        else: # 月またぎ
-                            # 履歴から前日の勤務者を集計
+                        else:
                             prev_day_workers = sum(1 for emp in employees_data if shift_history_map.get((emp["id"], target_d_str)) == s_name)
                             staff_terms.append(prev_day_workers)
-
                     actual_staff = pulp.lpSum(staff_terms) if staff_terms else 0
-                    
-                    # 夜勤帯はハード制約、それ以外はソフト制約
-                    if is_night_hour_range:
-                        prob += (actual_staff == req_staff_count + staff_increase, f"HardMinStaff_{day_type}_{key}_{d_str}")
-                    else:
-                        shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
-                        prob += (actual_staff + shortfall >= req_staff_count + staff_increase, f"SoftMinStaff_{day_type}_{key}_{d_str}")
-                        objective_terms.append(shortfall * 10000000)
+
+                # 制約を定義
+                is_strict_night_hour = 0 <= hour <= 6
+                if is_strict_night_hour:
+                    # 0時-7時: ハード制約 (完全一致)
+                    prob += (actual_staff == req_staff_count + staff_increase, f"HardMinStaff_{day_type}_{key}_{d_str}")
+                else:
+                    # それ以外の時間 (日中 + 20時-0時): ソフト制約 (下限)
+                    shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
+                    prob += (actual_staff + shortfall >= req_staff_count + staff_increase, f"SoftMinStaff_{day_type}_{key}_{d_str}")
+                    objective_terms.append(shortfall * 10000000)
 
         # 3.2 従業員ごとの制約 (従業員ごとのループ)
         for emp in employees_data:
@@ -434,23 +434,32 @@ class ShiftGenerator:
             day_type = "sunday" if current_date.weekday() == 6 else "weekday"
             special_day_infos = special_days_map.get(d_str, [])
 
-            for key in hourly_req_keys: # hourly_req_keysは更新済み
+            for key in hourly_req_keys:
                 hour = int(key) // 100
-                is_night_hour_range = 20 <= hour <= 23 or 0 <= hour <= 6
                 
-                # 夜勤帯はハード制約で超過がないためペナルティ計算をスキップ
-                if is_night_hour_range:
+                # 0時-7時の厳密な夜勤帯は超過ペナルティを計算しない
+                is_strict_night_hour = 0 <= hour <= 6
+                if is_strict_night_hour:
                     continue
-
-                # --- これ以降は日中帯のソフト制約のロジック ---
+                
+                # --- これ以降は日中 + 20時-0時のソフト制約のロジック ---
                 staff_increase = 0
                 for special_day_info in special_day_infos:
                      if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
                         visit_hour = int(special_day_info.visit_time.split(':')[0])
                         if visit_hour == hour:
                             staff_increase += special_day_info.staff_increase
+                
+                # 時間帯に応じて制約キーとデフォルト値を設定
+                is_flexible_night_hour = 20 <= hour <= 23
+                if is_flexible_night_hour:
+                    constraint_key_suffix = "2000_next_0700"
+                    default_req = 2
+                else:
+                    constraint_key_suffix = key
+                    default_req = 0
 
-                req_staff_count = self.constraints.get(f"min_staff_{day_type}_{key}", 0)
+                req_staff_count = self.constraints.get(f"min_staff_{day_type}_{constraint_key_suffix}", default_req)
                 shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
 
                 if shifts_for_hour_with_offset:

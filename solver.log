@@ -2,18 +2,18 @@ Welcome to the CBC MILP Solver
 Version: 2.10.3 
 Build Date: Dec 15 2019 
 
-command line - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/0ad5940b54264b5390ac74ba0449c2bd-pulp.mps -sec 300 -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/0ad5940b54264b5390ac74ba0449c2bd-pulp.sol (default strategy 1)
+command line - /Users/yamatotakuya/camp/final_product/shifpita_mvp/.venv/lib/python3.13/site-packages/pulp/apis/../solverdir/cbc/osx/i64/cbc /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/af9f923bfcb74e2a925e98879dfc6aa8-pulp.mps -sec 300 -timeMode elapsed -branch -printingOptions all -solution /var/folders/1m/6ch_n04s7cvdqp3p8kh6c58h0000gn/T/af9f923bfcb74e2a925e98879dfc6aa8-pulp.sol (default strategy 1)
 At line 2 NAME          MODEL
 At line 3 ROWS
-At line 22748 COLUMNS
-At line 249570 RHS
-At line 272314 BOUNDS
-At line 283424 ENDATA
-Problem MODEL has 22743 rows, 11109 columns and 203290 elements
+At line 23616 COLUMNS
+At line 256266 RHS
+At line 279878 BOUNDS
+At line 291236 ENDATA
+Problem MODEL has 23611 rows, 11357 columns and 208498 elements
 Coin0008I MODEL read with 0 errors
 seconds was changed from 1e+100 to 300
 Option for timeMode changed from cpu to elapsed
-Problem is infeasible - 0.09 seconds
+Problem is infeasible - 0.12 seconds
 Option for printingOptions changed from normal to all
-Total time (CPU seconds):       0.22   (Wallclock seconds):       0.36
+Total time (CPU seconds):       0.26   (Wallclock seconds):       0.44
 
