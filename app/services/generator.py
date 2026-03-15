@@ -223,16 +223,11 @@ class ShiftGenerator:
                             staff_terms.append(prev_day_workers)
                     actual_staff = pulp.lpSum(staff_terms) if staff_terms else 0
 
-                # 制約を定義
-                is_strict_night_hour = 0 <= hour <= 6
-                if is_strict_night_hour:
-                    # 0時-7時: ハード制約 (完全一致)
-                    prob += (actual_staff == req_staff_count + staff_increase, f"HardMinStaff_{day_type}_{key}_{d_str}")
-                else:
-                    # それ以外の時間 (日中 + 20時-0時): ソフト制約 (下限)
-                    shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
-                    prob += (actual_staff + shortfall >= req_staff_count + staff_increase, f"SoftMinStaff_{day_type}_{key}_{d_str}")
-                    objective_terms.append(shortfall * 10000000)
+                # [診断的修正] 全ての時間帯でソフト制約（下限）を適用
+                # これにより、ハード制約が満たせない場合でも解が生成され、どこで人員が不足しているかが分かるようになる
+                shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
+                prob += (actual_staff + shortfall >= req_staff_count + staff_increase, f"SoftMinStaff_{day_type}_{key}_{d_str}")
+                objective_terms.append(shortfall * 10000000)
 
         # 3.2 従業員ごとの制約 (従業員ごとのループ)
         for emp in employees_data:
