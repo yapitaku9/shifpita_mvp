@@ -15,34 +15,40 @@ from app.models.special_day import SpecialDay
 
 class ShiftGenerator:
     """シフト生成エンジンクラス。"""
+
     def __init__(self):
+        """
+        コンストラクタ。DBアクセスを含まない基本的な定義を初期化する。
+        DBからのデータロードは run メソッド内で行う。
+        """
+        # --- シフト定義 (DBアクセス不要なもの) ---
+        self.SHIFT_KYU = "休"
+        self.SHIFT_AKE = "明"
+        self.SHIFT_PAID_HOLIDAY = "有"
+
+        # --- 時間帯別人員配置のためのグループ定義 (runメソッドで動的に構築) ---
+        self.hourly_groups = {h: [] for h in range(24)}
+
+    def _load_data_from_db(self):
+        """DBからマスターデータや設定を読み込み、インスタンス変数に格納する。"""
         # --- DBからマスターデータを読み込む ---
         self.shift_types_by_id = {s.shift_type_id: s for s in db.session.query(ShiftType).all()}
         self.shift_types_by_name = {s.name: s for s in self.shift_types_by_id.values()}
         self.constraints = {c.name: c.value for c in db.session.query(ShiftConstraint).all()}
 
-        # --- シフト定義 ---
-        self.SHIFT_KYU = "休"
-        self.SHIFT_AKE = "明"  # '明'は '夜勤明け' の意
-        self.SHIFT_PAID_HOLIDAY = "有"  # 有給休暇
-
+        # --- シフト定義 (DBデータに依存するもの) ---
         self.SHIFTS_NIGHT = [st.name for st in self.shift_types_by_id.values() if "夜" in st.name]
         self.SHIFTS_LATE = [st.name for st in self.shift_types_by_id.values() if "遅" in st.name]
         self.SHIFTS_EARLY = [st.name for st in self.shift_types_by_id.values() if "早" in st.name]
         self.SHIFTS_DAY = [st.name for st in self.shift_types_by_id.values() if "日" in st.name]
 
-        # 総勤務日数計算用のシフト（休み、明け、有給以外）
         self.SHIFTS_FOR_WORK_COUNT = [
             s.name for s in self.shift_types_by_id.values() if s.name not in [self.SHIFT_KYU, self.SHIFT_AKE, self.SHIFT_PAID_HOLIDAY]
         ]
-        # 連勤計算用の勤務シフト（休み、明け、有給以外）
         self.SHIFTS_WORK = self.SHIFTS_FOR_WORK_COUNT
-
-        # 正社員の勤務シフト
         self.SHIFTS_FULL_TIME_WORK = [
             s for s in self.SHIFTS_WORK if s not in ["1", "2", "3", "4", "5", "6", "7", "8"]
         ]
-        # 遅番または夜勤
         self.SHIFTS_LATE_OR_NIGHT = self.SHIFTS_LATE + self.SHIFTS_NIGHT
 
         # --- 禁止連続シフトペア (例: 早2 -> 早1) ---
@@ -54,8 +60,9 @@ class ShiftGenerator:
             s1_name = f"{base}1"
             if s2_name in all_shift_names_in_db and s1_name in all_shift_names_in_db:
                 self.forbidden_consecutive_pairs.append((s2_name, s1_name))
-
+        
         # --- 時間帯別人員配置のためのグループ ---
+        # hourly_groupsを再初期化
         self.hourly_groups = {h: [] for h in range(24)}
         for st in self.shift_types_by_id.values():
             if st.name in [self.SHIFT_KYU, self.SHIFT_AKE]:
@@ -66,22 +73,23 @@ class ShiftGenerator:
             start_h = st.start_time.hour
             end_h = st.end_time.hour
 
-            # 「夜2」シフトを「完全翌日勤務」として特別扱いする
             if "夜2" in st.name:
                 for h in range(start_h, end_h):
-                    # 常にオフセット1（翌日扱い）とする
                     self.hourly_groups[h].append((st.name, 1))
-            elif start_h < end_h:  # 日中シフト
+            elif start_h < end_h:
                 for h in range(start_h, end_h):
                     self.hourly_groups[h].append((st.name, 0))
-            else:  # 夜勤など日をまたぐシフト
+            else:
                 for h in range(start_h, 24):
                     self.hourly_groups[h].append((st.name, 0))
                 for h in range(0, end_h):
                     self.hourly_groups[h].append((st.name, 1))
 
+
     def run(self, year: int, month: int) -> tuple[bool, list | str | None]:
-        # --- 0. デバッグ用ロギング設定 ---
+        # --- 0. データベースからデータをロード ---
+        self._load_data_from_db()
+
         logging.basicConfig(
             level=logging.DEBUG,
             filename="generator.log",

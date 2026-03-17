@@ -986,6 +986,7 @@ def download_excel(year, month):
 
         # PDFと同様の集計情報を取得
         generator = ShiftGenerator()
+        generator._load_data_from_db()  # DBから設定をロード
         staffing_requirements = {c.name: c.value for c in ShiftConstraint.query.all()}
         special_days_query = SpecialDay.query.filter(
             db.extract('year', SpecialDay.date) == year,
