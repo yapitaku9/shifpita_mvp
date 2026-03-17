@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime, timezone, timedelta
 from flask import Flask
 from config import Config
@@ -39,12 +40,14 @@ def to_jst(utc_dt):
 
 def create_app(test_config=None) -> Flask:
     """アプリケーションファクトリ関数。"""
+    logging.warning("--- Starting create_app ---")
     app = Flask(__name__, instance_relative_config=True)
 
     if test_config is None:
         app.config.from_object(Config)
     else:
         app.config.from_mapping(test_config)
+    logging.warning("--- Config loaded ---")
 
     try:
         os.makedirs(app.instance_path)
@@ -52,28 +55,43 @@ def create_app(test_config=None) -> Flask:
         pass
 
     # 拡張機能の初期化
+    logging.warning("--- Initializing extensions ---")
     db.init_app(app)
+    logging.warning("--- db initialized ---")
     migrate.init_app(app, db, render_as_batch=True)  # Add render_as_batch=True
+    logging.warning("--- migrate initialized ---")
     login_manager.init_app(app)
+    logging.warning("--- login_manager initialized ---")
     
     # Conditionally initialize Mail to prevent crash if not configured
     if app.config.get('MAIL_SERVER'):
         mail.init_app(app)
+    logging.warning("--- mail initialized ---")
+
 
     # Register custom Jinja filter
     app.jinja_env.filters['jst'] = to_jst
+    logging.warning("--- Jinja filter registered ---")
 
     # Blueprintの登録
+    logging.warning("--- Registering blueprints ---")
     from app.views import main, admin, employee
     app.register_blueprint(main.bp)
+    logging.warning("--- main blueprint registered ---")
     app.register_blueprint(admin.admin_bp)
+    logging.warning("--- admin blueprint registered ---")
     app.register_blueprint(employee.employee_bp)
+    logging.warning("--- employee blueprint registered ---")
+
 
     # Register commands
     from . import commands
     commands.init_app(app)
+    logging.warning("--- Commands registered ---")
 
     # Ensure models are imported for Alembic autodetect
     from . import models
+    logging.warning("--- Models imported ---")
 
+    logging.warning("--- create_app finished ---")
     return app
