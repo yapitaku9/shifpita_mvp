@@ -13,11 +13,10 @@
             ('人員配置（日曜日）', '【人員配置_日曜】'),
             ('連勤制約', '【連勤制約】'),
             ('シフト構成', '【シフト構成】'),
-            ('【ソフト制約】 重み設定', '【重み】'),
-            ('ソフト制約（ペナルティ）', '【ペナルティ】')
+            ('【ソフト制約】 重み設定', '【重み】|【ペナルティ】')
         ] %}
 
-        {% for category_title, prefix in categories %}
+        {% for category_title, prefixes in categories %}
         <div class="card mb-3">
             <div class="card-header">{{ category_title }}</div>
             <div class="card-body">
@@ -25,8 +24,9 @@
                 <p class="card-text text-muted small">各項目に対するペナルティの大きさを設定します。数値が大きいほど影響が強くなります。</p>
                 {% endif %}
 
-                {# Loop through constraints that match the current category prefix #}
-                {% for c in form.constraints if c.form.description.data.startswith(prefix) %}
+                {# Loop through constraints that match any of the current category prefixes #}
+                {% set prefix_list = prefixes.split('|') %}
+                {% for c in form.constraints if prefix_list | select('in', c.form.description.data) | list | length > 0 %}
                     {{ c.form.name() }}
                     {{ c.form.is_boolean() }}
                     {% set label_text = c.form.description.data.split('】', 1)[1] %}

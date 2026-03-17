@@ -186,28 +186,44 @@ class ShiftGenerator:
         ]
         for d_idx, d_str in enumerate(date_strs):
             current_date = date.fromisoformat(d_str)
-            day_type = "sunday" if current_date.weekday() == 6 else "weekday"
-            special_day_infos = special_days_map.get(d_str, [])
 
             for key in hourly_req_keys:
                 hour = int(key) // 100
+                
+                # 要件の対象となる日付を決定する
+                is_early_morning_hour = 0 <= hour <= 6
+                if is_early_morning_hour:
+                    if d_idx == 0:
+                        continue
+                    req_date = current_date - timedelta(days=1)
+                else:
+                    req_date = current_date
+
+                req_day_type = "sunday" if req_date.weekday() == 6 else "weekday"
+                req_special_day_infos = special_days_map.get(req_date.isoformat(), [])
+
                 staff_increase = 0
-                for special_day_info in special_day_infos:
+                for special_day_info in req_special_day_infos:
                     if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
                         visit_hour = int(special_day_info.visit_time.split(':')[0])
-                        if visit_hour == hour:
+                        if not is_early_morning_hour and visit_hour == hour:
                             staff_increase += special_day_info.staff_increase
-
-                # 時間帯に応じて制約キーとデフォルト値を設定
-                is_night_hour_range = 20 <= hour <= 23 or 0 <= hour <= 6
-                if is_night_hour_range:
-                    constraint_key_suffix = "2000_next_0700"
+                
+                # 時間帯に応じた制約キーを設定
+                if 20 <= hour <= 22:
+                    constraint_key_suffix = "2000_2300"
+                    default_req = 2
+                elif hour == 23:
+                    constraint_key_suffix = "2300_0000"
+                    default_req = 2
+                elif 0 <= hour <= 6:
+                    constraint_key_suffix = "0000_next_0700"
                     default_req = 2
                 else:
                     constraint_key_suffix = key
                     default_req = 0
                 
-                req_staff_count = self.constraints.get(f"min_staff_{day_type}_{constraint_key_suffix}", default_req)
+                req_staff_count = self.constraints.get(f"min_staff_{req_day_type}_{constraint_key_suffix}", default_req)
                 
                 # 実際の勤務者数を計算
                 shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
@@ -215,24 +231,45 @@ class ShiftGenerator:
                 if shifts_for_hour_with_offset:
                     staff_terms = []
                     for s_name, offset in shifts_for_hour_with_offset:
-                        target_d_str = (current_date - timedelta(days=offset)).isoformat()
+                        target_d_str_for_worker = (current_date - timedelta(days=offset)).isoformat()
                         if (current_date - timedelta(days=offset)).month == month:
-                             staff_terms.append(pulp.lpSum(x[emp["id"], target_d_str, s_name] for emp in employees_data))
+                             staff_terms.append(pulp.lpSum(x[emp["id"], target_d_str_for_worker, s_name] for emp in employees_data))
                         else:
-                            prev_day_workers = sum(1 for emp in employees_data if shift_history_map.get((emp["id"], target_d_str)) == s_name)
+                            prev_day_workers = sum(1 for emp in employees_data if shift_history_map.get((emp["id"], target_d_str_for_worker)) == s_name)
                             staff_terms.append(prev_day_workers)
                     actual_staff = pulp.lpSum(staff_terms) if staff_terms else 0
 
-                # 制約を定義
-                is_strict_night_hour = 0 <= hour <= 6
-                if is_strict_night_hour:
-                    # 0時-7時はハード制約（完全一致）
-                    prob += (actual_staff == req_staff_count + staff_increase, f"HardMinStaff_{day_type}_{key}_{d_str}")
-                else:
-                    # 20時-24時および日中はソフト制約（下限）
-                    shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
-                    prob += (actual_staff + shortfall >= req_staff_count + staff_increase, f"SoftMinStaff_{day_type}_{key}_{d_str}")
+                # 制約とペナルティを定義
+                if is_early_morning_hour:
+                    # 早朝（0-7時）は過不足両方にペナルティ
+                    shortfall = pulp.LpVariable(f"Night_Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
+                    overstaff = pulp.LpVariable(f"Night_Overstaff_{d_str}_{key}", 0, None, pulp.LpInteger)
+                    prob += (actual_staff + shortfall >= req_staff_count + staff_increase, f"SoftMinStaff_Night_{req_day_type}_{key}_{d_str}")
+                    prob += (actual_staff - overstaff <= req_staff_count + staff_increase, f"SoftMaxStaff_Night_{req_day_type}_{key}_{d_str}")
                     objective_terms.append(shortfall * 10000000)
+                    objective_terms.append(overstaff * 10000000)
+                else:
+                    # 日中と20-24時は不足にペナルティ
+                    shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
+                    prob += (actual_staff + shortfall >= req_staff_count + staff_increase, f"SoftMinStaff_{req_day_type}_{key}_{d_str}")
+                    objective_terms.append(shortfall * 10000000)
+                    
+                    # さらに、超過にもペナルティ（段階的）
+                    p1 = self.constraints.get("weight_exceed_staffing_1", 10)
+                    p2 = self.constraints.get("weight_exceed_staffing_2", 30)
+                    p3_plus = self.constraints.get("weight_exceed_staffing_3_plus", 100)
+                    over_staff = pulp.LpVariable(f"OverStaff_{d_str}_{key}", 0, None, pulp.LpInteger)
+                    prob += over_staff >= actual_staff - (req_staff_count + staff_increase)
+                    is_1, is_2, is_3 = pulp.LpVariable.dicts(f"OverStaffLevel_{d_str}_{key}", [1, 2, 3], 0, 1, pulp.LpBinary)
+                    max_staff = len(employees_data)
+                    prob += over_staff >= is_1
+                    prob += over_staff <= max_staff * is_1
+                    prob += over_staff >= 2 * is_2
+                    prob += over_staff <= 1 + (max_staff - 1) * is_2
+                    prob += over_staff >= 3 * is_3
+                    prob += over_staff <= 2 + (max_staff - 2) * is_3
+                    penalty = p1 * (is_1 - is_2) + p2 * (is_2 - is_3) + p3_plus * is_3
+                    objective_terms.append(penalty)
 
         # 3.2 従業員ごとの制約 (従業員ごとのループ)
         for emp in employees_data:
@@ -281,39 +318,40 @@ class ShiftGenerator:
                 except (ValueError, KeyError) as e:
                     logging.warning(f"Could not parse ng_shifts for employee {emp_id}: {emp.get('ng_shifts')}. Error: {e}")
 
+            # 勤務日数と夜勤日数のソフト制約
+            total_work_days = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_FOR_WORK_COUNT)
+            total_night_shifts = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_NIGHT)
+            
+            work_days_penalty = self.constraints.get('work_days_penalty', 100)
+            night_shifts_penalty = self.constraints.get('night_shifts_penalty', 120) # 夜勤の方が重要なので少し重くする
+
+            # 最小勤務日数
             min_days = emp.get("min_work_days")
+            if min_days is not None:
+                shortage = pulp.LpVariable(f"work_days_shortage_{emp_id}", 0, None, pulp.LpInteger)
+                prob += (total_work_days + shortage >= min_days, f"MinWorkDays_Soft_{emp_id}")
+                objective_terms.append(shortage * work_days_penalty)
+
+            # 最大勤務日数
             max_days = emp.get("max_work_days")
-            # 最低または最大のどちらかが設定されていればソフト制約を適用
-            if min_days is not None or max_days is not None:
-                total_work_days = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_FOR_WORK_COUNT)
-                penalty_value = self.constraints.get('work_days_penalty', 100)
+            if max_days is not None:
+                excess = pulp.LpVariable(f"work_days_excess_{emp_id}", 0, None, pulp.LpInteger)
+                prob += (total_work_days - excess <= max_days, f"MaxWorkDays_Soft_{emp_id}")
+                objective_terms.append(excess * work_days_penalty)
 
-                if min_days is not None:
-                    work_days_shortage = pulp.LpVariable(f"work_days_shortage_{emp_id}", 0, None, pulp.LpInteger)
-                    prob += (total_work_days + work_days_shortage >= min_days, f"MinWorkDays_Soft_{emp_id}")
-                    objective_terms.append(work_days_shortage * penalty_value)
-
-                if max_days is not None:
-                    work_days_surplus = pulp.LpVariable(f"work_days_surplus_{emp_id}", 0, None, pulp.LpInteger)
-                    prob += (total_work_days - work_days_surplus <= max_days, f"MaxWorkDays_Soft_{emp_id}")
-                    objective_terms.append(work_days_surplus * penalty_value)
-
+            # 最小夜勤日数
             min_night = emp.get("min_night_shifts")
+            if min_night is not None:
+                shortage = pulp.LpVariable(f"night_shifts_shortage_{emp_id}", 0, None, pulp.LpInteger)
+                prob += (total_night_shifts + shortage >= min_night, f"MinNightShifts_Soft_{emp_id}")
+                objective_terms.append(shortage * night_shifts_penalty)
+
+            # 最大夜勤日数
             max_night = emp.get("max_night_shifts")
-            # 最低または最大のどちらかが設定されていればソフト制約を適用
-            if min_night is not None or max_night is not None:
-                total_night_shifts = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_NIGHT)
-                penalty_value = self.constraints.get('night_shifts_penalty', 100)
-
-                if min_night is not None:
-                    night_shifts_shortage = pulp.LpVariable(f"night_shifts_shortage_{emp_id}", 0, None, pulp.LpInteger)
-                    prob += (total_night_shifts + night_shifts_shortage >= min_night, f"MinNightShifts_Soft_{emp_id}")
-                    objective_terms.append(night_shifts_shortage * penalty_value)
-
-                if max_night is not None:
-                    night_shifts_surplus = pulp.LpVariable(f"night_shifts_surplus_{emp_id}", 0, None, pulp.LpInteger)
-                    prob += (total_night_shifts - night_shifts_surplus <= max_night, f"MaxNightShifts_Soft_{emp_id}")
-                    objective_terms.append(night_shifts_surplus * penalty_value)
+            if max_night is not None:
+                excess = pulp.LpVariable(f"night_shifts_excess_{emp_id}", 0, None, pulp.LpInteger)
+                prob += (total_night_shifts - excess <= max_night, f"MaxNightShifts_Soft_{emp_id}")
+                objective_terms.append(excess * night_shifts_penalty)
 
             # 連勤制約
             max_consecutive = int(emp.get("max_consecutive_work_days") or self.constraints.get("max_consecutive_work_days", 5))
@@ -445,77 +483,6 @@ class ShiftGenerator:
 
         # --- 4. ソフト制約の定義 ---
         logging.info("Defining soft constraints.")
-        # 4.1 人員配置の超過ペナルティ
-        p1 = self.constraints.get("weight_exceed_staffing_1", 10)
-        p2 = self.constraints.get("weight_exceed_staffing_2", 30)
-        p3_plus = self.constraints.get("weight_exceed_staffing_3_plus", 100)
-        for d_idx, d_str in enumerate(date_strs):
-            current_date = date.fromisoformat(d_str)
-            day_type = "sunday" if current_date.weekday() == 6 else "weekday"
-            special_day_infos = special_days_map.get(d_str, [])
-
-            for key in hourly_req_keys:
-                hour = int(key) // 100
-                
-                # 0時-7時の厳密な夜勤帯は超過ペナルティを計算しない
-                is_strict_night_hour = 0 <= hour <= 6
-                if is_strict_night_hour:
-                    continue
-                
-                # --- これ以降は日中 + 20時-0時のソフト制約のロジック ---
-                staff_increase = 0
-                for special_day_info in special_day_infos:
-                     if special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time:
-                        visit_hour = int(special_day_info.visit_time.split(':')[0])
-                        if visit_hour == hour:
-                            staff_increase += special_day_info.staff_increase
-                
-                # 時間帯に応じて制約キーとデフォルト値を設定
-                is_flexible_night_hour = 20 <= hour <= 23
-                if is_flexible_night_hour:
-                    constraint_key_suffix = "2000_next_0700"
-                    default_req = 2
-                else:
-                    constraint_key_suffix = key
-                    default_req = 0
-
-                req_staff_count = self.constraints.get(f"min_staff_{day_type}_{constraint_key_suffix}", default_req)
-                shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
-
-                if shifts_for_hour_with_offset:
-                    staff_terms = []
-                    for s_name, offset in shifts_for_hour_with_offset:
-                        target_d_str = (current_date - timedelta(days=offset)).isoformat()
-                        if (current_date - timedelta(days=offset)).month == month: # 月内
-                            staff_terms.append(pulp.lpSum(x[emp["id"], target_d_str, s_name] for emp in employees_data))
-                        else: # 月またぎ
-                            prev_day_workers = sum(1 for emp in employees_data if shift_history_map.get((emp["id"], target_d_str)) == s_name)
-                            staff_terms.append(prev_day_workers)
-                    
-                    actual_staff = pulp.lpSum(staff_terms) if staff_terms else 0
-                    
-                    over_staff = pulp.LpVariable(f"OverStaff_{d_str}_{key}", 0, None, pulp.LpInteger)
-                    prob += over_staff >= actual_staff - (req_staff_count + staff_increase)
-
-                    is_1, is_2, is_3 = pulp.LpVariable.dicts(
-                        f"OverStaffLevel_{d_str}_{key}", [1, 2, 3], 0, 1, pulp.LpBinary
-                    )
-                    max_staff = len(employees_data)
-
-                    # is_k = 1 <=> over_staff >= k となるように制約を修正
-                    # k=1
-                    prob += over_staff >= is_1
-                    prob += over_staff <= max_staff * is_1
-                    # k=2
-                    prob += over_staff >= 2 * is_2
-                    prob += over_staff <= 1 + (max_staff - 1) * is_2
-                    # k=3
-                    prob += over_staff >= 3 * is_3
-                    prob += over_staff <= 2 + (max_staff - 2) * is_3
-                    
-                    penalty = p1 * (is_1 - is_2) + p2 * (is_2 - is_3) + p3_plus * is_3
-                    objective_terms.append(penalty)
-
         # 4.2 責任者とサポの同日勤務回避
         if self.constraints.get("avoid_charge_and_support_same_day", 1) == 1:
             charge_ids = [e["id"] for e in employees_data if e["employment_type"] == EmploymentType.MANAGER]

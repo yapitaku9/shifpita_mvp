@@ -71,7 +71,8 @@ class PDFExporter:
         # --- 集計定義 ---
         constraint_hours = [7, 8, 9, 12, 13, 14, 16, 18, 19]
         summary_labels = {h: f"{h:02d}:00時点" for h in constraint_hours}
-        summary_labels["late_night"] = "準夜勤(20-24時)"
+        summary_labels["late_night_1"] = "20-23時"
+        summary_labels["late_night_2"] = "23-24時"
         summary_labels["deep_night"] = "深夜勤(0-7時)"
         actual_counts = {label: {d: 0 for d in dates} for label in summary_labels.values()}
 
@@ -95,7 +96,8 @@ class PDFExporter:
                 continue
 
             # 各時間帯のカウンタを一度だけインクリメントするためのセット
-            target_dates_for_latenight = set()
+            target_dates_for_latenight_1 = set()
+            target_dates_for_latenight_2 = set()
             target_dates_for_deepnight = set()
 
             for hour, offset in covered_hours_info.items():
@@ -114,17 +116,23 @@ class PDFExporter:
                 if hour in constraint_hours:
                     actual_counts[summary_labels[hour]][target_date_str] += 1
                 
-                # 準夜勤(20-24時)の対象日をセットに追加
-                if 20 <= hour <= 23:
-                    target_dates_for_latenight.add(target_date_str)
+                # 20-23時の対象日をセットに追加
+                if 20 <= hour <= 22:
+                    target_dates_for_latenight_1.add(target_date_str)
+
+                # 23-24時の対象日をセットに追加
+                if hour == 23:
+                    target_dates_for_latenight_2.add(target_date_str)
 
                 # 深夜勤(0-7時)の対象日をセットに追加
                 if 0 <= hour <= 6:
                     target_dates_for_deepnight.add(target_date_str)
 
             # セットに追加された日付に対して実績を+1する
-            for target_date in target_dates_for_latenight:
-                actual_counts[summary_labels["late_night"]][target_date] += 1
+            for target_date in target_dates_for_latenight_1:
+                actual_counts[summary_labels["late_night_1"]][target_date] += 1
+            for target_date in target_dates_for_latenight_2:
+                actual_counts[summary_labels["late_night_2"]][target_date] += 1
             for target_date in target_dates_for_deepnight:
                 actual_counts[summary_labels["deep_night"]][target_date] += 1
 
@@ -137,7 +145,7 @@ class PDFExporter:
         summary_header_row_idx = len(data) - 1
         style_commands_for_summary.append(('BACKGROUND', (0, summary_header_row_idx), (-1, summary_header_row_idx), colors.lightgrey))
 
-        sorted_summary_keys = sorted(constraint_hours) + ["late_night", "deep_night"]
+        sorted_summary_keys = sorted(constraint_hours) + ["late_night_1", "late_night_2", "deep_night"]
         
         for key in sorted_summary_keys:
             is_time_key = isinstance(key, int)
@@ -146,12 +154,16 @@ class PDFExporter:
                 hour_str_key = f"{key:02d}00"
                 time_label = f"{key:02d}:00"
                 actual_row_values = [actual_counts[summary_labels[key]][d] for d in dates]
-            elif key == "late_night":
-                hour_str_key = "2000_next_0700" # 制約名は共通
-                time_label = "20-24時"
-                actual_row_values = [actual_counts[summary_labels["late_night"]][d] for d in dates]
+            elif key == "late_night_1":
+                hour_str_key = "2000_2300"
+                time_label = "20-23時"
+                actual_row_values = [actual_counts[summary_labels["late_night_1"]][d] for d in dates]
+            elif key == "late_night_2":
+                hour_str_key = "2300_0000"
+                time_label = "23-24時"
+                actual_row_values = [actual_counts[summary_labels["late_night_2"]][d] for d in dates]
             else: # deep_night
-                hour_str_key = "2000_next_0700" # 制約名は共通
+                hour_str_key = "0000_next_0700"
                 time_label = "0-7時"
                 actual_row_values = [actual_counts[summary_labels["deep_night"]][d] for d in dates]
 
