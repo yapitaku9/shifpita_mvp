@@ -81,7 +81,15 @@ def seed_command():
         ]
 
         for c_data in hourly_constraints:
-            if not ShiftConstraint.query.filter_by(name=c_data['name']).first():
+            constraint = ShiftConstraint.query.filter_by(name=c_data['name']).first()
+            if constraint:
+                # 存在する場合は description と display_order を更新
+                if constraint.description != c_data['description'] or constraint.display_order != c_data['display_order']:
+                    constraint.description = c_data['description']
+                    constraint.display_order = c_data['display_order']
+                    click.echo(f"Updated constraint: {c_data['name']}")
+            else:
+                # 存在しない場合は新規追加
                 db.session.add(ShiftConstraint(**c_data))
                 click.echo(f"Added constraint: {c_data['name']}")
         

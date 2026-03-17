@@ -7,44 +7,95 @@
     <form method="POST" action="{{ url_for('admin.manage_constraints') }}">
         {{ form.hidden_tag() }}
 
-        {# Define categories and loop through them to create cards #}
-        {% set categories = [
-            ('人員配置（日曜日以外）', '【人員配置_平日】'),
-            ('人員配置（日曜日）', '【人員配置_日曜】'),
-            ('連勤制約', '【連勤制約】'),
-            ('シフト構成', '【シフト構成】'),
-            ('【ソフト制約】 重み設定', '【重み】|【ペナルティ】')
-        ] %}
+        {# Define categories and their prefixes for grouping #}
+        {% set categories = {
+            '基本制約': ['最大連続勤務日数', '最低連続休日数', '夜勤明けの最低連続休日数', '遅番・夜勤の最大連続日数'],
+            '【人員配置】 平日': ['【人員配置】平日'],
+            '【人員配置】 休日': ['【人員配置】休日'],
+            '【シフト構成】 ルール': ['【シフト構成】'],
+            '【ペナルティ】 重み設定': ['【ペナルティ】']
+        } %}
 
-        {% for category_title, prefixes in categories %}
+        {# This list will keep track of descriptions that have been rendered #}
+        {% set rendered_descriptions = namespace(items=[]) %}
+
+        {% for category_title, prefixes in categories.items() %}
         <div class="card mb-3">
             <div class="card-header">{{ category_title }}</div>
             <div class="card-body">
-                {% if category_title == '【ソフト制約】 重み設定' %}
+                {% if category_title == '【ペナルティ】 重み設定' %}
                 <p class="card-text text-muted small">各項目に対するペナルティの大きさを設定します。数値が大きいほど影響が強くなります。</p>
                 {% endif %}
 
-                {# Loop through constraints that match any of the current category prefixes #}
-                {% set prefix_list = prefixes.split('|') %}
-                {% for c in form.constraints if prefix_list | select('in', c.form.description.data) | list | length > 0 %}
+                {# Loop through all constraints to find matches for the current category #}
+                {% for c in form.constraints %}
+                    {% set is_matched = namespace(value=false) %}
+                    {% for prefix in prefixes %}
+                        {% if c.form.description.data.startswith(prefix) %}
+                            {% set is_matched.value = true %}
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if is_matched.value %}
+                        {# Mark this constraint as rendered #}
+                        {% set _ = rendered_descriptions.items.append(c.form.description.data) %}
+                        
+                        {{ c.form.name() }}
+                        {{ c.form.is_boolean() }}
+                        
+                        {# Extract the label text, removing the prefix if present #}
+                        {% set label_text = c.form.description.data %}
+                        {% if '】' in label_text %}
+                            {% set label_text = label_text.split('】', 1)[1] | trim %}
+                        {% endif %}
+
+                        <div class="mb-3 row">
+                            <div class="col-sm-6">
+                                <label class="form-label" for="{{ c.form.value.id }}">{{ label_text }}</label>
+                            </div>
+                            <div class="col-sm-6">
+                                {% if c.form.is_boolean.data == 'y' %}
+                                    <div class="form-check pt-2">
+                                        <input class="form-check-input" type="checkbox" id="{{ c.form.value.id }}" name="{{ c.form.value.name }}" value="1" {% if c.form.value.data == 1 %}checked{% endif %}>
+                                    </div>
+                                {% else %}
+                                    {{ c.form.value(class="form-control") }}
+                                {% endif %}
+
+                                {% if c.form.value.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in c.form.value.errors %}<span>{{ error }}</span>{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        
+        {# A special card for any constraints that were not rendered in the categories above #}
+        <div class="card mb-3">
+            <div class="card-header">その他</div>
+            <div class="card-body">
+                 {% for c in form.constraints if c.form.description.data not in rendered_descriptions.items %}
                     {{ c.form.name() }}
                     {{ c.form.is_boolean() }}
-                    {% set label_text = c.form.description.data.split('】', 1)[1] %}
-
-                    <div class="mb-3 row">
+                    {% set label_text = c.form.description.data %}
+                     <div class="mb-3 row">
                         <div class="col-sm-6">
                             <label class="form-label" for="{{ c.form.value.id }}">{{ label_text }}</label>
                         </div>
                         <div class="col-sm-6">
-                            {% if c.form.is_boolean.data == 'y' %}
+                             {% if c.form.is_boolean.data == 'y' %}
                                 <div class="form-check pt-2">
                                     <input class="form-check-input" type="checkbox" id="{{ c.form.value.id }}" name="{{ c.form.value.name }}" value="1" {% if c.form.value.data == 1 %}checked{% endif %}>
                                 </div>
                             {% else %}
                                 {{ c.form.value(class="form-control") }}
                             {% endif %}
-
-                            {% if c.form.value.errors %}
+                             {% if c.form.value.errors %}
                                 <div class="invalid-feedback d-block">
                                     {% for error in c.form.value.errors %}<span>{{ error }}</span>{% endfor %}
                                 </div>
@@ -54,7 +105,6 @@
                 {% endfor %}
             </div>
         </div>
-        {% endfor %}
 
         <div class="d-grid gap-2 mt-4">
             <button type="submit" name="submit_constraints" class="btn btn-primary">制約条件を更新</button>
