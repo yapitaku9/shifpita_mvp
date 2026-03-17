@@ -283,17 +283,39 @@ class ShiftGenerator:
 
             min_days = emp.get("min_work_days")
             max_days = emp.get("max_work_days")
-            if min_days is not None:
-                prob += (pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_FOR_WORK_COUNT) >= min_days, f"MinWorkDays_{emp_id}")
-            if max_days is not None:
-                prob += (pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_FOR_WORK_COUNT) <= max_days, f"MaxWorkDays_{emp_id}")
+            if min_days is not None and max_days is not None:
+                total_work_days = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_FOR_WORK_COUNT)
+                
+                # 過不足を表す変数を定義
+                work_days_shortage = pulp.LpVariable(f"work_days_shortage_{emp_id}", 0, None, pulp.LpInteger)
+                work_days_surplus = pulp.LpVariable(f"work_days_surplus_{emp_id}", 0, None, pulp.LpInteger)
+
+                # 変数と実際の勤務日数を紐づける制約
+                prob += (total_work_days + work_days_shortage >= min_days, f"MinWorkDays_Soft_{emp_id}")
+                prob += (total_work_days - work_days_surplus <= max_days, f"MaxWorkDays_Soft_{emp_id}")
+
+                # 目的関数にペナルティを追加
+                penalty_value = self.constraints.get('work_days_penalty', 100) # DBから取得、なければデフォルト値
+                objective_terms.append(work_days_shortage * penalty_value)
+                objective_terms.append(work_days_surplus * penalty_value)
 
             min_night = emp.get("min_night_shifts")
             max_night = emp.get("max_night_shifts")
-            if min_night is not None:
-                prob += (pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_NIGHT) >= min_night, f"MinNightShifts_{emp_id}")
-            if max_night is not None:
-                prob += (pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_NIGHT) <= max_night, f"MaxNightShifts_{emp_id}")
+            if min_night is not None and max_night is not None:
+                total_night_shifts = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_NIGHT)
+
+                # 過不足を表す変数を定義
+                night_shifts_shortage = pulp.LpVariable(f"night_shifts_shortage_{emp_id}", 0, None, pulp.LpInteger)
+                night_shifts_surplus = pulp.LpVariable(f"night_shifts_surplus_{emp_id}", 0, None, pulp.LpInteger)
+
+                # 変数と実際の夜勤日数を紐づける制約
+                prob += (total_night_shifts + night_shifts_shortage >= min_night, f"MinNightShifts_Soft_{emp_id}")
+                prob += (total_night_shifts - night_shifts_surplus <= max_night, f"MaxNightShifts_Soft_{emp_id}")
+
+                # 目的関数にペナルティを追加
+                penalty_value = self.constraints.get('night_shifts_penalty', 100) # DBから取得、なければデフォルト値
+                objective_terms.append(night_shifts_shortage * penalty_value)
+                objective_terms.append(night_shifts_surplus * penalty_value)
 
             # 連勤制約
             max_consecutive = int(emp.get("max_consecutive_work_days") or self.constraints.get("max_consecutive_work_days", 5))
