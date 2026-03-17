@@ -122,13 +122,22 @@ class ExcelExporter:
         # --- Daily Summary Rows (PDF Style) ---
         summary_start_row = len(employees) + 3
         
-        # --- Hourly staffing calculation ---
+        # --- 時間帯別の人員配置計算 ---
         constraint_hours = [7, 8, 9, 12, 13, 14, 16, 18, 19]
         summary_labels = {h: f"{h:02d}:00時点" for h in constraint_hours}
-        summary_labels["night"] = "夜勤帯(20-7時)"
+        summary_labels["late_night"] = "準夜勤(20-24時)"
+        summary_labels["deep_night"] = "深夜勤(0-7時)"
         
         actual_counts = {label: {d: 0 for d in dates} for label in summary_labels.values()}
         
+        # --- シフト -> 時間のマッピングを準備 ---
+        shift_to_hours_map = defaultdict(dict)
+        if hourly_groups:
+            for hour, shifts_with_offset in hourly_groups.items():
+                for s_name, offset in shifts_with_offset:
+                    shift_to_hours_map[s_name][hour] = offset
+
+        # --- 実績人数の計算 ---
         full_shift_data = []
         for u in employees:
             for d in dates:
@@ -136,24 +145,36 @@ class ExcelExporter:
                 if s is None and d in paid_leave_reqs.get(u.id, []): s = "有"
                 if s: full_shift_data.append({'user_id': u.id, 'date': d, 'shift_name': s})
 
-        shift_to_hours_map = defaultdict(dict)
-        for hour, shifts_with_offset in hourly_groups.items():
-            for s_name, offset in shifts_with_offset:
-                shift_to_hours_map[s_name][hour] = offset
-
         for assignment in full_shift_data:
-            shift, d = assignment["shift_name"], assignment["date"]
-            if shift in ["休", "明", "有"]: continue
-            if "夜" in shift: actual_counts[summary_labels["night"]][d] += 1
-            if shift not in shift_to_hours_map: continue
+            shift_name, d = assignment["shift_name"], assignment["date"]
+            if shift_name in ["休", "明", "有"]:
+                continue
             
-            for hour, offset in shift_to_hours_map[shift].items():
-                if hour not in constraint_hours: continue
-                target_date = d + datetime.timedelta(days=offset)
-                if target_date in dates:
-                    actual_counts[summary_labels[hour]][target_date] += 1
+            covered_hours_info = shift_to_hours_map.get(shift_name)
+            if not covered_hours_info:
+                continue
 
-        # --- Write summary rows ---
+            target_dates_for_latenight = set()
+            target_dates_for_deepnight = set()
+
+            for hour, offset in covered_hours_info.items():
+                target_date = d + datetime.timedelta(days=offset)
+                if target_date not in dates:
+                    continue
+
+                if hour in constraint_hours:
+                    actual_counts[summary_labels[hour]][target_date] += 1
+                if 20 <= hour <= 23:
+                    target_dates_for_latenight.add(target_date)
+                if 0 <= hour <= 6:
+                    target_dates_for_deepnight.add(target_date)
+            
+            for target_date in target_dates_for_latenight:
+                actual_counts[summary_labels["late_night"]][target_date] += 1
+            for target_date in target_dates_for_deepnight:
+                actual_counts[summary_labels["deep_night"]][target_date] += 1
+
+        # --- 集計行の書き込み ---
         ws.cell(row=summary_start_row, column=1, value="時間").border = thin_border
         ws.cell(row=summary_start_row, column=2, value="項目").border = thin_border
         for day in dates:
@@ -164,22 +185,32 @@ class ExcelExporter:
             ws.cell(row=summary_start_row, column=c).font = bold_font
 
         current_row = summary_start_row + 1
-        sorted_hours = sorted(constraint_hours) + ["night"]
-        for hour in sorted_hours:
-            is_night_row = (hour == "night")
-            hour_str_key = "2000_next_0700" if is_night_row else f"{hour:02d}00"
-            req_weekday_key = f"min_staff_{'weekday'}_{hour_str_key}"
-            req_sunday_key = f"min_staff_{'sunday'}_{hour_str_key}"
+        sorted_summary_keys = sorted(constraint_hours) + ["late_night", "deep_night"]
+        
+        for key in sorted_summary_keys:
+            is_time_key = isinstance(key, int)
+
+            if is_time_key:
+                hour_str_key = f"{key:02d}00"
+                time_label = f"{key:02d}:00"
+                actual_row_values = [actual_counts[summary_labels[key]][d] for d in dates]
+            elif key == "late_night":
+                hour_str_key = "2000_next_0700"
+                time_label = "20-24時"
+                actual_row_values = [actual_counts[summary_labels["late_night"]][d] for d in dates]
+            else: # deep_night
+                hour_str_key = "2000_next_0700"
+                time_label = "0-7時"
+                actual_row_values = [actual_counts[summary_labels["deep_night"]][d] for d in dates]
+            
+            req_weekday_key = f"min_staff_weekday_{hour_str_key}"
+            req_sunday_key = f"min_staff_sunday_{hour_str_key}"
             
             base_req = {d: staffing_requirements.get(req_sunday_key, 0) if d.weekday() == 6 else staffing_requirements.get(req_weekday_key, 0) for d in dates}
-            
-            time_label = f"{hour:02d}:00" if isinstance(hour, int) else "夜勤"
-            is_special_hour = hour in [8, 9]
+            is_special_hour = is_time_key and key in [8, 9]
 
             block_start_row = current_row
             
-            actual_row_values = [actual_counts[summary_labels['night' if is_night_row else hour]][d] for d in dates]
-
             if is_special_hour:
                 ws.cell(row=current_row, column=2, value="基本必要人数").border = thin_border
                 for d in dates: ws.cell(row=current_row, column=d.day + 1, value=base_req[d]).border = thin_border
@@ -188,11 +219,7 @@ class ExcelExporter:
                 final_req_list = []
                 ws.cell(row=current_row, column=2, value="通院者数").border = thin_border
                 for d in dates:
-                    special_day_list = special_days.get(d, [])
-                    num_visitors = 0
-                    for special_day in special_day_list:
-                        if special_day and special_day.visit_time and int(special_day.visit_time.split(':')[0]) == hour:
-                            num_visitors += special_day.staff_increase
+                    num_visitors = sum(sd.staff_increase for sd in special_days.get(d, []) if sd.visit_time and int(sd.visit_time.split(':')[0]) == key)
                     ws.cell(row=current_row, column=d.day + 1, value=num_visitors).border = thin_border
                     final_req_list.append(base_req[d] + num_visitors)
                 current_row += 1
@@ -200,43 +227,34 @@ class ExcelExporter:
                 ws.cell(row=current_row, column=2, value="最終必要人数").border = thin_border
                 for i, d in enumerate(dates): ws.cell(row=current_row, column=d.day + 1, value=final_req_list[i]).border = thin_border
                 current_row += 1
+                
+                diff_values = [actual - final for actual, final in zip(actual_row_values, final_req_list)]
 
-                ws.cell(row=current_row, column=2, value="予定人数").border = thin_border
-                for i, d in enumerate(dates): ws.cell(row=current_row, column=d.day + 1, value=actual_row_values[i]).border = thin_border
-                current_row += 1
-
-                ws.cell(row=current_row, column=2, value="過不足").border = thin_border
-                for i, d in enumerate(dates):
-                    diff = actual_row_values[i] - final_req_list[i]
-                    cell = ws.cell(row=current_row, column=d.day + 1, value=f"+{diff}" if diff > 0 else str(diff))
-                    cell.border = thin_border
-                    if diff < 0: cell.fill = deficit_fill
-                current_row += 1
-
-            else: # Other hours
-                ws.cell(row=current_row, column=2, value="必要人数").border = thin_border
+            else:
                 req_list = [base_req[d] for d in dates]
+                ws.cell(row=current_row, column=2, value="必要人数").border = thin_border
                 for i, d in enumerate(dates): ws.cell(row=current_row, column=d.day + 1, value=req_list[i]).border = thin_border
                 current_row += 1
-                
-                ws.cell(row=current_row, column=2, value="予定人数").border = thin_border
-                for i, d in enumerate(dates): ws.cell(row=current_row, column=d.day + 1, value=actual_row_values[i]).border = thin_border
-                current_row += 1
+                diff_values = [actual - req for actual, req in zip(actual_row_values, req_list)]
 
-                ws.cell(row=current_row, column=2, value="過不足").border = thin_border
-                for i, d in enumerate(dates):
-                    diff = actual_row_values[i] - req_list[i]
-                    cell = ws.cell(row=current_row, column=d.day + 1, value=f"+{diff}" if diff > 0 else str(diff))
-                    cell.border = thin_border
-                    if diff < 0: cell.fill = deficit_fill
-                current_row += 1
+            ws.cell(row=current_row, column=2, value="予定人数").border = thin_border
+            for i, d in enumerate(dates): ws.cell(row=current_row, column=d.day + 1, value=actual_row_values[i]).border = thin_border
+            current_row += 1
 
-            # Merge time label cells
+            ws.cell(row=current_row, column=2, value="過不足").border = thin_border
+            for i, d in enumerate(dates):
+                diff = diff_values[i]
+                cell = ws.cell(row=current_row, column=d.day + 1, value=f"+{diff}" if diff > 0 else str(diff))
+                cell.border = thin_border
+                if diff < 0: cell.fill = deficit_fill
+            current_row += 1
+
             ws.merge_cells(start_row=block_start_row, start_column=1, end_row=current_row - 1, end_column=1)
             cell = ws.cell(row=block_start_row, column=1)
             cell.value = time_label
             cell.alignment = center_alignment
             cell.border = thin_border
-            ws.cell(row=block_start_row, column=2).border = thin_border # Fix merged cell border
+            ws.cell(row=block_start_row, column=2).border = thin_border
+
 
         return wb

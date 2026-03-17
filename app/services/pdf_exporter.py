@@ -68,11 +68,14 @@ class PDFExporter:
             row = ["", emp["name"]] + row_shifts + [str(work_days), str(holidays), str(paid_holidays), str(night_shifts)]
             data.append(row)
 
+        # --- 集計定義 ---
         constraint_hours = [7, 8, 9, 12, 13, 14, 16, 18, 19]
         summary_labels = {h: f"{h:02d}:00時点" for h in constraint_hours}
-        summary_labels["night"] = "夜勤帯(20-7時)"
+        summary_labels["late_night"] = "準夜勤(20-24時)"
+        summary_labels["deep_night"] = "深夜勤(0-7時)"
         actual_counts = {label: {d: 0 for d in dates} for label in summary_labels.values()}
-        
+
+        # --- シフトがカバーする時間の逆引きマップを作成 ---
         shift_to_hours_map = {}
         if hourly_groups:
             for hour, shifts_with_offset in hourly_groups.items():
@@ -80,54 +83,87 @@ class PDFExporter:
                     if s_name not in shift_to_hours_map: shift_to_hours_map[s_name] = {}
                     shift_to_hours_map[s_name][hour] = offset
 
+        # --- 実績人数の計算 ---
         date_to_idx = {d: i for i, d in enumerate(dates)}
         for assignment in assignments:
             shift_name, d_str = assignment["shift_type"], assignment["date"]
-            if shift_name in ["休", "明", "有"]: continue
-            if "夜" in shift_name: actual_counts[summary_labels["night"]][d_str] += 1
-            if shift_name not in shift_to_hours_map: continue
-            
-            for hour, offset in shift_to_hours_map[shift_name].items():
-                if hour not in constraint_hours: continue
+            if shift_name in ["休", "明", "有"]:
+                continue
+
+            covered_hours_info = shift_to_hours_map.get(shift_name)
+            if not covered_hours_info:
+                continue
+
+            # 各時間帯のカウンタを一度だけインクリメントするためのセット
+            target_dates_for_latenight = set()
+            target_dates_for_deepnight = set()
+
+            for hour, offset in covered_hours_info.items():
                 target_date_str = None
-                if offset == 0: target_date_str = d_str
+                if offset == 0:
+                    target_date_str = d_str
                 elif offset == 1:
                     current_date_idx = date_to_idx.get(d_str)
                     if current_date_idx is not None and current_date_idx + 1 < len(dates):
                         target_date_str = dates[current_date_idx + 1]
-                if target_date_str:
+
+                if not target_date_str:
+                    continue
+
+                # 日中時間帯の集計
+                if hour in constraint_hours:
                     actual_counts[summary_labels[hour]][target_date_str] += 1
-        
-        # --- 集計行の作成ロジックを刷新 ---
-        summary_rows_data = []
+                
+                # 準夜勤(20-24時)の対象日をセットに追加
+                if 20 <= hour <= 23:
+                    target_dates_for_latenight.add(target_date_str)
+
+                # 深夜勤(0-7時)の対象日をセットに追加
+                if 0 <= hour <= 6:
+                    target_dates_for_deepnight.add(target_date_str)
+
+            # セットに追加された日付に対して実績を+1する
+            for target_date in target_dates_for_latenight:
+                actual_counts[summary_labels["late_night"]][target_date] += 1
+            for target_date in target_dates_for_deepnight:
+                actual_counts[summary_labels["deep_night"]][target_date] += 1
+
+        # --- 集計行の作成ロジック ---
         style_commands_for_summary = []
         base_row_idx = len(data)
 
-        # 集計行用のヘッダーを追加
         summary_header = ["時間", "項目"] + [f"{d.split('-')[-1]}" for d in dates] + ["", "", "", "", ""]
         data.append(summary_header)
         summary_header_row_idx = len(data) - 1
         style_commands_for_summary.append(('BACKGROUND', (0, summary_header_row_idx), (-1, summary_header_row_idx), colors.lightgrey))
 
-        sorted_hours = sorted(constraint_hours) + ["night"]
-        for hour in sorted_hours:
-            is_night_row = (hour == "night")
-            hour_str_key = "2000_next_0700" if is_night_row else f"{hour:02d}00"
+        sorted_summary_keys = sorted(constraint_hours) + ["late_night", "deep_night"]
+        
+        for key in sorted_summary_keys:
+            is_time_key = isinstance(key, int)
             
+            if is_time_key:
+                hour_str_key = f"{key:02d}00"
+                time_label = f"{key:02d}:00"
+                actual_row_values = [actual_counts[summary_labels[key]][d] for d in dates]
+            elif key == "late_night":
+                hour_str_key = "2000_next_0700" # 制約名は共通
+                time_label = "20-24時"
+                actual_row_values = [actual_counts[summary_labels["late_night"]][d] for d in dates]
+            else: # deep_night
+                hour_str_key = "2000_next_0700" # 制約名は共通
+                time_label = "0-7時"
+                actual_row_values = [actual_counts[summary_labels["deep_night"]][d] for d in dates]
+
             req_weekday_key = f"min_staff_weekday_{hour_str_key}"
             req_sunday_key = f"min_staff_sunday_{hour_str_key}"
             
             base_req = {d: staffing_requirements.get(req_sunday_key, 0) if datetime.datetime.strptime(d, "%Y-%m-%d").weekday() == 6 else staffing_requirements.get(req_weekday_key, 0) for d in dates}
+            is_special_hour = is_time_key and key in [8, 9]
             
-            time_label = f"{hour:02d}:00" if isinstance(hour, int) else "夜勤"
-            is_special_hour = hour in [8, 9]
+            block_start_row = len(data)
 
-            block_start_row = len(data) # これから追加する行の開始インデックス
-            
-            actual_row_values = [actual_counts[summary_labels['night' if is_night_row else hour]][d] for d in dates]
-            
             if is_special_hour:
-                # 8時, 9時の場合
                 data.append([time_label, "基本必要人数"] + [base_req[d] for d in dates] + [""]*5)
                 
                 num_visitors_list = []
@@ -136,37 +172,27 @@ class PDFExporter:
                     special_day_list = special_days.get(d, [])
                     num_visitors = 0
                     for special_day in special_day_list:
-                        if special_day and special_day.visit_time:
-                            if int(special_day.visit_time.split(':')[0]) == hour:
-                                num_visitors += special_day.staff_increase
+                        if special_day and special_day.visit_time and int(special_day.visit_time.split(':')[0]) == key:
+                            num_visitors += special_day.staff_increase
                     num_visitors_list.append(str(num_visitors) if num_visitors > 0 else "0")
                     final_req_list.append(base_req[d] + num_visitors)
                 
                 data.append(["", "通院者数"] + num_visitors_list + [""]*5)
                 data.append(["", "最終必要人数"] + final_req_list + [""]*5)
                 data.append(["", "予定人数"] + actual_row_values + [""]*5)
-
-                diff_row = ["", "過不足"]
-                for i in range(len(dates)):
-                    diff = actual_row_values[i] - final_req_list[i]
-                    diff_row.append(f"+{diff}" if diff > 0 else str(diff))
-                    if diff < 0:
-                        style_commands_for_summary.append(('BACKGROUND', (i + 2, len(data) - 1), (i + 2, len(data) - 1), colors.yellow))
-                data.append(diff_row + [""]*5)
-
+                diff_values = [actual - final for actual, final in zip(actual_row_values, final_req_list)]
             else:
-                # それ以外の時間
                 req_list = [base_req[d] for d in dates]
                 data.append([time_label, "必要人数"] + req_list + [""]*5)
                 data.append(["", "予定人数"] + actual_row_values + [""]*5)
+                diff_values = [actual - req for actual, req in zip(actual_row_values, req_list)]
 
-                diff_row = ["", "過不足"]
-                for i in range(len(dates)):
-                    diff = actual_row_values[i] - req_list[i]
-                    diff_row.append(f"+{diff}" if diff > 0 else str(diff))
-                    if diff < 0:
-                         style_commands_for_summary.append(('BACKGROUND', (i + 2, len(data) - 1), (i + 2, len(data) - 1), colors.yellow))
-                data.append(diff_row + [""]*5)
+            diff_row = ["", "過不足"]
+            for i, diff in enumerate(diff_values):
+                diff_row.append(f"+{diff}" if diff > 0 else str(diff))
+                if diff < 0:
+                    style_commands_for_summary.append(('BACKGROUND', (i + 2, len(data)), (i + 2, len(data)), colors.yellow))
+            data.append(diff_row + [""]*5)
 
             block_end_row = len(data) - 1
             if block_start_row <= block_end_row:
