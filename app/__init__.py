@@ -40,58 +40,67 @@ def to_jst(utc_dt):
 
 def create_app(test_config=None) -> Flask:
     """アプリケーションファクトリ関数。"""
-    logging.warning("--- Starting create_app ---")
+    # Configure logging to see startup messages
+    logging.basicConfig(level=logging.INFO)
+    logging.info("--- Starting create_app ---")
+    
     app = Flask(__name__, instance_relative_config=True)
+    logging.info("--- Flask app created ---")
 
     if test_config is None:
         app.config.from_object(Config)
     else:
         app.config.from_mapping(test_config)
-    logging.warning("--- Config loaded ---")
+    logging.info("--- Config loaded ---")
 
     try:
         os.makedirs(app.instance_path)
     except OSError:
         pass
+    logging.info("--- Instance path checked ---")
 
     # 拡張機能の初期化
-    logging.warning("--- Initializing extensions ---")
+    logging.info("--- Initializing extensions ---")
     db.init_app(app)
-    logging.warning("--- db initialized ---")
-    migrate.init_app(app, db, render_as_batch=True)  # Add render_as_batch=True
-    logging.warning("--- migrate initialized ---")
+    logging.info("--- db initialized ---")
+    migrate.init_app(app, db, render_as_batch=True)
+    logging.info("--- migrate initialized ---")
     login_manager.init_app(app)
-    logging.warning("--- login_manager initialized ---")
+    logging.info("--- login_manager initialized ---")
     
     # Conditionally initialize Mail to prevent crash if not configured
     if app.config.get('MAIL_SERVER'):
         mail.init_app(app)
-    logging.warning("--- mail initialized ---")
+    logging.info("--- mail initialized (conditional) ---")
 
 
     # Register custom Jinja filter
     app.jinja_env.filters['jst'] = to_jst
-    logging.warning("--- Jinja filter registered ---")
+    logging.info("--- Jinja filter registered ---")
 
     # Blueprintの登録
-    logging.warning("--- Registering blueprints ---")
+    logging.info("--- Registering blueprints ---")
     from app.views import main, admin, employee
+    logging.info("--- views imported ---")
     app.register_blueprint(main.bp)
-    logging.warning("--- main blueprint registered ---")
+    logging.info("--- main blueprint registered ---")
     app.register_blueprint(admin.admin_bp)
-    logging.warning("--- admin blueprint registered ---")
+    logging.info("--- admin blueprint registered ---")
     app.register_blueprint(employee.employee_bp)
-    logging.warning("--- employee blueprint registered ---")
+    logging.info("--- employee blueprint registered ---")
 
 
     # Register commands
+    logging.info("--- Registering commands ---")
     from . import commands
+    logging.info("--- commands imported ---")
     commands.init_app(app)
-    logging.warning("--- Commands registered ---")
+    logging.info("--- Commands registered ---")
 
     # Ensure models are imported for Alembic autodetect
+    logging.info("--- Importing models ---")
     from . import models
-    logging.warning("--- Models imported ---")
+    logging.info("--- Models imported ---")
 
-    logging.warning("--- create_app finished ---")
+    logging.info("--- create_app finished successfully ---")
     return app
