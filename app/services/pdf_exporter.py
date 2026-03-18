@@ -73,7 +73,7 @@ class PDFExporter:
         summary_labels = {h: f"{h:02d}:00時点" for h in constraint_hours}
         summary_labels["late_night_1"] = "20-23時"
         summary_labels["late_night_2"] = "23-24時"
-        summary_labels["deep_night"] = "深夜勤(0-7時)"
+        summary_labels["deep_night"] = "24時から翌7時"
         actual_counts = {label: {d: 0 for d in dates} for label in summary_labels.values()}
 
         # --- シフトがカバーする時間の逆引きマップを作成 ---
@@ -85,56 +85,43 @@ class PDFExporter:
                     shift_to_hours_map[s_name][hour] = offset
 
         # --- 実績人数の計算 ---
-        date_to_idx = {d: i for i, d in enumerate(dates)}
+        # 各時間カテゴリごとに、各日に勤務する従業員のIDを保持するset
+        staff_by_category_date = {label: {d: set() for d in dates} for label in summary_labels.values()}
+
         for assignment in assignments:
-            shift_name, d_str = assignment["shift_type"], assignment["date"]
+            shift_name = assignment["shift_type"]
+            emp_id = assignment["employee_id"]
+            
             if shift_name in ["休", "明", "有"]:
                 continue
 
             covered_hours_info = shift_to_hours_map.get(shift_name)
             if not covered_hours_info:
                 continue
-
-            # 各時間帯のカウンタを一度だけインクリメントするためのセット
-            target_dates_for_latenight_1 = set()
-            target_dates_for_latenight_2 = set()
-            target_dates_for_deepnight = set()
+            
+            assignment_date = datetime.datetime.strptime(assignment["date"], '%Y-%m-%d').date()
 
             for hour, offset in covered_hours_info.items():
-                target_date_str = None
-                if offset == 0:
-                    target_date_str = d_str
-                elif offset == 1:
-                    current_date_idx = date_to_idx.get(d_str)
-                    if current_date_idx is not None and current_date_idx + 1 < len(dates):
-                        target_date_str = dates[current_date_idx + 1]
-
-                if not target_date_str:
+                target_date = assignment_date + datetime.timedelta(days=offset)
+                target_date_str = target_date.strftime('%Y-%m-%d')
+                
+                if target_date_str not in dates:
                     continue
 
-                # 日中時間帯の集計
+                # 時間帯に応じて、該当するカテゴリと日付のsetに従業員IDを追加
                 if hour in constraint_hours:
-                    actual_counts[summary_labels[hour]][target_date_str] += 1
-                
-                # 20-23時の対象日をセットに追加
+                    staff_by_category_date[summary_labels[hour]][target_date_str].add(emp_id)
                 if 20 <= hour <= 22:
-                    target_dates_for_latenight_1.add(target_date_str)
-
-                # 23-24時の対象日をセットに追加
+                    staff_by_category_date[summary_labels["late_night_1"]][target_date_str].add(emp_id)
                 if hour == 23:
-                    target_dates_for_latenight_2.add(target_date_str)
-
-                # 深夜勤(0-7時)の対象日をセットに追加
+                    staff_by_category_date[summary_labels["late_night_2"]][target_date_str].add(emp_id)
                 if 0 <= hour <= 6:
-                    target_dates_for_deepnight.add(target_date_str)
-
-            # セットに追加された日付に対して実績を+1する
-            for target_date in target_dates_for_latenight_1:
-                actual_counts[summary_labels["late_night_1"]][target_date] += 1
-            for target_date in target_dates_for_latenight_2:
-                actual_counts[summary_labels["late_night_2"]][target_date] += 1
-            for target_date in target_dates_for_deepnight:
-                actual_counts[summary_labels["deep_night"]][target_date] += 1
+                    staff_by_category_date[summary_labels["deep_night"]][target_date_str].add(emp_id)
+        
+        # 従業員IDのsetのサイズ（つまり人数）を actual_counts に格納
+        for label, dates_data in staff_by_category_date.items():
+            for d_str, emp_ids_set in dates_data.items():
+                actual_counts[label][d_str] = len(emp_ids_set)
 
         # --- 集計行の作成ロジック ---
         style_commands_for_summary = []
@@ -164,7 +151,7 @@ class PDFExporter:
                 actual_row_values = [actual_counts[summary_labels["late_night_2"]][d] for d in dates]
             else: # deep_night
                 hour_str_key = "0000_next_0700"
-                time_label = "0-7時"
+                time_label = "24時から翌7時"
                 actual_row_values = [actual_counts[summary_labels["deep_night"]][d] for d in dates]
 
             req_weekday_key = f"min_staff_weekday_{hour_str_key}"

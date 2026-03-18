@@ -139,6 +139,9 @@ class ExcelExporter:
                     shift_to_hours_map[s_name][hour] = offset
 
         # --- 実績人数の計算 ---
+        # 各時間カテゴリごとに、各日に勤務する従業員のIDを保持するset
+        staff_by_category_date = {label: {d: set() for d in dates} for label in summary_labels.values()}
+        
         full_shift_data = []
         for u in employees:
             for d in dates:
@@ -147,7 +150,10 @@ class ExcelExporter:
                 if s: full_shift_data.append({'user_id': u.id, 'date': d, 'shift_name': s})
 
         for assignment in full_shift_data:
-            shift_name, d = assignment["shift_name"], assignment["date"]
+            shift_name = assignment["shift_name"]
+            assignment_date = assignment["date"]
+            emp_id = assignment["user_id"]
+
             if shift_name in ["休", "明", "有"]:
                 continue
             
@@ -155,30 +161,25 @@ class ExcelExporter:
             if not covered_hours_info:
                 continue
 
-            target_dates_for_latenight_1 = set()
-            target_dates_for_latenight_2 = set()
-            target_dates_for_deepnight = set()
-
             for hour, offset in covered_hours_info.items():
-                target_date = d + datetime.timedelta(days=offset)
+                target_date = assignment_date + datetime.timedelta(days=offset)
                 if target_date not in dates:
                     continue
-
+                
+                # 時間帯に応じて、該当するカテゴリと日付のsetに従業員IDを追加
                 if hour in constraint_hours:
-                    actual_counts[summary_labels[hour]][target_date] += 1
+                    staff_by_category_date[summary_labels[hour]][target_date].add(emp_id)
                 if 20 <= hour <= 22:
-                    target_dates_for_latenight_1.add(target_date)
+                    staff_by_category_date[summary_labels["late_night_1"]][target_date].add(emp_id)
                 if hour == 23:
-                    target_dates_for_latenight_2.add(target_date)
+                    staff_by_category_date[summary_labels["late_night_2"]][target_date].add(emp_id)
                 if 0 <= hour <= 6:
-                    target_dates_for_deepnight.add(target_date)
-            
-            for target_date in target_dates_for_latenight_1:
-                actual_counts[summary_labels["late_night_1"]][target_date] += 1
-            for target_date in target_dates_for_latenight_2:
-                actual_counts[summary_labels["late_night_2"]][target_date] += 1
-            for target_date in target_dates_for_deepnight:
-                actual_counts[summary_labels["deep_night"]][target_date] += 1
+                    staff_by_category_date[summary_labels["deep_night"]][target_date].add(emp_id)
+
+        # 従業員IDのsetのサイズ（つまり人数）を actual_counts に格納
+        for label, dates_data in staff_by_category_date.items():
+            for d_date, emp_ids_set in dates_data.items():
+                actual_counts[label][d_date] = len(emp_ids_set)
 
         # --- 集計行の書き込み ---
         ws.cell(row=summary_start_row, column=1, value="時間").border = thin_border
