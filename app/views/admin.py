@@ -144,7 +144,7 @@ def get_shift_choices(employment_type):
 @admin_bp.route("/shifts/download")
 def download_pdf():
     """生成されたシフトPDFをダウンロードする"""
-    history_id = request.args.get('id', type=int)
+    history_id = request.args.get('history_id', type=int)
     if not history_id:
         flash("ダウンロード用のIDが指定されていません。", "danger")
         return redirect(url_for('admin.dashboard'))
@@ -156,8 +156,6 @@ def download_pdf():
     else:
         flash("PDFファイルが見つからないか、生成に失敗しています。", "danger")
         return redirect(url_for('admin.dashboard'))
-
-
 
 
 @admin_bp.route("/generate", methods=["POST"])
@@ -184,15 +182,30 @@ def generate_shifts():
 
     try:
         generator = ShiftGenerator()
-        # 戻り値を success と result (成功時はデータ、失敗時はエラーメッセージ) で受け取る
         success, result = generator.run(year, month)
 
         if success:
-
-
-
-            assignments_for_pdf = result # 成功時はPDF用データ
+            assignments_for_pdf = result
             
+            # --- 前月5日間のデータを取得 ---
+            prev_month_date = datetime.date(year, month, 1) - datetime.timedelta(days=1)
+            prev_month_start_date = prev_month_date.replace(day=1)
+            # For headcount calculation, we need at least the last day of the previous month.
+            # For display, we need the last 5 days. Get 5 days for both.
+            pm_first_day_to_get = prev_month_date - datetime.timedelta(days=4)
+            
+            prev_month_shifts_raw = ShiftHistory.query.filter(
+                ShiftHistory.date.between(pm_first_day_to_get, prev_month_date)
+            ).all()
+
+            prev_month_assignments = [
+                {"date": s.date.isoformat(), "employee_id": s.user_id, "shift_type": s.shift_type.name}
+                for s in prev_month_shifts_raw
+            ]
+            
+            # 結合
+            full_assignments = prev_month_assignments + assignments_for_pdf
+
             # PDF生成
             sort_order = case(
                 (User.employment_type == EmploymentType.MANAGER, 1),
@@ -205,76 +218,66 @@ def generate_shifts():
             all_users = User.query.filter_by(is_admin=False).order_by(sort_order, User.full_name).all()
             employees_for_pdf = [{"id": u.id, "name": u.full_name} for u in all_users]
 
-            # PDF生成用にシフト定義を取得
             all_shift_types = db.session.query(ShiftType).all()
             shift_types_map = {st.name: st for st in all_shift_types}
             
-            # --- PDF生成用に、希望が通った申請を特定する ---
             start_date = datetime.date(year, month, 1)
             last_day = calendar.monthrange(year, month)[1]
             end_date = datetime.date(year, month, last_day)
 
-            # 承認済みの希望休と有給休暇を取得
-            day_off_reqs = {}
-            paid_leave_reqs = {}
+            day_off_reqs, paid_leave_reqs = {}, {}
             approved_day_offs = DayOffRequest.query.filter(
                 DayOffRequest.date.between(start_date, end_date), DayOffRequest.status == "approved"
             ).all()
             for req in approved_day_offs:
                 if req.request_type == 'paid_leave':
                     paid_leave_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
-                else: # 'day_off'
+                else:
                     day_off_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
 
-            # 承認済みの希望勤務を取得
             work_req_map = {}
             approved_work_reqs = WorkRequest.query.filter(
-                WorkRequest.date.between(start_date, end_date), DayOffRequest.status == "approved"
+                WorkRequest.date.between(start_date, end_date), WorkRequest.status == "approved"
             ).all()
             for req in approved_work_reqs:
                 shift_names = [st.name for st in req.shift_types]
                 if shift_names:
                     work_req_map[(req.user_id, req.date.isoformat())] = shift_names
             
-            # 実際に希望が叶ったセルを特定する
             highlight_cells = set()
             for assignment in assignments_for_pdf:
                 user_id = assignment["employee_id"]
                 date_str = assignment["date"]
                 shift_name = assignment["shift_type"]
-                
-                # 休日/有給申請が叶ったか
                 if date_str in day_off_reqs.get(user_id, []) and shift_name == "休":
                     highlight_cells.add((user_id, date_str))
                 elif date_str in paid_leave_reqs.get(user_id, []) and shift_name == "有":
                     highlight_cells.add((user_id, date_str))
-                
-                # 勤務申請が叶ったか
                 if (user_id, date_str) in work_req_map:
                     if shift_name in work_req_map.get((user_id, date_str), []):
                         highlight_cells.add((user_id, date_str))
 
-            # --- PDF生成用に、人員配置条件と特別日を取得 ---
             constraints = {c.name: c.value for c in ShiftConstraint.query.all()}
             
             special_days_query = SpecialDay.query.filter(
-                db.extract('year', SpecialDay.date) == year,
-                db.extract('month', SpecialDay.date) == month
+                db.or_(
+                    db.and_(db.extract('year', SpecialDay.date) == year, db.extract('month', SpecialDay.date) == month),
+                    db.and_(db.extract('year', SpecialDay.date) == prev_month_date.year, db.extract('month', SpecialDay.date) == prev_month_date.month)
+                )
             ).all()
-            special_days_map = {}
+            special_days_map = {day.date.isoformat(): [] for day in special_days_query}
             for day in special_days_query:
-                special_days_map.setdefault(day.date.isoformat(), []).append(day)
+                special_days_map[day.date.isoformat()].append(day)
 
             pdf_exporter = PDFExporter()
             pdf_data = pdf_exporter.generate(
-                year, month, employees_for_pdf, assignments_for_pdf, 
+                year, month, employees_for_pdf, full_assignments,
                 shift_types=shift_types_map, hourly_groups=generator.hourly_groups,
                 highlight_cells=highlight_cells,
                 staffing_requirements=constraints,
                 special_days=special_days_map
             )
             
-            # PDF保存
             pdf_dir = os.path.join(current_app.instance_path, 'pdfs')
             os.makedirs(pdf_dir, exist_ok=True)
             timestamp = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
@@ -284,12 +287,10 @@ def generate_shifts():
             with open(pdf_path, 'wb') as f:
                 f.write(pdf_data)
 
-            # 履歴を更新
             history.status = "Success"
-            history.pdf_file_path = pdf_filename # Store relative path from pdf_dir
+            history.pdf_file_path = pdf_filename
             flash(f"{year}年{month}月のシフトが正常に作成・保存されました。", "success")
         else:
-            # 失敗時は result がエラーメッセージ
             error_message = result
             history.status = "Failed"
             flash(error_message, "danger")
@@ -297,7 +298,6 @@ def generate_shifts():
     except Exception as e:
         history.status = "Failed"
         flash(f"シフト生成中に予期せぬエラーが発生しました: {e}", "danger")
-        # Log the full error for debugging
         current_app.logger.error(f"Shift generation failed: {e}", exc_info=True)
     finally:
         db.session.commit()
@@ -948,20 +948,35 @@ def download_excel(year, month):
         start_date = datetime.date(year, month, 1)
         end_date = datetime.date(year, month, calendar.monthrange(year, month)[1])
 
-        # データを取得
-        all_shifts = ShiftHistory.query.filter(
+        # 当月のデータを取得
+        current_month_shifts = ShiftHistory.query.filter(
             ShiftHistory.date.between(start_date, end_date)
         ).options(db.joinedload(ShiftHistory.user), db.joinedload(ShiftHistory.shift_type)).all()
         
+        # 前月5日間のデータを取得
+        prev_month_last_day = start_date - datetime.timedelta(days=1)
+        prev_month_first_day_to_get = prev_month_last_day - datetime.timedelta(days=4)
+        prev_month_shifts = ShiftHistory.query.filter(
+            ShiftHistory.date.between(prev_month_first_day_to_get, prev_month_last_day)
+        ).options(db.joinedload(ShiftHistory.user), db.joinedload(ShiftHistory.shift_type)).all()
+        
+        all_shifts = prev_month_shifts + current_month_shifts
+
+        if not all_shifts:
+            flash(f"{year}年{month}月の確定済みシフトデータがありません。", "warning")
+            return redirect(url_for('admin.confirmed_shifts'))
+
+        # 申請データを取得
+        day_off_reqs, paid_leave_reqs, work_req_map = {}, {}, {}
         approved_day_offs = DayOffRequest.query.filter(
-            DayOffRequest.date.between(start_date, end_date),
-            DayOffRequest.status == "approved"
+            DayOffRequest.date.between(start_date, end_date), DayOffRequest.status == "approved"
         ).all()
+        for req in approved_day_offs:
+            if req.request_type == 'paid_leave':
+                paid_leave_reqs.setdefault(req.user_id, []).append(req.date)
+            else:
+                day_off_reqs.setdefault(req.user_id, []).append(req.date)
 
-        day_off_reqs = {req.user_id: [r.date for r in approved_day_offs if r.user_id == req.user_id and r.request_type != 'paid_leave'] for req in approved_day_offs}
-        paid_leave_reqs = {req.user_id: [r.date for r in approved_day_offs if r.user_id == req.user_id and r.request_type == 'paid_leave'] for req in approved_day_offs}
-
-        work_req_map = {}
         approved_work_reqs = WorkRequest.query.filter(
             WorkRequest.date.between(start_date, end_date), WorkRequest.status == "approved"
         ).all()
@@ -970,10 +985,7 @@ def download_excel(year, month):
             if shift_names:
                 work_req_map[(req.user_id, req.date)] = shift_names
 
-        if not all_shifts and not paid_leave_reqs:
-            flash(f"{year}年{month}月の確定済みシフトデータがありません。", "warning")
-            return redirect(url_for('admin.confirmed_shifts'))
-            
+        # 従業員リストを取得
         sort_order = case(
             (User.employment_type == EmploymentType.MANAGER, 1),
             (User.employment_type == EmploymentType.SUPPORT, 2),
@@ -984,17 +996,18 @@ def download_excel(year, month):
         )
         employees = User.query.filter_by(is_admin=False).order_by(sort_order, User.full_name).all()
 
-        # PDFと同様の集計情報を取得
+        # その他必要なデータを取得
         generator = ShiftGenerator()
-        generator._load_data_from_db()  # DBから設定をロード
+        generator._load_data_from_db()
         staffing_requirements = {c.name: c.value for c in ShiftConstraint.query.all()}
+        
+        prev_and_current_month_dates = [prev_month_first_day_to_get, end_date]
         special_days_query = SpecialDay.query.filter(
-            db.extract('year', SpecialDay.date) == year,
-            db.extract('month', SpecialDay.date) == month
+            SpecialDay.date.between(min(d.replace(day=1) for d in prev_and_current_month_dates), max(prev_and_current_month_dates))
         ).all()
-        special_days = {}
+        special_days = defaultdict(list)
         for day in special_days_query:
-            special_days.setdefault(day.date, []).append(day)
+            special_days[day.date].append(day)
 
         # Excelを生成
         exporter = ExcelExporter()
@@ -1008,7 +1021,6 @@ def download_excel(year, month):
             special_days=special_days
         )
         
-        # メモリ上でファイルを作成
         output = io.BytesIO()
         workbook.save(output)
         output.seek(0)
@@ -1026,3 +1038,116 @@ def download_excel(year, month):
         flash(f"Excelファイルの生成中にエラーが発生しました: {e}", "danger")
         current_app.logger.error(f"Excel generation for {year}-{month} failed: {e}", exc_info=True)
         return redirect(url_for('admin.confirmed_shifts'))
+
+
+@admin_bp.route("/download_pdf/<int:year>/<int:month>")
+def download_confirmed_pdf(year, month):
+    """指定された年月の確定済みシフトをPDFファイルで動的に生成してダウンロードする"""
+    try:
+        start_date = datetime.date(year, month, 1)
+        end_date = datetime.date(year, month, calendar.monthrange(year, month)[1])
+
+        # 当月のデータを取得
+        current_month_shifts_raw = ShiftHistory.query.filter(
+            ShiftHistory.date.between(start_date, end_date)
+        ).options(db.joinedload(ShiftHistory.user), db.joinedload(ShiftHistory.shift_type)).all()
+        
+        # 前月5日間のデータを取得
+        prev_month_last_day = start_date - datetime.timedelta(days=1)
+        prev_month_first_day_to_get = prev_month_last_day - datetime.timedelta(days=4)
+        prev_month_shifts_raw = ShiftHistory.query.filter(
+            ShiftHistory.date.between(prev_month_first_day_to_get, prev_month_last_day)
+        ).options(db.joinedload(ShiftHistory.user), db.joinedload(ShiftHistory.shift_type)).all()
+
+        if not current_month_shifts_raw and not prev_month_shifts_raw:
+            flash(f"{year}年{month}月の確定済みシフトデータがありません。", "warning")
+            return redirect(url_for('admin.confirmed_shifts'))
+
+        # PDF Exporterが期待する辞書のリスト形式に変換
+        assignments = [
+            {"date": s.date.isoformat(), "employee_id": s.user_id, "shift_type": s.shift_type.name}
+            for s in prev_month_shifts_raw + current_month_shifts_raw
+        ]
+
+        # --- PDF生成に必要なデータを取得 ---
+        sort_order = case(
+            (User.employment_type == EmploymentType.MANAGER, 1),
+            (User.employment_type == EmploymentType.SUPPORT, 2),
+            (User.employment_type == EmploymentType.FULL_TIME, 3),
+            (User.employment_type == EmploymentType.PART_TIME_8H, 4),
+            (User.employment_type == EmploymentType.PART_TIME_SHORT, 5),
+            else_=6
+        )
+        all_users = User.query.filter_by(is_admin=False).order_by(sort_order, User.full_name).all()
+        employees_for_pdf = [{"id": u.id, "name": u.full_name} for u in all_users]
+
+        all_shift_types = db.session.query(ShiftType).all()
+        shift_types_map = {st.name: st for st in all_shift_types}
+        
+        day_off_reqs, paid_leave_reqs, work_req_map = {}, {}, {}
+        approved_day_offs = DayOffRequest.query.filter(
+            DayOffRequest.date.between(start_date, end_date), DayOffRequest.status == "approved"
+        ).all()
+        for req in approved_day_offs:
+            if req.request_type == 'paid_leave':
+                paid_leave_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
+            else:
+                day_off_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
+        
+        approved_work_reqs = WorkRequest.query.filter(
+            WorkRequest.date.between(start_date, end_date), WorkRequest.status == "approved"
+        ).all()
+        for req in approved_work_reqs:
+            shift_names = [st.name for st in req.shift_types]
+            if shift_names:
+                work_req_map[(req.user_id, req.date.isoformat())] = shift_names
+        
+        highlight_cells = set()
+        for s in current_month_shifts_raw:
+            date_str, user_id, shift_name = s.date.isoformat(), s.user_id, s.shift_type.name
+            if date_str in day_off_reqs.get(user_id, []) and shift_name == "休":
+                highlight_cells.add((user_id, date_str))
+            elif date_str in paid_leave_reqs.get(user_id, []) and shift_name == "有":
+                highlight_cells.add((user_id, date_str))
+            if (user_id, date_str) in work_req_map and shift_name in work_req_map.get((user_id, date_str), []):
+                highlight_cells.add((user_id, date_str))
+
+        generator = ShiftGenerator()
+        generator._load_data_from_db()
+        staffing_requirements = {c.name: c.value for c in ShiftConstraint.query.all()}
+        
+        prev_and_current_month_dates = [prev_month_first_day_to_get, end_date]
+        special_days_query = SpecialDay.query.filter(
+             db.or_(
+                db.and_(db.extract('year', SpecialDay.date) == year, db.extract('month', SpecialDay.date) == month),
+                db.and_(db.extract('year', SpecialDay.date) == prev_month_last_day.year, db.extract('month', SpecialDay.date) == prev_month_last_day.month)
+            )
+        ).all()
+        special_days_map = defaultdict(list)
+        for day in special_days_query:
+            special_days_map[day.date.isoformat()].append(day)
+
+        # PDFを生成
+        pdf_exporter = PDFExporter()
+        pdf_data = pdf_exporter.generate(
+            year, month, employees_for_pdf, assignments,
+            shift_types=shift_types_map, hourly_groups=generator.hourly_groups,
+            highlight_cells=highlight_cells,
+            staffing_requirements=staffing_requirements,
+            special_days=special_days_map
+        )
+        
+        filename = f"confirmed_shift_{year}_{month:02d}.pdf"
+        
+        return send_file(
+            io.BytesIO(pdf_data),
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+
+    except Exception as e:
+        flash(f"PDFファイルの生成中にエラーが発生しました: {e}", "danger")
+        current_app.logger.error(f"PDF generation for {year}-{month} failed: {e}", exc_info=True)
+        return redirect(url_for('admin.confirmed_shifts'))
+

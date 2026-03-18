@@ -433,6 +433,9 @@ class ShiftGenerator:
                 # 夜勤明け
                 if prev_shift in self.SHIFTS_NIGHT:
                     prob += (pulp.lpSum(x[emp_id, first_day_str, s] for s in [self.SHIFT_AKE] + self.SHIFTS_NIGHT) == 1, f"History_NightFollowedBy_{emp_id}_{first_day_str}")
+                # 明けの翌日は休み
+                elif prev_shift == self.SHIFT_AKE and self.constraints.get("require_day_off_after_ake", 1) == 1:
+                    prob += (x[emp_id, first_day_str, self.SHIFT_KYU] == 1, f"History_RestAfterAke_{emp_id}_{first_day_str}")
                 else:
                     prob += (x[emp_id, first_day_str, self.SHIFT_AKE] == 0, f"History_NoAkeWithoutNight_{emp_id}_{first_day_str}")
                 # 履歴に基づいた禁止シフト (1日のシフトを制限)

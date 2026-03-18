@@ -25,13 +25,9 @@
                             <span class="fw-bold">{{ shift.year }}年{{ shift.month }}月</span>
                         </td>
                         <td class="text-center">
-                            {% if shift.generation_history and shift.generation_history.pdf_file_path %}
-                                <a href="{{ url_for('admin.download_pdf', history_id=shift.generation_history.id) }}" class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-file-earmark-pdf"></i> PDF
-                                </a>
-                            {% else %}
-                                <span class="badge bg-secondary">PDFなし</span>
-                            {% endif %}
+                            <a href="{{ url_for('admin.download_confirmed_pdf', year=shift.year, month=shift.month) }}" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-file-earmark-pdf"></i> PDF
+                            </a>
                             <a href="{{ url_for('admin.download_excel', year=shift.year, month=shift.month) }}" class="btn btn-sm btn-outline-success">
                                 <i class="bi bi-file-earmark-excel"></i> Excel
                             </a>
