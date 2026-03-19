@@ -20,6 +20,7 @@ import datetime
 import os
 import io
 import calendar
+from collections import defaultdict
 
 # URLプレフィックス '/admin' を持つブループリントを作成
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
