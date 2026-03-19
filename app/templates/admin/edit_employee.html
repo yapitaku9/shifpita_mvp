@@ -38,6 +38,15 @@
                                 {% if form.employment_type.errors %}<div class="invalid-feedback d-block">{% for error in form.employment_type.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check mt-4">
+                                    {{ form.is_active(class="form-check-input") }}
+                                    {{ form.is_active.label(class="form-check-label") }}
+                                    {% if form.is_active.errors %}<div class="invalid-feedback d-block">{% for error in form.is_active.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
 
                         <hr>
                         <h5>制約と希望</h5>

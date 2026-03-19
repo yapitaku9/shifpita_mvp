@@ -11,7 +11,6 @@ class ShiftGenerationHistory(db.Model):
     target_year = db.Column(db.Integer, nullable=False)
     target_month = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(50), nullable=False)  # e.g., "Success", "Failed", "In Progress"
-    pdf_file_path = db.Column(db.String(255), nullable=True)
     
     def __repr__(self):
         return f'<ShiftGenerationHistory {self.id} for {self.target_year}-{self.target_month:02d} ({self.status})>'

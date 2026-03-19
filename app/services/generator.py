@@ -99,7 +99,7 @@ class ShiftGenerator:
         logging.info("Shift generation started.")
 
         # --- 1. データ準備 ---
-        all_users = db.session.query(User).filter_by(is_admin=False).all()
+        all_users = db.session.query(User).filter_by(is_admin=False, is_active=True).all()
         start_date = date(year, month, 1)
         end_date = date(year, month, calendar.monthrange(year, month)[1])
         dates = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]

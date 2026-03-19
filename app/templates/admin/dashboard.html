@@ -99,36 +99,6 @@
         </div>
         <div class="col">
             <div class="card h-100">
-                <div class="card-header fw-bold">シフト生成履歴</div>
-                <div class="card-body">
-                    {% if history_list %}
-                        <ul class="list-group list-group-flush">
-                        {% for history in history_list %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
-                                <div>
-                                    <span class="fw-bold">{{ history.target_year }}年{{ history.target_month }}月</span>
-                                    <small class="text-muted d-block">{{ (history.generation_timestamp | jst).strftime('%Y-%m-%d %H:%M') }}</small>
-                                </div>
-                                {% if history.status == 'Success' and history.pdf_file_path %}
-                                    <a href="{{ url_for('admin.download_pdf', history_id=history.id) }}" class="btn btn-sm btn-outline-success">
-                                        <i class="bi bi-download"></i>
-                                    </a>
-                                {% elif history.status == 'Failed' %}
-                                    <span class="badge bg-danger">失敗</span>
-                                {% else %}
-                                     <span class="badge bg-secondary">{{ history.status }}</span>
-                                {% endif %}
-                            </li>
-                        {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="text-center text-muted my-3">履歴はありません</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        <div class="col">
-            <div class="card h-100">
                 <div class="card-header fw-bold">確定済みシフト</div>
                 <div class="card-body d-flex flex-column">
                     <p>過去に確定されたシフトを確認・削除します。</p>
@@ -148,6 +118,57 @@
                         <a href="{{ url_for('admin.edit_email') }}" class="btn btn-outline-dark">メールアドレスを変更</a>
                         <a href="{{ url_for('admin.change_password') }}" class="btn btn-outline-dark">パスワードを変更</a>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generation History Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header fw-bold">
+                    シフト生成履歴
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>年月</th>
+                                <th>実行日時</th>
+                                <th>ステータス</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for history in history_list %}
+                            <tr>
+                                <td>{{ history.target_year }}年{{ history.target_month }}月</td>
+                                <td>{{ history.generation_timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    {% if history.status == 'Success' %}
+                                        <span class="badge bg-success">成功</span>
+                                    {% elif history.status == 'Failed' %}
+                                        <span class="badge bg-danger">失敗</span>
+                                    {% elif history.status == 'In Progress' %}
+                                        <span class="badge bg-secondary">処理中...</span>
+                                    {% else %}
+                                        {{ history.status }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if history.status == 'Success' %}
+                                        <a href="{{ url_for('admin.download_generated_pdf', year=history.target_year, month=history.target_month) }}" class="btn btn-sm btn-outline-info">PDFダウンロード</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">生成履歴はありません。</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -278,9 +299,12 @@
                         </thead>
                         <tbody>
                             {% for user in users %}
-                            <tr>
+                            <tr class="{{ 'table-secondary text-muted' if not user.is_active }}">
                                 <td>
                                     {{ user.full_name }}
+                                    {% if not user.is_active %}
+                                        <span class="badge bg-danger ms-2">無効</span>
+                                    {% endif %}
                                     <br>
                                     <small class="text-muted">{{ user.username }}</small>
                                 </td>

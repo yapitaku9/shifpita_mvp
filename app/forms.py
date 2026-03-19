@@ -52,6 +52,10 @@ class EmployeeForm(FlaskForm):
         coerce=str,
         validators=[DataRequired(message="雇用形態を選択してください。")]
     )
+    is_active = BooleanField(
+        "シフト生成対象",
+        default=True
+    )
     password = PasswordField(
         "新しいパスワード (半角数字4文字)",
         validators=[

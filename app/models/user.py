@@ -86,6 +86,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=True, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False) # シフト生成対象
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # 雇用形態
