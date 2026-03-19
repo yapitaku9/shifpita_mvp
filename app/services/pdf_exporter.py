@@ -109,15 +109,22 @@ class PDFExporter:
             
             assignment_date = datetime.datetime.strptime(assignment["date"], '%Y-%m-%d').date()
             for hour, offset in covered_hours_info.items():
-                target_date = assignment_date + datetime.timedelta(days=offset)
-                target_date_str = target_date.strftime('%Y-%m-%d')
+                # For deep night (0-6h), the count is for the day the shift *started*.
+                if 0 <= hour <= 6:
+                    target_date_str = assignment_date.strftime('%Y-%m-%d')
+                    if target_date_str in dates:
+                        staff_by_category_date[summary_labels["deep_night"]][target_date_str].add(emp_id)
                 
-                if target_date_str not in dates: continue
+                # For all other times, the count is for the actual calendar day.
+                else:
+                    target_date = assignment_date + datetime.timedelta(days=offset)
+                    target_date_str = target_date.strftime('%Y-%m-%d')
 
-                if hour in constraint_hours: staff_by_category_date[summary_labels[hour]][target_date_str].add(emp_id)
-                if 20 <= hour <= 22: staff_by_category_date[summary_labels["late_night_1"]][target_date_str].add(emp_id)
-                if hour == 23: staff_by_category_date[summary_labels["late_night_2"]][target_date_str].add(emp_id)
-                if 0 <= hour <= 6: staff_by_category_date[summary_labels["deep_night"]][target_date_str].add(emp_id)
+                    if target_date_str not in dates: continue
+
+                    if hour in constraint_hours: staff_by_category_date[summary_labels[hour]][target_date_str].add(emp_id)
+                    if 20 <= hour <= 22: staff_by_category_date[summary_labels["late_night_1"]][target_date_str].add(emp_id)
+                    if hour == 23: staff_by_category_date[summary_labels["late_night_2"]][target_date_str].add(emp_id)
         
         for label, dates_data in staff_by_category_date.items():
             for d_str, emp_ids_set in dates_data.items():

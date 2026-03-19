@@ -184,18 +184,24 @@ class ExcelExporter:
                 continue
 
             for hour, offset in covered_hours_info.items():
-                target_date = assignment_date + datetime.timedelta(days=offset)
-                if target_date not in dates:
-                    continue
-                
-                if hour in constraint_hours:
-                    staff_by_category_date[summary_labels[hour]][target_date].add(emp_id)
-                if 20 <= hour <= 22:
-                    staff_by_category_date[summary_labels["late_night_1"]][target_date].add(emp_id)
-                if hour == 23:
-                    staff_by_category_date[summary_labels["late_night_2"]][target_date].add(emp_id)
+                # For deep night (0-6h), the count is for the day the shift *started*.
                 if 0 <= hour <= 6:
-                    staff_by_category_date[summary_labels["deep_night"]][target_date].add(emp_id)
+                    target_date = assignment_date # No offset
+                    if target_date in dates:
+                        staff_by_category_date[summary_labels["deep_night"]][target_date].add(emp_id)
+
+                # For all other times, the count is for the actual calendar day.
+                else:
+                    target_date = assignment_date + datetime.timedelta(days=offset)
+                    if target_date not in dates:
+                        continue
+                    
+                    if hour in constraint_hours:
+                        staff_by_category_date[summary_labels[hour]][target_date].add(emp_id)
+                    if 20 <= hour <= 22:
+                        staff_by_category_date[summary_labels["late_night_1"]][target_date].add(emp_id)
+                    if hour == 23:
+                        staff_by_category_date[summary_labels["late_night_2"]][target_date].add(emp_id)
 
         for label, dates_data in staff_by_category_date.items():
             for d_date, emp_ids_set in dates_data.items():
