@@ -18,6 +18,7 @@ class EmploymentType(enum.Enum):
     FULL_TIME = '介護員'
     PART_TIME_8H = 'パート８時間勤務'
     PART_TIME_SHORT = 'パート短時間勤務'
+    HOSPITAL_VISIT_SUPPORT = '通院介助'
 
 
 # 雇用形態別の選択可能シフト名
@@ -25,6 +26,8 @@ class EmploymentType(enum.Enum):
 FULL_TIME_SHIFT_NAMES = ['早1', '早2', '日1', '日2', '遅1', '遅2', '夜1', '夜2', '明', '休']
 # パート短時間勤務: 9シフト
 SHORT_TIME_SHIFT_NAMES = ['1', '2', '3', '4', '5', '6', '7', '8', '休']
+# 通院介助: 3シフト（休を含む）
+HOSPITAL_VISIT_SHIFT_NAMES = ['通8', '通9', '休']
 
 
 def get_selectable_shift_choices(employment_type, include_blank=False, coerce_int=False, exclude_kyu=False):
@@ -53,6 +56,8 @@ def get_selectable_shift_choices(employment_type, include_blank=False, coerce_in
         selectable_shift_names = FULL_TIME_SHIFT_NAMES.copy()
     elif employment_type == EmploymentType.PART_TIME_SHORT:
         selectable_shift_names = SHORT_TIME_SHIFT_NAMES.copy()
+    elif employment_type == EmploymentType.HOSPITAL_VISIT_SUPPORT:
+        selectable_shift_names = HOSPITAL_VISIT_SHIFT_NAMES.copy()
 
     if not selectable_shift_names:
         return []

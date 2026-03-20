@@ -29,6 +29,8 @@ def seed_command():
             ShiftType(name='6', start_time=datetime.time(9, 0), end_time=datetime.time(14, 0)),
             ShiftType(name='7', start_time=datetime.time(9, 0), end_time=datetime.time(15, 0)),
             ShiftType(name='8', start_time=datetime.time(13, 0), end_time=datetime.time(19, 0)),
+            ShiftType(name='通8', start_time=datetime.time(8, 0), end_time=datetime.time(9, 0)),
+            ShiftType(name='通9', start_time=datetime.time(9, 0), end_time=datetime.time(10, 0)),
         ]
         db.session.bulk_save_objects(shift_types)
         click.echo('Seeded shift types.')
