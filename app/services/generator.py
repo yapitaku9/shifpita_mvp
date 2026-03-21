@@ -171,7 +171,12 @@ class ShiftGenerator:
         logging.info(f"Processing {len(employees_data)} employees.")
         
         # 全シフト名（DBに「休」「明」「有」が無くても必ず含める。LPに変数が出力されるために必須）
-        all_shift_names = list(set(self.shift_types_by_name.keys()) | {self.SHIFT_KYU, self.SHIFT_AKE, self.SHIFT_PAID_HOLIDAY})
+        SHIFTS_PART_TIME_SHORT_WORK = ["1", "2", "3", "4", "5", "6", "7", "8"]
+        HOSPITAL_SHIFTS = ['通8', '通9']
+        all_shift_names = list(set(self.shift_types_by_name.keys()) | 
+                               {self.SHIFT_KYU, self.SHIFT_AKE, self.SHIFT_PAID_HOLIDAY} |
+                               set(SHIFTS_PART_TIME_SHORT_WORK) |
+                               set(HOSPITAL_SHIFTS))
         
         # --- 2. 問題定義 ---
         prob = pulp.LpProblem("ShiftScheduling", pulp.LpMinimize)
@@ -287,9 +292,6 @@ class ShiftGenerator:
 
             for d_str in date_strs:
                 prob += (pulp.lpSum(x[emp_id, d_str, s] for s in all_shift_names) == 1, f"OneShiftPerDay_{emp_id}_{d_str}")
-
-            SHIFTS_PART_TIME_SHORT_WORK = ["1", "2", "3", "4", "5", "6", "7", "8"]
-            HOSPITAL_SHIFTS = ['通8', '通9']
 
             if emp["employment_type"] == EmploymentType.PART_TIME_SHORT:
                 allowed_shifts = SHIFTS_PART_TIME_SHORT_WORK + [self.SHIFT_KYU, self.SHIFT_PAID_HOLIDAY, self.SHIFT_AKE]
@@ -477,10 +479,9 @@ class ShiftGenerator:
                 # 夜勤 -> 明け or 夜勤
                 for night_shift in self.SHIFTS_NIGHT:
                     prob += (x[emp_id, d_str, night_shift] <= pulp.lpSum(x[emp_id, next_d_str, s] for s in [self.SHIFT_AKE] + self.SHIFTS_NIGHT), f"NightToAkeOrNight_{emp_id}_{d_str}_{night_shift}")
-                # 明け -> 夜勤の翌日のみ
-                # 2日目以降に適用する（1日目の分は月初の処理で対応済み）
-                if d_str != date_strs[0]:
-                    prob += (x[emp_id, d_str, self.SHIFT_AKE] <= pulp.lpSum(x[emp_id, (date.fromisoformat(d_str)-timedelta(days=1)).isoformat(), s] for s in self.SHIFTS_NIGHT), f"AkeOnlyAfterNight_{emp_id}_{d_str}")
+                
+                # 明けは夜勤の翌日のみ (バグ修正)
+                prob += (x[emp_id, next_d_str, self.SHIFT_AKE] <= pulp.lpSum(x[emp_id, d_str, s] for s in self.SHIFTS_NIGHT), f"AkeOnlyAfterNight_{emp_id}_{next_d_str}")
                 
                 # 明け -> 休み
                 if self.constraints.get("require_day_off_after_ake", 1) == 1:

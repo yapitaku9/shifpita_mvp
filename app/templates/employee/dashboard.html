@@ -24,18 +24,12 @@
             <!-- 希望申請フォーム (タブ形式) -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <ul class="nav nav-tabs card-header-tabs" id="request-tabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="day-off-tab" data-bs-toggle="tab" data-bs-target="#day-off-form-pane" type="button" role="tab" aria-controls="day-off-form-pane" aria-selected="true">休み希望</button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="work-request-tab" data-bs-toggle="tab" data-bs-target="#work-request-form-pane" type="button" role="tab" aria-controls="work-request-form-pane" aria-selected="false">希望勤務</button>
-                        </li>
-                    </ul>
+                    希望申請
                 </div>
-                <div class="card-body tab-content" id="request-tabs-content">
+                <div class="card-body" id="request-forms-container">
                     <!-- 希望休申請フォーム -->
-                    <div class="tab-pane fade show active" id="day-off-form-pane" role="tabpanel" aria-labelledby="day-off-tab">
+                    <div id="day-off-form-pane">
+                        <h5 class="mt-2">休み希望</h5>
                         <form action="{{ url_for('employee.dashboard') }}" method="post" novalidate>
                             {{ day_off_form.hidden_tag() }}
                             <div class="mb-3">
@@ -51,8 +45,10 @@
                             </div>
                         </form>
                     </div>
+                    <hr class="my-4">
                     <!-- 希望勤務申請フォーム -->
-                    <div class="tab-pane fade" id="work-request-form-pane" role="tabpanel" aria-labelledby="work-request-tab">
+                    <div id="work-request-form-pane">
+                        <h5 class="mt-2">希望勤務</h5>
                          <form action="{{ url_for('employee.dashboard') }}" method="post" novalidate>
                             {{ work_request_form.hidden_tag() }}
                             <div class="mb-3">

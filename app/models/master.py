@@ -8,8 +8,8 @@ class ShiftType(db.Model):
 
     shift_type_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(20), unique=True, nullable=False)
-    start_time = db.Column(db.Time, nullable=False)
-    end_time = db.Column(db.Time, nullable=False)
+    start_time = db.Column(db.Time, nullable=True)
+    end_time = db.Column(db.Time, nullable=True)
 
     def __repr__(self):
         return f"<ShiftType {self.name}>"

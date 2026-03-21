@@ -17,8 +17,10 @@ depends_on = None
 
 
 def upgrade():
-    # Add the new value to the existing 'employmenttype' ENUM in PostgreSQL.
-    op.execute("ALTER TYPE employmenttype ADD VALUE 'HOSPITAL_VISIT_SUPPORT'")
+    bind = op.get_bind()
+    if bind.engine.name == 'postgresql':
+        # Add the new value to the existing 'employmenttype' ENUM in PostgreSQL.
+        op.execute("ALTER TYPE employmenttype ADD VALUE 'HOSPITAL_VISIT_SUPPORT'")
 
 
 def downgrade():
