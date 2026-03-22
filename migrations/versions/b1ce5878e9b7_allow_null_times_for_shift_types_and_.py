@@ -28,43 +28,38 @@ def upgrade():
                nullable=True)
     # ### end Alembic commands ###
     
-    # --- Manually modified for idempotency ---
-    # Define the table structure for querying
+    # --- Manually added for idempotency ---
+    # Define the table structure for querying.
     shift_types_table = sa.table('shift_types',
-        sa.column('name', sa.String)
+        sa.column('name', sa.String),
+        sa.column('start_time', sa.Time),
+        sa.column('end_time', sa.Time)
     )
 
     # Get the current connection
     conn = op.get_bind()
 
-    # Define the shifts to be added
+    # Define the shifts that should exist
     special_shifts = [
         {'name': '休', 'start_time': None, 'end_time': None},
         {'name': '明', 'start_time': None, 'end_time': None},
         {'name': '有', 'start_time': None, 'end_time': None},
     ]
     
-    # Get the names of the shifts to be added
-    shift_names_to_add = [shift['name'] for shift in special_shifts]
+    # Get the names of the shifts to check
+    shift_names_to_check = [shift['name'] for shift in special_shifts]
 
-    # Query for existing shifts
-    existing_shifts_query = sa.select(shift_types_table.c.name).where(shift_types_table.c.name.in_(shift_names_to_add))
+    # Query for existing shifts from the database
+    existing_shifts_query = sa.select(shift_types_table.c.name).where(shift_types_table.c.name.in_(shift_names_to_check))
     existing_shifts_result = conn.execute(existing_shifts_query).fetchall()
     existing_shift_names = {row[0] for row in existing_shifts_result}
 
-    # Filter out shifts that already exist
+    # Determine which shifts are missing and need to be inserted
     shifts_to_insert = [shift for shift in special_shifts if shift['name'] not in existing_shift_names]
 
-    # Insert only the new special shifts
+    # Insert only the shifts that are missing
     if shifts_to_insert:
-        op.bulk_insert(
-            sa.table('shift_types',
-                sa.column('name', sa.String),
-                sa.column('start_time', sa.Time),
-                sa.column('end_time', sa.Time)
-            ),
-            shifts_to_insert
-        )
+        op.bulk_insert(shift_types_table, shifts_to_insert)
 
 
 def downgrade():
