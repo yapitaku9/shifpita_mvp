@@ -28,21 +28,43 @@ def upgrade():
                nullable=True)
     # ### end Alembic commands ###
     
-    # Define the table structure for the bulk insert
-    shift_types_table = table('shift_types',
-        column('name', sa.String),
-        column('start_time', sa.Time),
-        column('end_time', sa.Time)
+    # --- Manually modified for idempotency ---
+    # Define the table structure for querying
+    shift_types_table = sa.table('shift_types',
+        sa.column('name', sa.String)
     )
 
-    # Insert the special shifts
-    op.bulk_insert(shift_types_table,
-        [
-            {'name': '休', 'start_time': None, 'end_time': None},
-            {'name': '明', 'start_time': None, 'end_time': None},
-            {'name': '有', 'start_time': None, 'end_time': None},
-        ]
-    )
+    # Get the current connection
+    conn = op.get_bind()
+
+    # Define the shifts to be added
+    special_shifts = [
+        {'name': '休', 'start_time': None, 'end_time': None},
+        {'name': '明', 'start_time': None, 'end_time': None},
+        {'name': '有', 'start_time': None, 'end_time': None},
+    ]
+    
+    # Get the names of the shifts to be added
+    shift_names_to_add = [shift['name'] for shift in special_shifts]
+
+    # Query for existing shifts
+    existing_shifts_query = sa.select(shift_types_table.c.name).where(shift_types_table.c.name.in_(shift_names_to_add))
+    existing_shifts_result = conn.execute(existing_shifts_query).fetchall()
+    existing_shift_names = {row[0] for row in existing_shifts_result}
+
+    # Filter out shifts that already exist
+    shifts_to_insert = [shift for shift in special_shifts if shift['name'] not in existing_shift_names]
+
+    # Insert only the new special shifts
+    if shifts_to_insert:
+        op.bulk_insert(
+            sa.table('shift_types',
+                sa.column('name', sa.String),
+                sa.column('start_time', sa.Time),
+                sa.column('end_time', sa.Time)
+            ),
+            shifts_to_insert
+        )
 
 
 def downgrade():
