@@ -293,17 +293,13 @@ class ShiftGenerator:
             for d_str in date_strs:
                 prob += (pulp.lpSum(x[emp_id, d_str, s] for s in all_shift_names) == 1, f"OneShiftPerDay_{emp_id}_{d_str}")
 
-            # --- DEBUG LOG ---
-            logging.info(f"DEBUG: Employee {emp_id} has employment_type: {emp['employment_type']} (type: {type(emp['employment_type'])})")
-            # --- END DEBUG LOG ---
-
             if emp["employment_type"] == EmploymentType.PART_TIME_SHORT:
                 allowed_shifts = SHIFTS_PART_TIME_SHORT_WORK + [self.SHIFT_KYU, self.SHIFT_PAID_HOLIDAY, self.SHIFT_AKE]
                 forbidden_shifts = [s for s in all_shift_names if s not in allowed_shifts]
                 for d_str in date_strs:
                     prob += (pulp.lpSum(x[emp_id, d_str, s] for s in forbidden_shifts) == 0, f"ForbiddenShifts_PartTimeShort_{emp_id}_{d_str}")
 
-            elif emp["employment_type"] == EmploymentType.HOSPITAL_VISIT_SUPPORT:
+            if emp["employment_type"] == EmploymentType.HOSPITAL_VISIT_SUPPORT:
                 # 1. 勤務可能なシフトを限定する
                 allowed_shifts = HOSPITAL_SHIFTS + [self.SHIFT_KYU, self.SHIFT_PAID_HOLIDAY, self.SHIFT_AKE]
                 forbidden_shifts = [s for s in all_shift_names if s not in allowed_shifts]
@@ -319,7 +315,7 @@ class ShiftGenerator:
                         # 通院日でもなく、休み希望もなければ、強制的に休み
                         prob += (x[emp_id, d_str, self.SHIFT_KYU] == 1, f"ForceKyu_IfNotHospitalDay_{emp_id}_{d_str}")
 
-            else: # For FULL_TIME, MANAGER, SUPPORT
+            if emp["employment_type"] in [EmploymentType.MANAGER, EmploymentType.SUPPORT, EmploymentType.FULL_TIME, EmploymentType.PART_TIME_8H]:
                 forbidden_shifts = SHIFTS_PART_TIME_SHORT_WORK + HOSPITAL_SHIFTS
                 for d_str in date_strs:
                     prob += (pulp.lpSum(x[emp_id, d_str, s] for s in forbidden_shifts) == 0, f"ForbiddenShifts_Others_{emp_id}_{d_str}")
