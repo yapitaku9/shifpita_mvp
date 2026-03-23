@@ -1,8 +1,58 @@
 import click
 from flask.cli import with_appcontext
 from . import db
+from .models.user import User, EmploymentType
 from .models.master import ShiftType, ShiftConstraint
 import datetime
+
+@click.command('create-test-users')
+@with_appcontext
+def create_test_users_command():
+    """Creates test users in the database."""
+    if User.query.filter(User.username.like('test_%')).first():
+        click.echo('Test users already seem to exist. Aborting.')
+        return
+
+    users_to_create = []
+    password = '0000'
+    
+    # Define user counts for each employment type
+    user_counts = {
+        EmploymentType.MANAGER: 1,
+        EmploymentType.SUPPORT: 1,
+        EmploymentType.FULL_TIME: 6,
+        EmploymentType.PART_TIME_8H: 3,
+        EmploymentType.PART_TIME_SHORT: 7,
+        EmploymentType.HOSPITAL_VISIT_SUPPORT: 1,
+    }
+
+    click.echo('Creating test users...')
+    total_users = 0
+    for emp_type, count in user_counts.items():
+        for i in range(1, count + 1):
+            total_users += 1
+            username = f"test_{emp_type.name.lower()}_{i}"
+            full_name = f"{emp_type.value} {i}"
+            
+            user = User(
+                username=username,
+                full_name=full_name,
+                employment_type=emp_type,
+                is_admin=False
+            )
+            user.set_password(password)
+            users_to_create.append(user)
+            click.echo(f"  - Created {full_name} (ID: {username})")
+
+    try:
+        db.session.bulk_save_objects(users_to_create)
+        db.session.commit()
+        click.echo(f"\nSuccessfully created {total_users} test users.")
+        click.echo(f"All users have the password: '{password}'")
+    except Exception as e:
+        db.session.rollback()
+        click.echo(f"\nAn error occurred: {e}")
+
 
 @click.command('seed')
 @with_appcontext
@@ -140,3 +190,4 @@ def seed_command():
 def init_app(app):
     """Register command with app."""
     app.cli.add_command(seed_command)
+    app.cli.add_command(create_test_users_command)

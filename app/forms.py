@@ -446,6 +446,12 @@ class SpecialDayForm(FlaskForm):
         if not super(SpecialDayForm, self).validate(extra_validators):
             return False
 
+        # descriptionに「通院」が含まれる場合、visit_timeを必須にする
+        if self.description.data and '通院' in self.description.data:
+            if not self.visit_time.data:
+                self.visit_time.errors.append('説明に「通院」が含まれる場合、通院時間は必須です。')
+                return False
+
         from app.models.special_day import SpecialDay
         
         date_obj = self.date.data
