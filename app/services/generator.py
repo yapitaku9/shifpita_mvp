@@ -372,23 +372,16 @@ class ShiftGenerator:
             total_work_days = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_FOR_WORK_COUNT)
             total_night_shifts = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_NIGHT)
             
-            # 勤務日数(ソフト制約)
-            work_days_shortage_penalty = self.constraints.get('work_days_shortage_penalty', 150)
-            work_days_excess_penalty = self.constraints.get('work_days_excess_penalty', 150)
-
-            # 最小勤務日数 (ソフト制約)
+            # 勤務日数(ハード制約)
+            # 最小勤務日数 (ハード制約)
             min_days = emp.get("min_work_days")
             if min_days is not None:
-                shortage = pulp.LpVariable(f"work_days_shortage_{emp_id}", 0, None, pulp.LpInteger)
-                prob += (total_work_days + shortage >= min_days, f"MinWorkDays_Soft_{emp_id}")
-                objective_terms.append(shortage * work_days_shortage_penalty)
+                prob += (total_work_days >= min_days, f"MinWorkDays_Hard_{emp_id}")
 
-            # 最大勤務日数 (ソフト制約)
+            # 最大勤務日数 (ハード制約)
             max_days = emp.get("max_work_days")
             if max_days is not None:
-                excess = pulp.LpVariable(f"work_days_excess_{emp_id}", 0, None, pulp.LpInteger)
-                prob += (total_work_days - excess <= max_days, f"MaxWorkDays_Soft_{emp_id}")
-                objective_terms.append(excess * work_days_excess_penalty)
+                prob += (total_work_days <= max_days, f"MaxWorkDays_Hard_{emp_id}")
 
             night_shifts_penalty = self.constraints.get('night_shifts_penalty', 120)
 
