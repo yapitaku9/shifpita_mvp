@@ -327,7 +327,7 @@ class SingleConstraintForm(FlaskForm):
     value = IntegerField(
         "値",
         validators=[
-            DataRequired(message="値は必須です。"),
+            Optional(),
             NumberRange(min=0, message="0以上の数値を入力してください。")
         ]
     )
