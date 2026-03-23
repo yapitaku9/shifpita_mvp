@@ -174,6 +174,10 @@ def seed_command():
             {'name': 'disallow_specific_shifts_after_night', 'value': 1, 'description': '【シフト構成】夜勤の翌日に「遅・日・早」を禁止', 'display_order': 400},
             {'name': 'disallow_specific_shifts_after_late', 'value': 1, 'description': '【シフト構成】遅番の翌日に「日・早」を禁止', 'display_order': 401},
             {'name': 'disallow_specific_shifts_after_day', 'value': 1, 'description': '【シフト構成】日勤の翌日に「早」を禁止', 'display_order': 402},
+            # 連勤制約
+            {'name': 'max_consecutive_late_shifts', 'value': 4, 'description': '【連勤制約】遅番の最大連続日数', 'display_order': 600},
+            {'name': 'max_consecutive_night_shifts', 'value': 4, 'description': '【連勤制約】夜勤の最大連続日数', 'display_order': 601},
+            {'name': 'max_consecutive_late_night_shifts', 'value': 4, 'description': '【連勤制約】遅番・夜勤の最大連続日数', 'display_order': 602},
         ]
         
         all_new_constraints = other_constraints + shift_structure_rules
@@ -182,6 +186,13 @@ def seed_command():
                 db.session.add(ShiftConstraint(**c_data))
                 click.echo(f"Added constraint: {c_data['name']}")
                 
+        # Update description for max_consecutive_work_days to categorize it
+        mcwd = ShiftConstraint.query.filter_by(name='max_consecutive_work_days').first()
+        if mcwd and not mcwd.description.startswith('【'):
+            mcwd.description = '【連勤制約】最大連続勤務日数 (従業員ごとの未設定時)'
+            mcwd.display_order = 599 # To place it first
+            click.echo('Updated max_consecutive_work_days description.')
+
         click.echo('Constraint check finished.')
 
     db.session.commit()

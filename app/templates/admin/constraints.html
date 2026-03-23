@@ -11,7 +11,8 @@
         {% set categories = {
             '【人員配置】 平日': ['【人員配置】平日'],
             '【人員配置】 休日': ['【人員配置】休日'],
-            '【シフト構成】 ルール': ['【シフト構成】']
+            '【シフト構成】 ルール': ['【シフト構成】'],
+            '【連勤制約】 ルール': ['【連勤制約】']
         } %}
 
         {# This list will keep track of descriptions that have been rendered #}
@@ -78,7 +79,7 @@
             <div class="card-header">その他</div>
             <div class="card-body">
                  {# Define descriptions of basic constraints that should be hidden completely #}
-                 {% set hidden_constraints = ['最大連続勤務日数', '最低連続休日数', '夜勤明けの最低連続休日数', '遅番・夜勤の最大連続日数'] %}
+                 {% set hidden_constraints = ['最低連続休日数', '夜勤明けの最低連続休日数'] %}
                  
                  {% for c in form.constraints if c.form.description.data not in rendered_descriptions.items and c.form.description.data not in hidden_constraints %}
                     {{ c.form.name() }}
