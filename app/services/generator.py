@@ -300,12 +300,6 @@ class ShiftGenerator:
                     prob += (pulp.lpSum(x[emp_id, d_str, s] for s in forbidden_shifts) == 0, f"ForbiddenShifts_PartTimeShort_{emp_id}_{d_str}")
 
             if emp["employment_type"] == EmploymentType.HOSPITAL_VISIT_SUPPORT:
-                # 1. 勤務可能なシフトを限定する
-                allowed_shifts = HOSPITAL_SHIFTS + [self.SHIFT_KYU, self.SHIFT_PAID_HOLIDAY, self.SHIFT_AKE]
-                forbidden_shifts = [s for s in all_shift_names if s not in allowed_shifts]
-                for d_str in date_strs:
-                    prob += (pulp.lpSum(x[emp_id, d_str, s] for s in forbidden_shifts) == 0, f"ForbiddenShifts_HospitalSupport_{emp_id}_{d_str}")
-
                 # 2. 通院日のシフトを制御し、それ以外は強制的に休みにする
                 for d_str in date_strs:
                     day_special_infos = special_days_map.get(d_str, [])
@@ -323,15 +317,23 @@ class ShiftGenerator:
                     if is_hospital_day_9:
                         allowed_work_shifts.append('通9')
 
+                    # この従業員が基本入れる勤務シフトを定義する
+                    possible_work_shifts = [s for s in self.SHIFTS_WORK if s in HOSPITAL_SHIFTS]
+
                     if allowed_work_shifts:
                         # 通院日なので、許可された通院シフト以外の「勤務」を禁止
-                        # SHIFTS_WORKは '休','明','有'を含まない
-                        forbidden_work_shifts = [s for s in self.SHIFTS_WORK if s not in allowed_work_shifts]
+                        forbidden_work_shifts = [s for s in possible_work_shifts if s not in allowed_work_shifts]
                         if forbidden_work_shifts:
                             prob += (pulp.lpSum(x[emp_id, d_str, s] for s in forbidden_work_shifts) == 0, f"HospitalSupport_ForbiddenWork_{emp_id}_{d_str}")
                     else:
                         # 通院日ではないので、この従業員は強制的に休み
-                        prob += (x[emp_id, d_str, self.SHIFT_KYU] == 1, f"HospitalSupport_ForceKyu_{emp_id}_{d_str}")
+                        prob += (pulp.lpSum(x[emp_id, d_str, s] for s in possible_work_shifts) == 0, f"HospitalSupport_ForceKyu_{emp_id}_{d_str}")
+                
+                # この従業員は、HOSPITAL_SHIFTS 以外の全ての SHIFTS_WORK には入れない、という一般的な制約も追加
+                other_work_shifts = [s for s in self.SHIFTS_WORK if s not in HOSPITAL_SHIFTS]
+                if other_work_shifts:
+                    for d_str in date_strs:
+                        prob += (pulp.lpSum(x[emp_id, d_str, s] for s in other_work_shifts) == 0, f"HospitalSupport_GeneralForbidden_{emp_id}_{d_str}")
 
             if emp["employment_type"] in [EmploymentType.MANAGER, EmploymentType.SUPPORT, EmploymentType.FULL_TIME, EmploymentType.PART_TIME_8H]:
                 forbidden_shifts = SHIFTS_PART_TIME_SHORT_WORK + HOSPITAL_SHIFTS
