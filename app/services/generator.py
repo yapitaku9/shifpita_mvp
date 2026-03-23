@@ -308,8 +308,8 @@ class ShiftGenerator:
                     if is_requested_off:
                         continue # 休み希望は別制約で処理される
 
-                    is_hospital_day_8 = any(sdi.visit_time == "08:00" and sdi.description and "通院" in sdi.description for sdi in day_special_infos)
-                    is_hospital_day_9 = any(sdi.visit_time == "09:00" and sdi.description and "通院" in sdi.description for sdi in day_special_infos)
+                    is_hospital_day_8 = any(sdi.visit_time == "08:00" for sdi in day_special_infos)
+                    is_hospital_day_9 = any(sdi.visit_time == "09:00" for sdi in day_special_infos)
 
                     allowed_work_shifts = []
                     if is_hospital_day_8:
