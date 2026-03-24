@@ -293,14 +293,16 @@ class ShiftGenerator:
                     actual_staff = pulp.lpSum(staff_terms) if staff_terms else 0
 
                 # 制約とペナルティを定義
-                if is_early_morning_hour:
-                    # 早朝（0-7時）は過不足なくハード制約
+                is_hard_constraint_hour = (0 <= hour <= 6) or (20 <= hour <= 23)
+
+                if is_hard_constraint_hour:
+                    # 夜間帯 (0-7時, 20-24時) は過不足なくハード制約
                     prob += (
                         actual_staff == req_staff_count + staff_increase,
                         f"HardStaff_Night_{req_day_type}_{key}_{d_str}",
                     )
                 else:
-                    # 日中と20-24時は不足にペナルティ
+                    # 日中は不足にペナルティ
                     shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
                     prob += (
                         actual_staff + shortfall >= req_staff_count + staff_increase,
