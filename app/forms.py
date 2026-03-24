@@ -229,18 +229,20 @@ class DayOffRequestForm(FlaskForm):
             except ValueError:
                 raise ValidationError(f'無効な日付形式です: {date_str}')
 
-            # 同じ日付の休み希望をチェック
-            existing_day_off = DayOffRequest.query.filter_by(
-                user_id=current_user.id, 
-                date=date
+            # 同じ日付の休み希望をチェック（却下されたものを除く）
+            existing_day_off = DayOffRequest.query.filter(
+                DayOffRequest.user_id == current_user.id, 
+                DayOffRequest.date == date,
+                DayOffRequest.status != 'rejected'
             ).first()
             if existing_day_off:
                 raise ValidationError(f'{date_str}の休み希望は既に申請済みです。')
                 
-            # 同じ日付の希望勤務をチェック
-            existing_work_request = WorkRequest.query.filter_by(
-                user_id=current_user.id,
-                date=date
+            # 同じ日付の希望勤務をチェック（却下されたものを除く）
+            existing_work_request = WorkRequest.query.filter(
+                WorkRequest.user_id == current_user.id,
+                WorkRequest.date == date,
+                WorkRequest.status != 'rejected'
             ).first()
             if existing_work_request:
                 raise ValidationError(f'{date_str}は希望勤務として既に申請済みです。休み希望は申請できません。')
@@ -267,18 +269,20 @@ class WorkRequestForm(FlaskForm):
         except ValueError:
             raise ValidationError('無効な日付形式です。')
 
-        # 同じ日付の希望勤務をチェック
-        existing_work_request = WorkRequest.query.filter_by(
-            user_id=current_user.id,
-            date=date_obj
+        # 同じ日付の希望勤務をチェック（却下されたものを除く）
+        existing_work_request = WorkRequest.query.filter(
+            WorkRequest.user_id == current_user.id,
+            WorkRequest.date == date_obj,
+            WorkRequest.status != 'rejected'
         ).first()
         if existing_work_request:
             raise ValidationError('この日付の希望勤務は既に申請済みです。')
             
-        # 同じ日付の希望休をチェック
-        existing_day_off = DayOffRequest.query.filter_by(
-            user_id=current_user.id, 
-            date=date_obj
+        # 同じ日付の希望休をチェック（却下されたものを除く）
+        existing_day_off = DayOffRequest.query.filter(
+            DayOffRequest.user_id == current_user.id, 
+            DayOffRequest.date == date_obj,
+            DayOffRequest.status != 'rejected'
         ).first()
         if existing_day_off:
             raise ValidationError('この日付は休み希望として既に申請済みです。希望勤務は申請できません。')
