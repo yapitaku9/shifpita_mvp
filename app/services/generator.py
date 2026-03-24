@@ -192,6 +192,9 @@ class ShiftGenerator:
 
         # --- 3. 制約の定義 (構造を全面的に再設計) ---
         # 3.1 人員配置の制約 (日付ごとのループ)
+        # Handle night shift constraint for the last day, which falls on the next month
+        staffing_constraint_dates = dates + [dates[-1] + timedelta(days=1)]
+
         hourly_req_keys = [
             "0700",
             "0800",
@@ -215,10 +218,15 @@ class ShiftGenerator:
             "0500",
             "0600",
         ]
-        for d_idx, d_str in enumerate(date_strs):
-            current_date = date.fromisoformat(d_str)
+        for d_idx, current_date in enumerate(staffing_constraint_dates):
+            d_str = current_date.isoformat()
 
-            for key in hourly_req_keys:
+            # For the extra day (e.g., Apr 1st), only process early morning hours
+            keys_to_process = hourly_req_keys
+            if current_date > dates[-1]:
+                keys_to_process = [k for k in hourly_req_keys if 0 <= int(k) // 100 <= 6]
+
+            for key in keys_to_process:
                 hour = int(key) // 100
 
                 # 要件の対象となる日付を決定する
