@@ -88,20 +88,20 @@ class ExcelExporter:
 
         # --- Employee Summary Headers ---
         summary_start_col = len(dates) + 2
-        summary_headers = ["勤務日", "休日", "その他休日", "夜勤"]
+        summary_headers = ["稼働日", "有給休暇", "勤務日", "休日", "夜勤日"]
         for i, header in enumerate(summary_headers):
             col = summary_start_col + i
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = header_font
             cell.fill = header_fill
             cell.border = thin_border
-            ws.column_dimensions[get_column_letter(col)].width = 6
+            ws.column_dimensions[get_column_letter(col)].width = 7
 
         # --- Employee Rows ---
         for row_num, emp in enumerate(employees, start=2):
             ws.cell(row=row_num, column=1, value=emp.full_name).border = thin_border
             
-            work_days, paid_holidays, holidays, night_shifts = 0, 0, 0, 0
+            working_days, paid_holidays, holidays, night_shifts = 0, 0, 0, 0
 
             for i, day in enumerate(dates):
                 col = i + 2
@@ -112,7 +112,7 @@ class ExcelExporter:
                     if shift_name is None and day in paid_leave_reqs.get(emp.id, []):
                         shift_name = "有"
                     if shift_name:
-                        if shift_name not in ["有", "休", "明"]: work_days += 1
+                        if shift_name not in ["有", "休", "明"]: working_days += 1
                         if shift_name == "有": paid_holidays += 1
                         if shift_name in ["休", "明"]: holidays += 1
                         if "夜" in shift_name: night_shifts += 1
@@ -140,7 +140,8 @@ class ExcelExporter:
                     cell.fill = prev_month_fill
 
 
-            emp_summary_data = [work_days, holidays, paid_holidays, night_shifts]
+            total_work_days = working_days + paid_holidays
+            emp_summary_data = [working_days, paid_holidays, total_work_days, holidays, night_shifts]
             for i, value in enumerate(emp_summary_data):
                 ws.cell(row=row_num, column=summary_start_col + i, value=value).border = thin_border
                 ws.cell(row=row_num, column=summary_start_col + i).alignment = center_alignment

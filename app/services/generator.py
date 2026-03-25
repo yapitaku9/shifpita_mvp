@@ -475,7 +475,9 @@ class ShiftGenerator:
 
             # 勤務日数(ハード制約)と夜勤日数(ソフト制約)
             total_work_days = pulp.lpSum(
-                x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_FOR_WORK_COUNT
+                x[emp_id, d, s]
+                for d in date_strs
+                for s in self.SHIFTS_FOR_WORK_COUNT + [self.SHIFT_PAID_HOLIDAY]
             )
             total_night_shifts = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_NIGHT)
 

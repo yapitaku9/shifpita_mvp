@@ -49,7 +49,7 @@ class PDFExporter:
             f"{d.split('-')[-1]}\n({weekdays_ja[datetime.datetime.strptime(d, '%Y-%m-%d').weekday()]})"
             for d in dates
         ]
-        header_row = ["", "氏名"] + header_date_cells + ["勤務日", "休日", "その他休日", "夜勤日数"]
+        header_row = ["", "氏名"] + header_date_cells + ["稼働日", "有給休暇", "勤務日", "休日", "夜勤日"]
         data = [header_row]
 
         assignment_map = {(a["employee_id"], a["date"]): a["shift_type"] for a in assignments}
@@ -58,7 +58,7 @@ class PDFExporter:
         # 従業員のシフトと月次サマリー行を作成
         #
         for emp in employees:
-            work_days, paid_holidays, holidays, night_shifts = 0, 0, 0, 0
+            working_days, paid_holidays, holidays, night_shifts = 0, 0, 0, 0
             row_shifts = []
             for d in dates:
                 shift_name = assignment_map.get((emp["id"], d), "")
@@ -66,15 +66,16 @@ class PDFExporter:
                 # 当月のデータのみを集計対象とする
                 if d in month_dates:
                     if shift_name and shift_name not in ["有", "休", "明"]:
-                        work_days += 1
+                        working_days += 1
                     if shift_name == "有":
                         paid_holidays += 1
                     if shift_name in ["休", "明"]:
                         holidays += 1
                     if "夜" in shift_name:
                         night_shifts += 1
-
-            row = ["", emp["name"]] + row_shifts + [str(work_days), str(holidays), str(paid_holidays), str(night_shifts)]
+            
+            total_work_days = working_days + paid_holidays
+            row = ["", emp["name"]] + row_shifts + [str(working_days), str(paid_holidays), str(total_work_days), str(holidays), str(night_shifts)]
             data.append(row)
 
         # --- 日次集計の準備 ---
@@ -219,9 +220,9 @@ class PDFExporter:
                 style_commands_for_summary.append(('VALIGN', (0, block_start_row), (0, block_end_row), 'MIDDLE'))
 
         page_width = landscape(A4)[0] - 60
-        total_units = 1.0 + 1.5 + len(dates) + 4 # 従業員サマリー列の数を修正
+        total_units = 1.0 + 1.5 + len(dates) + 5 # 従業員サマリー列の数を修正
         unit_width = page_width / total_units
-        col_widths = [unit_width * 1.0, unit_width * 1.5] + [unit_width] * len(dates) + [unit_width] * 4
+        col_widths = [unit_width * 1.0, unit_width * 1.5] + [unit_width] * len(dates) + [unit_width] * 5
         table = Table(data, colWidths=col_widths)
 
         num_employees = len(employees)
