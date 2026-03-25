@@ -852,7 +852,7 @@ class ShiftGenerator:
         logging.info("Solving problem...")
         prob += pulp.lpSum(objective_terms), "Objective"
         prob.writeLP("ShiftProblem.lp")  # デバッグ用
-        solver = pulp.PULP_CBC_CMD(msg=True, logPath="solver.log", timeLimit=600)
+        solver = pulp.PULP_CBC_CMD(msg=True, logPath="solver.log", timeLimit=1200)
         status = prob.solve(solver)
         logging.info(f"Solver finished with status: {pulp.LpStatus[status]}")
 
