@@ -237,7 +237,7 @@ class PDFExporter:
         
         # 前月と当月の間に縦線を追加
         if num_prev_days > 0:
-            separator_col_idx = 1 + num_prev_days
+            separator_col_idx = 2 + num_prev_days
             style_commands.append(('LINEBEFORE', (separator_col_idx, 0), (separator_col_idx, -1), 1, colors.black))
 
         summary_start_row = 1 + num_employees

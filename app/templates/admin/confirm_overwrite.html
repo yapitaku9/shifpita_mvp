@@ -14,6 +14,8 @@
                     <form action="{{ url_for('admin.confirm_shifts') }}" method="post" class="d-inline" novalidate>
                         {{ form.hidden_tag() }}
                         <input type="hidden" name="overwrite" value="true">
+                        <input type="hidden" name="year" value="{{ year }}">
+                        <input type="hidden" name="month" value="{{ month }}">
                         <button type="submit" class="btn btn-danger">上書きする</button>
                     </form>
                     <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">キャンセル</a>
