@@ -125,12 +125,15 @@ class ShiftGenerator:
         # 承認済みの希望休と有給休暇を取得
         day_off_reqs = {}
         paid_leave_reqs = {}
+        preferred_paid_leave_reqs = {}
         approved_day_offs = DayOffRequest.query.filter(
             DayOffRequest.date.between(start_date, end_date), DayOffRequest.status == "approved"
         ).all()
         for req in approved_day_offs:
             if req.request_type == "paid_leave":
                 paid_leave_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
+            elif req.request_type == "preferred_paid_leave":
+                preferred_paid_leave_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
             else:  # 'day_off'
                 day_off_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
 
@@ -428,6 +431,15 @@ class ShiftGenerator:
                         x[emp_id, d_str, self.SHIFT_PAID_HOLIDAY] == 1,
                         f"PaidLeaveRequest_{emp_id}_{d_str}",
                     )
+                elif d_str in preferred_paid_leave_reqs.get(emp_id, []):
+                    penalty = self.constraints.get('penalty_for_preferred_paid_leave', 10)
+                    # ハード制約: 「休」か「有」のどちらかを割り当てる
+                    prob += (
+                        x[emp_id, d_str, self.SHIFT_KYU] + x[emp_id, d_str, self.SHIFT_PAID_HOLIDAY] == 1,
+                        f"PreferredPaidLeave_Hard_{emp_id}_{d_str}",
+                    )
+                    # ソフト制約: 「有」が割り当てられたらペナルティ
+                    objective_terms.append(x[emp_id, d_str, self.SHIFT_PAID_HOLIDAY] * penalty)
                 else:
                     prob += (
                         x[emp_id, d_str, self.SHIFT_PAID_HOLIDAY] == 0,

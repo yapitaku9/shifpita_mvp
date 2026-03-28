@@ -181,6 +181,9 @@ def seed_command():
         ]
         
         all_new_constraints = other_constraints + shift_structure_rules
+        all_new_constraints.append(
+            {'name': 'penalty_for_preferred_paid_leave', 'value': 10, 'description': '【ソフト制約】希望有給休暇に「有」を割り当てた場合のペナルティ', 'display_order': 220},
+        )
         for c_data in all_new_constraints:
             if not ShiftConstraint.query.filter_by(name=c_data['name']).first():
                 db.session.add(ShiftConstraint(**c_data))
