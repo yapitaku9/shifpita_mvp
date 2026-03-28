@@ -302,73 +302,137 @@ def confirm_shifts():
     return redirect(url_for("admin.dashboard"))
 
 
+
+from app.models.master import ShiftConstraint, ShiftType, ConstraintType
 @admin_bp.route("/constraints", methods=["GET", "POST"])
 def manage_constraints():
     """シフト作成の制約条件と特別日を編集する"""
-    form = ShiftConstraintForm()
+    if not current_user.is_admin:
+        flash('管理者権限が必要です。')
+        return redirect(url_for('main.index'))
+
+    # マスター制約リスト
+    master_constraints = [
+        # 人員配置
+        {'name': 'min_workers_day', 'category': '人員配置', 'description_jp': '日勤の最小人員'},
+        {'name': 'max_workers_day', 'category': '人員配置', 'description_jp': '日勤の最大人員'},
+        {'name': 'min_workers_night', 'category': '人員配置', 'description_jp': '夜勤の最小人員'},
+        {'name': 'max_workers_night', 'category': '人員配置', 'description_jp': '夜勤の最大人員'},
+        {'name': 'min_workers_day_sp', 'category': '人員配置', 'description_jp': '日勤の最小人員 (特別日)'},
+        {'name': 'max_workers_day_sp', 'category': '人員配置', 'description_jp': '日勤の最大人員 (特別日)'},
+        {'name': 'min_workers_night_sp', 'category': '人員配置', 'description_jp': '夜勤の最小人員 (特別日)'},
+        {'name': 'max_workers_night_sp', 'category': '人員配置', 'description_jp': '夜勤の最大人員 (特別日)'},
+        # 連勤
+        {'name': 'max_consecutive_work', 'category': '連勤', 'description_jp': '最大連勤日数'},
+        # 休日
+        {'name': 'min_consecutive_holidays', 'category': '休日', 'description_jp': '最小連続休日数'},
+        # 夜勤
+        {'name': 'night_shift_after_mid_day', 'category': '夜勤', 'description_jp': '準夜勤後の日勤禁止'},
+        {'name': 'no_day_shift_after_night_shift', 'category': '夜勤', 'description_jp': '夜勤後の日勤禁止'},
+        # 経験年数
+        {'name': 'min_experience_night_shift', 'category': '経験年数', 'description_jp': '夜勤に必要な最小経験年数'},
+        # 公平性
+        {'name': 'ensure_fairness', 'category': '公平性', 'description_jp': '勤務回数の公平性'},
+        # 役職
+        {'name': 'leader_in_day_shift', 'category': '役職', 'description_jp': '日勤にリーダーを1名配置'},
+        {'name': 'leader_in_night_shift', 'category': '役職', 'description_jp': '夜勤にリーダーを1名配置'},
+        # 特殊スキル
+        {'name': 'advanced_care_in_day_shift', 'category': '特殊スキル', 'description_jp': '日勤に高度なケア担当を1名配置'},
+        # 連続夜勤
+        {'name': 'max_consecutive_night_shifts', 'category': '連続夜勤', 'description_jp': '最大連続夜勤日数'},
+        # 個人設定
+        {'name': 'respect_individual_preferences', 'category': '個人設定', 'description_jp': '個人の勤務希望を尊重'},
+        # 病院訪問シフト
+        {'name': 'assign_hospital_visit_shift', 'category': '病院訪問シフト', 'description_jp': '病院訪問シフトの割り当て'},
+    ]
+
+    if request.method == 'POST':
+        if 'submit_constraints' in request.form:
+            try:
+                all_constraints = ShiftConstraint.query.all()
+                for constraint in all_constraints:
+                    # Update constraint type
+                    constraint_type_str = request.form.get(f'constraint_type_{constraint.id}')
+                    if constraint_type_str in [ct.name for ct in ConstraintType]:
+                        constraint.constraint_type = ConstraintType[constraint_type_str]
+
+                    # Update value
+                    value_str = request.form.get(f'value_{constraint.id}')
+                    if value_str and value_str.isdigit():
+                        constraint.value = int(value_str)
+                    elif value_str == '':
+                        constraint.value = None
+
+                    # Update penalty
+                    penalty_str = request.form.get(f'penalty_{constraint.id}')
+                    if constraint.constraint_type == ConstraintType.SOFT:
+                        if penalty_str and penalty_str.isdigit():
+                            constraint.penalty = int(penalty_str)
+                        else:
+                            constraint.penalty = 0 # Default penalty if invalid or empty
+                    else:
+                        constraint.penalty = 0 # Non-soft constraints have no penalty
+
+                db.session.commit()
+                flash('制約条件を更新しました。', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'更新中にエラーが発生しました: {e}', 'danger')
+            return redirect(url_for('admin.manage_constraints'))
+
+        elif 'submit_special_day' in request.form:
+            special_day_form = SpecialDayForm()
+            if special_day_form.validate_on_submit():
+                try:
+                    special_day = SpecialDay(
+                        date=special_day_form.date.data,
+                        staff_increase=special_day_form.staff_increase.data,
+                        description=special_day_form.description.data,
+                        visit_time=special_day_form.visit_time.data or None
+                    )
+                    db.session.add(special_day)
+                    db.session.commit()
+                    flash(f"{special_day.date.strftime('%Y-%m-%d')}を特別日として設定しました。", "success")
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f"特別日の設定中にエラーが発生しました: {e}", "danger")
+            return redirect(url_for("admin.manage_constraints"))
+
     special_day_form = SpecialDayForm()
-
-    if 'submit_constraints' in request.form and form.validate_on_submit():
-        try:
-            for item in form.constraints.data:
-                constraint = ShiftConstraint.query.filter_by(name=item['name']).first()
-                if constraint:
-                    # is_booleanフラグはテンプレートでの表示にのみ使用
-                    # 値は常にIntegerFieldから来るので、Noneかどうかでチェックボックスの状態を判断
-                    new_value = item['value'] if item['value'] is not None else 0
-                    if constraint.value != new_value:
-                        constraint.value = new_value
-            db.session.commit()
-            flash("制約条件を更新しました。", "success")
-        except Exception as e:
-            db.session.rollback()
-            flash(f"制約条件の更新中にエラーが発生しました: {e}", "danger")
-        return redirect(url_for("admin.manage_constraints"))
-
-    elif 'submit_special_day' in request.form and special_day_form.validate_on_submit():
-        try:
-            special_day = SpecialDay(
-                date=special_day_form.date.data,
-                staff_increase=special_day_form.staff_increase.data,
-                description=special_day_form.description.data,
-                visit_time=special_day_form.visit_time.data or None
+    # DBにマスター制約が存在するか確認し、なければ作成・更新
+    for mc in master_constraints:
+        constraint = ShiftConstraint.query.filter_by(name=mc['name']).first()
+        if not constraint:
+            constraint = ShiftConstraint(
+                name=mc['name'],
+                constraint_type=ConstraintType.INACTIVE, # デフォルトは無効
+                penalty=0
             )
-            db.session.add(special_day)
-            db.session.commit()
-            flash(f"{special_day.date.strftime('%Y-%m-%d')}を特別日として設定しました。", "success")
-        except Exception as e:
-            db.session.rollback()
-            flash(f"特別日の設定中にエラーが発生しました: {e}", "danger")
-        return redirect(url_for("admin.manage_constraints"))
+            db.session.add(constraint)
+        # カテゴリと説明は常にマスターリストで更新
+        constraint.category = mc['category']
+        constraint.description_jp = mc['description_jp']
+    db.session.commit()
 
-    # GETリクエスト、またはPOSTでバリデーション失敗時の処理
-    if not form.is_submitted():
-        # --- データベースの制約をフォームに設定 ---
-        # 既存のリストをクリア
-        while len(form.constraints) > 0:
-            form.constraints.pop_entry()
-        
-        # DBから読み込んでフォームに設定
-        all_constraints = ShiftConstraint.query.order_by(ShiftConstraint.display_order, ShiftConstraint.id).all()
-        for c in all_constraints:
-            is_bool = c.description.startswith('【シフト構成】')
-            form.constraints.append_entry({
-                'name': c.name,
-                'description': c.description,
-                'value': c.value,
-                'is_boolean': 'y' if is_bool else 'n'
-            })
-
+    all_constraints = ShiftConstraint.query.order_by(ShiftConstraint.category, ShiftConstraint.id).all()
+    constraints_by_category = {}
+    for constraint in all_constraints:
+        if constraint.category not in constraints_by_category:
+            constraints_by_category[constraint.category] = []
+        constraints_by_category[constraint.category].append(constraint)
+    
     # --- 特別日のリストを取得 ---
     special_days = SpecialDay.query.order_by(SpecialDay.date.asc()).all()
 
     return render_template(
         "admin/constraints.html",
         title="制約条件・特別日の編集",
-        form=form,
+        constraints_by_category=constraints_by_category,
         special_day_form=special_day_form,
-        special_days=special_days
+        special_days=special_days,
+        ConstraintType=ConstraintType # テンプレートでEnumを使えるように
     )
+
 
 
 @admin_bp.route("/delete_special_day/<int:day_id>", methods=['POST'])
