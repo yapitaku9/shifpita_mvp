@@ -56,6 +56,7 @@ def dashboard():
             user = User(
                 username=form.username.data,
                 full_name=form.full_name.data,
+                employee_number=form.employee_number.data,
                 email=form.email.data or None,
                 employment_type=employment_type_enum,
                 max_consecutive_work_days=form.max_consecutive_work_days.data,
@@ -105,7 +106,19 @@ def dashboard():
             for error in errors:
                 flash(f"{getattr(form, field).label.text}: {error}", "danger")
 
-    user_list = User.query.filter_by(is_admin=False).order_by(User.full_name).all()
+    sort_order_employment = case(
+        (User.employment_type == EmploymentType.MANAGER, 1),
+        (User.employment_type == EmploymentType.SUPPORT, 2),
+        (User.employment_type == EmploymentType.FULL_TIME, 3),
+        (User.employment_type == EmploymentType.PART_TIME_8H, 4),
+        (User.employment_type == EmploymentType.PART_TIME_SHORT, 5),
+        else_=6
+    )
+    user_list = User.query.filter_by(is_admin=False).order_by(
+        User.employee_number.asc().nulls_last(),
+        sort_order_employment,
+        User.full_name
+    ).all()
     
     # シフト生成履歴を取得 (最新5件)
     history_list = ShiftGenerationHistory.query.order_by(ShiftGenerationHistory.generation_timestamp.desc()).limit(5).all()
@@ -384,6 +397,7 @@ def edit_employee(user_id):
     form = EmployeeForm(
         original_username=user.username,
         original_email=user.email,
+        original_employee_number=user.employee_number,
         employment_type=user.employment_type
     )
 
@@ -391,6 +405,7 @@ def edit_employee(user_id):
         try:
             user.username = form.username.data
             user.full_name = form.full_name.data
+            user.employee_number = form.employee_number.data
             user.email = form.email.data or None
             user.employment_type = EmploymentType[form.employment_type.data]
             user.is_active = form.is_active.data
@@ -430,6 +445,7 @@ def edit_employee(user_id):
         form.set_shift_choices_by_employment(user.employment_type)
         form.username.data = user.username
         form.full_name.data = user.full_name
+        form.employee_number.data = user.employee_number
         form.email.data = user.email
         form.employment_type.data = user.employment_type.name
         form.is_active.data = user.is_active
@@ -879,7 +895,7 @@ def download_excel(year, month):
                 work_req_map[(req.user_id, req.date)] = shift_names
 
         # 従業員リストを取得
-        sort_order = case(
+        sort_order_employment = case(
             (User.employment_type == EmploymentType.MANAGER, 1),
             (User.employment_type == EmploymentType.SUPPORT, 2),
             (User.employment_type == EmploymentType.FULL_TIME, 3),
@@ -887,7 +903,11 @@ def download_excel(year, month):
             (User.employment_type == EmploymentType.PART_TIME_SHORT, 5),
             else_=6
         )
-        employees = User.query.filter_by(is_admin=False).order_by(sort_order, User.full_name).all()
+        employees = User.query.filter_by(is_admin=False).order_by(
+            User.employee_number.asc().nulls_last(),
+            sort_order_employment,
+            User.full_name
+        ).all()
 
         # その他必要なデータを取得
         from collections import defaultdict
@@ -964,7 +984,7 @@ def download_generated_pdf(year, month):
         ]
 
         # --- PDF生成に必要なデータを取得 (download_confirmed_pdfとほぼ同じ) ---
-        sort_order = case(
+        sort_order_employment = case(
             (User.employment_type == EmploymentType.MANAGER, 1),
             (User.employment_type == EmploymentType.SUPPORT, 2),
             (User.employment_type == EmploymentType.FULL_TIME, 3),
@@ -973,7 +993,11 @@ def download_generated_pdf(year, month):
             else_=6
         )
         # is_active=True のユーザーのみをPDFに含める
-        all_users = User.query.filter_by(is_admin=False, is_active=True).order_by(sort_order, User.full_name).all()
+        all_users = User.query.filter_by(is_admin=False, is_active=True).order_by(
+            User.employee_number.asc().nulls_last(),
+            sort_order_employment,
+            User.full_name
+        ).all()
         employees_for_pdf = [{"id": u.id, "name": u.full_name} for u in all_users]
 
         all_shift_types = db.session.query(ShiftType).all()
@@ -1077,7 +1101,7 @@ def download_confirmed_pdf(year, month):
         ]
 
         # --- PDF生成に必要なデータを取得 ---
-        sort_order = case(
+        sort_order_employment = case(
             (User.employment_type == EmploymentType.MANAGER, 1),
             (User.employment_type == EmploymentType.SUPPORT, 2),
             (User.employment_type == EmploymentType.FULL_TIME, 3),
@@ -1085,7 +1109,11 @@ def download_confirmed_pdf(year, month):
             (User.employment_type == EmploymentType.PART_TIME_SHORT, 5),
             else_=6
         )
-        all_users = User.query.filter_by(is_admin=False).order_by(sort_order, User.full_name).all()
+        all_users = User.query.filter_by(is_admin=False).order_by(
+            User.employee_number.asc().nulls_last(),
+            sort_order_employment,
+            User.full_name
+        ).all()
         employees_for_pdf = [{"id": u.id, "name": u.full_name} for u in all_users]
 
         all_shift_types = db.session.query(ShiftType).all()

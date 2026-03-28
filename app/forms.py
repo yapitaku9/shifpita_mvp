@@ -43,6 +43,10 @@ class EmployeeForm(FlaskForm):
         "氏名",
         validators=[DataRequired(message="氏名は入力必須です。")]
     )
+    employee_number = IntegerField(
+        "従業員番号",
+        validators=[Optional(), NumberRange(min=1, message="1以上の数値を入力してください。")]
+    )
     email = StringField(
         "メールアドレス",
         validators=[Optional(), Email(message="有効なメールアドレスを入力してください。")]
@@ -131,10 +135,11 @@ class EmployeeForm(FlaskForm):
             if self.min_night_shifts.data > max_night_shifts.data:
                 raise ValidationError('最大夜勤日数は最低夜勤日数以上である必要があります。')
 
-    def __init__(self, original_username=None, original_email=None, employment_type=None, *args, **kwargs):
+    def __init__(self, original_username=None, original_email=None, original_employee_number=None, employment_type=None, *args, **kwargs):
         super(EmployeeForm, self).__init__(*args, **kwargs)
         self.original_username = original_username
         self.original_email = original_email
+        self.original_employee_number = original_employee_number
         self._employment_type = employment_type
 
         self.employment_type.choices = [(e.name, e.value) for e in EmploymentType]
@@ -201,6 +206,12 @@ class EmployeeForm(FlaskForm):
             user = User.query.filter_by(email=self.email.data).first()
             if user:
                 raise ValidationError('このメールアドレスは既に使用されています。')
+
+    def validate_employee_number(self, employee_number):
+        if employee_number.data and employee_number.data != self.original_employee_number:
+            user = User.query.filter_by(employee_number=employee_number.data).first()
+            if user:
+                raise ValidationError('この従業員番号は既に使用されています。')
 
 
 

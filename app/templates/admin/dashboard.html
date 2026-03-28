@@ -192,6 +192,10 @@
                             {{ form.full_name(class="form-control") }}
                         </div>
                         <div class="mb-3">
+                            {{ form.employee_number.label(class="form-label") }}
+                            {{ form.employee_number(class="form-control") }}
+                        </div>
+                        <div class="mb-3">
                             {{ form.username.label(class="form-label") }}
                             {{ form.username(class="form-control") }}
                         </div>
@@ -291,6 +295,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>氏名 (ログインID)</th>
+                                <th>従業員番号</th>
                                 <th>雇用形態</th>
                                 <th>メールアドレス</th>
                                 <th>登録日</th>
@@ -308,6 +313,7 @@
                                     <br>
                                     <small class="text-muted">{{ user.username }}</small>
                                 </td>
+                                <td>{{ user.employee_number or '-' }}</td>
                                 <td>{{ user.employment_type.value if user.employment_type else '未設定' }}</td>
                                 <td>{{ user.email or '-' }}</td>
                                 <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at }}</td>
