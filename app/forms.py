@@ -208,7 +208,7 @@ class DayOffRequestForm(FlaskForm):
     """希望休申請フォーム"""
     request_type = SelectField(
         "申請種別",
-        choices=[('day_off', '希望休'), ('paid_leave', '有給休暇')],
+        choices=[('day_off', '希望休'), ('paid_leave', '有給休暇'), ('preferred_paid_leave', '希望有給休暇')],
         default='day_off',
         validators=[DataRequired(message="申請種別を選択してください。")]
     )

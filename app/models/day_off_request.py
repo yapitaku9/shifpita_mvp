@@ -9,7 +9,7 @@ class DayOffRequest(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, nullable=False)
-    # 申請タイプ ('day_off' (希望休), 'paid_leave' (有給休暇))
+    # 申請タイプ ('day_off' (希望休), 'paid_leave' (有給休暇), 'preferred_paid_leave' (希望有給休暇))
     request_type = db.Column(db.String(20), default="day_off", nullable=False)
     # ステータス (例: 'pending', 'approved', 'rejected')
     status = db.Column(db.String(20), default="pending", nullable=False)
