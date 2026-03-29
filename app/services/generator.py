@@ -717,6 +717,7 @@ class ShiftGenerator:
                 
                 # 履歴に基づいた禁止シフト
                 def apply_history_follow_constraint(prev_s, forbidden_shifts, config, shift_name):
+                    nonlocal prob, objective_terms
                     if prev_shift in prev_s and config.get('type') != ConstraintType.INACTIVE:
                         if config.get('type') == ConstraintType.HARD:
                             prob += pulp.lpSum(x[emp_id, first_day_str, s] for s in forbidden_shifts) == 0, f"History_No{shift_name}After_{emp_id}"
@@ -758,7 +759,8 @@ class ShiftGenerator:
                 
                 # 禁止シフトパターン
                 def apply_internal_follow_constraint(shifts, forbidden_shifts, config, name):
-                     if shifts and config.get('type') != ConstraintType.INACTIVE:
+                    nonlocal prob, objective_terms
+                    if shifts and config.get('type') != ConstraintType.INACTIVE:
                         for prev_s in shifts:
                             for next_s in forbidden_shifts:
                                 if config.get('type') == ConstraintType.HARD:

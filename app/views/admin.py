@@ -479,17 +479,23 @@ def manage_constraints():
 
     db.session.commit()
 
-    # 表示する制約をマスターリストにあるものだけに限定する
+    # 表示する制約をマスターリストの順序で正しくグループ化する
     master_constraint_names = [mc['name'] for mc in master_constraints]
-    all_constraints = ShiftConstraint.query.filter(
+    constraints_from_db = ShiftConstraint.query.filter(
         ShiftConstraint.name.in_(master_constraint_names)
-    ).order_by(ShiftConstraint.category, ShiftConstraint.id).all()
+    ).all()
+    constraints_map = {c.name: c for c in constraints_from_db}
 
     constraints_by_category = {}
-    for constraint in all_constraints:
-        if constraint.category not in constraints_by_category:
-            constraints_by_category[constraint.category] = []
-        constraints_by_category[constraint.category].append(constraint)
+    for mc in master_constraints:
+        category = mc['category']
+        constraint_name = mc['name']
+        constraint_obj = constraints_map.get(constraint_name)
+        
+        if constraint_obj:
+            if category not in constraints_by_category:
+                constraints_by_category[category] = []
+            constraints_by_category[category].append(constraint_obj)
     
     # --- 特別日のリストを取得 ---
     special_days = SpecialDay.query.order_by(SpecialDay.date.asc()).all()
