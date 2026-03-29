@@ -318,7 +318,7 @@ def manage_constraints():
         {'name': 'respect_work_requests', 'category': '勤務ルール', 'description_jp': '希望勤務の厳守'},
         {'name': 'respect_ng_shifts', 'category': '勤務ルール', 'description_jp': 'NG勤務の厳守'},
         {'name': 'prefer_paid_leave_as_holiday', 'category': '勤務ルール', 'description_jp': '希望有給休暇に”休”を優先'},
-        {'name': 'penalty_for_not_assigning_preferred_shift', 'category': '勤務ルール', 'description_jp': '優先シフト非採用'},
+        {'name': 'penalty_for_not_assigning_preferred_shift', 'category': '勤務ルール', 'description_jp': '優先シフトの採用'},
         {'name': 'max_consecutive_work', 'category': '勤務ルール', 'description_jp': '最大連勤日数'},
         {'name': 'max_consecutive_night_shifts', 'category': '勤務ルール', 'description_jp': '夜勤の最大連勤日数'},
         {'name': 'max_consecutive_late_shifts', 'category': '勤務ルール', 'description_jp': '遅番の最大連続日数'},
@@ -326,8 +326,12 @@ def manage_constraints():
         {'name': 'avoid_5_consecutive_work_days', 'category': '勤務ルール', 'description_jp': '5連続勤務の回避'},
         {'name': 'avoid_4_consecutive_night_shifts', 'category': '勤務ルール', 'description_jp': '4連続夜勤の回避'},
         {'name': 'avoid_4_consecutive_late_shifts', 'category': '勤務ルール', 'description_jp': '4連続遅番の回避'},
-        {'name': 'penalty_for_work_day_violation', 'category': '勤務ルール', 'description_jp': '勤務日数の不足・超過'},
-        {'name': 'penalty_for_night_shift_violation', 'category': '勤務ルール', 'description_jp': '夜勤日数の不足・超過'},
+        {'name': 'penalty_for_work_day_violation', 'category': '勤務ルール', 'description_jp': '希望勤務日数の厳守'},
+        {'name': 'penalty_for_night_shift_violation', 'category': '勤務ルール', 'description_jp': '希望夜勤回数の厳守'},
+
+        # その他
+        {'name': 'avoid_leader_and_support_same_day', 'category': 'その他', 'description_jp': '責任者とサポの同日勤務回避'},
+        {'name': 'ensure_full_time_early_day_shift', 'category': 'その他', 'description_jp': '正職員の早番/日勤確保'},
 
         # シフト間のルール
         {'name': 'holiday_after_ake', 'category': 'シフト間のルール', 'description_jp': '明けの翌日は休み'},
@@ -354,10 +358,6 @@ def manage_constraints():
         {'name': 'penalty_surplus_1_24_07', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (24:00-翌07:00)'},
         {'name': 'penalty_surplus_2_24_07', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (24:00-翌07:00)'},
         {'name': 'penalty_surplus_3_plus_24_07', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (24:00-翌07:00)'},
-
-        # その他
-        {'name': 'avoid_leader_and_support_same_day', 'category': 'その他', 'description_jp': '責任者とサポの同日勤務回避'},
-        {'name': 'ensure_full_time_early_day_shift', 'category': 'その他', 'description_jp': '正職員の早番/日勤確保'},
     ]
 
 

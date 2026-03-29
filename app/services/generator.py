@@ -414,7 +414,7 @@ class ShiftGenerator:
                         f"PaidLeaveRequest_{emp_id}_{d_str}",
                     )
                 elif d_str in preferred_paid_leave_reqs.get(emp_id, []):
-                    constraint = self.constraints.get('preferred_paid_leave', {})
+                    constraint = self.constraints.get('prefer_paid_leave_as_holiday', {})
                     constraint_type = constraint.get('type', ConstraintType.INACTIVE)
                     
                     if constraint_type == ConstraintType.HARD:
@@ -486,69 +486,70 @@ class ShiftGenerator:
             )
             total_night_shifts = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_NIGHT)
 
-            # 最小勤務日数
-            min_work_days_config = self.constraints.get('min_work_days', {})
-            min_work_days_type = min_work_days_config.get('type', ConstraintType.INACTIVE)
-            min_days_value = emp.get("min_work_days")
-            if min_work_days_type != ConstraintType.INACTIVE and min_days_value is not None:
-                if min_work_days_type == ConstraintType.HARD:
-                    prob += total_work_days >= min_days_value, f"HardMinWorkDays_{emp_id}"
-                elif min_work_days_type == ConstraintType.SOFT:
-                    shortage = pulp.LpVariable(f"work_days_shortage_{emp_id}", 0, None, pulp.LpInteger)
-                    prob += total_work_days + shortage >= min_days_value, f"SoftMinWorkDays_{emp_id}"
-                    penalty = min_work_days_config.get('penalty', 0)
-                    if penalty > 0:
-                        objective_terms.append(shortage * penalty)
+            # 勤務日数
+            work_days_config = self.constraints.get('penalty_for_work_day_violation', {})
+            work_days_type = work_days_config.get('type', ConstraintType.INACTIVE)
+            if work_days_type != ConstraintType.INACTIVE:
+                # 最小勤務日数
+                min_days_value = emp.get("min_work_days")
+                if min_days_value is not None:
+                    if work_days_type == ConstraintType.HARD:
+                        prob += total_work_days >= min_days_value, f"HardMinWorkDays_{emp_id}"
+                    elif work_days_type == ConstraintType.SOFT:
+                        shortage = pulp.LpVariable(f"work_days_shortage_{emp_id}", 0, None, pulp.LpInteger)
+                        prob += total_work_days + shortage >= min_days_value, f"SoftMinWorkDays_{emp_id}"
+                        penalty = work_days_config.get('penalty', 0)
+                        if penalty > 0:
+                            objective_terms.append(shortage * penalty)
+                # 最大勤務日数
+                max_days_value = emp.get("max_work_days")
+                if max_days_value is not None:
+                    if work_days_type == ConstraintType.HARD:
+                        prob += total_work_days <= max_days_value, f"HardMaxWorkDays_{emp_id}"
+                    elif work_days_type == ConstraintType.SOFT:
+                        excess = pulp.LpVariable(f"work_days_excess_{emp_id}", 0, None, pulp.LpInteger)
+                        prob += total_work_days - excess <= max_days_value, f"SoftMaxWorkDays_{emp_id}"
+                        penalty = work_days_config.get('penalty', 0)
+                        if penalty > 0:
+                            objective_terms.append(excess * penalty)
 
-            # 最大勤務日数
-            max_work_days_config = self.constraints.get('max_work_days', {})
-            max_work_days_type = max_work_days_config.get('type', ConstraintType.INACTIVE)
-            max_days_value = emp.get("max_work_days")
-            if max_work_days_type != ConstraintType.INACTIVE and max_days_value is not None:
-                if max_work_days_type == ConstraintType.HARD:
-                    prob += total_work_days <= max_days_value, f"HardMaxWorkDays_{emp_id}"
-                elif max_work_days_type == ConstraintType.SOFT:
-                    excess = pulp.LpVariable(f"work_days_excess_{emp_id}", 0, None, pulp.LpInteger)
-                    prob += total_work_days - excess <= max_days_value, f"SoftMaxWorkDays_{emp_id}"
-                    penalty = max_work_days_config.get('penalty', 0)
-                    if penalty > 0:
-                        objective_terms.append(excess * penalty)
-
-            # 最小夜勤日数
-            min_night_shifts_config = self.constraints.get('min_night_shifts', {})
-            min_night_shifts_type = min_night_shifts_config.get('type', ConstraintType.INACTIVE)
-            min_night_value = emp.get("min_night_shifts")
-            if min_night_shifts_type != ConstraintType.INACTIVE and min_night_value is not None:
-                if min_night_shifts_type == ConstraintType.HARD:
-                    prob += total_night_shifts >= min_night_value, f"HardMinNightShifts_{emp_id}"
-                elif min_night_shifts_type == ConstraintType.SOFT:
-                    shortage = pulp.LpVariable(f"night_shifts_shortage_{emp_id}", 0, None, pulp.LpInteger)
-                    prob += total_night_shifts + shortage >= min_night_value, f"SoftMinNightShifts_{emp_id}"
-                    penalty = min_night_shifts_config.get('penalty', 0)
-                    if penalty > 0:
-                        objective_terms.append(shortage * penalty)
-
-            # 最大夜勤日数
-            max_night_shifts_config = self.constraints.get('max_night_shifts', {})
-            max_night_shifts_type = max_night_shifts_config.get('type', ConstraintType.INACTIVE)
-            max_night_value = emp.get("max_night_shifts")
-            if max_night_shifts_type != ConstraintType.INACTIVE and max_night_value is not None:
-                if max_night_shifts_type == ConstraintType.HARD:
-                    prob += total_night_shifts <= max_night_value, f"HardMaxNightShifts_{emp_id}"
-                elif max_night_shifts_type == ConstraintType.SOFT:
-                    excess = pulp.LpVariable(f"night_shifts_excess_{emp_id}", 0, None, pulp.LpInteger)
-                    prob += total_night_shifts - excess <= max_night_value, f"SoftMaxNightShifts_{emp_id}"
-                    penalty = max_night_shifts_config.get('penalty', 0)
-                    if penalty > 0:
-                        objective_terms.append(excess * penalty)
+            # 夜勤日数
+            night_shifts_config = self.constraints.get('penalty_for_night_shift_violation', {})
+            night_shifts_type = night_shifts_config.get('type', ConstraintType.INACTIVE)
+            if night_shifts_type != ConstraintType.INACTIVE:
+                # 最小夜勤日数
+                min_night_value = emp.get("min_night_shifts")
+                if min_night_value is not None:
+                    if night_shifts_type == ConstraintType.HARD:
+                        prob += total_night_shifts >= min_night_value, f"HardMinNightShifts_{emp_id}"
+                    elif night_shifts_type == ConstraintType.SOFT:
+                        shortage = pulp.LpVariable(f"night_shifts_shortage_{emp_id}", 0, None, pulp.LpInteger)
+                        prob += total_night_shifts + shortage >= min_night_value, f"SoftMinNightShifts_{emp_id}"
+                        penalty = night_shifts_config.get('penalty', 0)
+                        if penalty > 0:
+                            objective_terms.append(shortage * penalty)
+                # 最大夜勤日数
+                max_night_value = emp.get("max_night_shifts")
+                if max_night_value is not None:
+                    if night_shifts_type == ConstraintType.HARD:
+                        prob += total_night_shifts <= max_night_value, f"HardMaxNightShifts_{emp_id}"
+                    elif night_shifts_type == ConstraintType.SOFT:
+                        excess = pulp.LpVariable(f"night_shifts_excess_{emp_id}", 0, None, pulp.LpInteger)
+                        prob += total_night_shifts - excess <= max_night_value, f"SoftMaxNightShifts_{emp_id}"
+                        penalty = night_shifts_config.get('penalty', 0)
+                        if penalty > 0:
+                            objective_terms.append(excess * penalty)
 
             # --- 連勤制約 (動的) ---
 
-            # 1. 最大連勤日数 (max_consecutive_work_days)
-            work_cons_config = self.constraints.get('max_consecutive_work_days', {})
+            # 1. 最大連勤日数 (max_consecutive_work)
+            work_cons_config = self.constraints.get('max_consecutive_work', {})
             work_cons_type = work_cons_config.get('type', ConstraintType.INACTIVE)
             if work_cons_type != ConstraintType.INACTIVE:
-                max_consecutive = work_cons_config.get('value')
+                max_consecutive = emp.get('max_consecutive_work_days')
+                if max_consecutive is None:
+                    max_consecutive = work_cons_config.get('value')
+
                 if max_consecutive is not None and max_consecutive > 0:
                     consecutive_work_from_prev_month = 0
                     for i in range(max_consecutive):
@@ -688,10 +689,10 @@ class ShiftGenerator:
 
             # --- シフト構成ルール (動的) ---
             all_dates_with_next = [(d.isoformat(), (d + timedelta(days=1)).isoformat()) for d in dates[:-1]]
-            ake_rest_config = self.constraints.get('require_day_off_after_ake', {})
-            night_follow_config = self.constraints.get('disallow_specific_shifts_after_night', {})
-            late_follow_config = self.constraints.get('disallow_specific_shifts_after_late', {})
-            day_follow_config = self.constraints.get('disallow_specific_shifts_after_day', {})
+            ake_rest_config = self.constraints.get('holiday_after_ake', {})
+            night_follow_config = self.constraints.get('forbidden_shift_after_night_shift', {})
+            late_follow_config = self.constraints.get('forbidden_shift_after_late_shift', {})
+            day_follow_config = self.constraints.get('forbidden_shift_after_day_shift', {})
 
             # 月初の処理 (前月最終日 -> 当月1日)
             first_day_str = date_strs[0]
@@ -782,7 +783,7 @@ class ShiftGenerator:
         logging.info("Defining soft constraints.")
 
         # 4.1 責任者とサポの同日勤務回避
-        charge_support_config = self.constraints.get('avoid_charge_and_support_same_day', {})
+        charge_support_config = self.constraints.get('avoid_leader_and_support_same_day', {})
         if charge_support_config.get('type') == ConstraintType.SOFT:
             penalty = charge_support_config.get('penalty', 0)
             if penalty > 0:
@@ -798,7 +799,7 @@ class ShiftGenerator:
                                 objective_terms.append(w * penalty)
 
         # 4.2 正職員の早番/日勤確保
-        main_staff_config = self.constraints.get('ensure_main_staff_in_day_shift', {})
+        main_staff_config = self.constraints.get('ensure_full_time_early_day_shift', {})
         main_staff_type = main_staff_config.get('type', ConstraintType.INACTIVE)
         if main_staff_type != ConstraintType.INACTIVE:
             full_timer_ids = [e["id"] for e in employees_data if e["employment_type"] in [EmploymentType.MANAGER, EmploymentType.SUPPORT, EmploymentType.FULL_TIME]]
@@ -818,22 +819,21 @@ class ShiftGenerator:
                             objective_terms.append(z * penalty)
 
         # 4.3 4連続夜勤の回避 (max_consecutive_night_shiftsが4の場合の追加ペナルティ)
-        avoid_4_night_config = self.constraints.get('avoid_4_night_streak', {})
+        avoid_4_night_config = self.constraints.get('avoid_4_consecutive_night_shifts', {})
         night_cons_config = self.constraints.get('max_consecutive_night_shifts', {})
         if avoid_4_night_config.get('type') == ConstraintType.SOFT and night_cons_config.get('value') == 4 and self.SHIFTS_NIGHT:
             penalty = avoid_4_night_config.get('penalty', 0)
             if penalty > 0:
                 for emp in employees_data:
                     for i in range(len(dates) - 3):
-                        # v=1 if it is a 4-day night streak
                         v = pulp.LpVariable(f"is_4_night_streak_{emp['id']}_{i}", 0, 1, pulp.LpBinary)
                         four_days_of_nights = pulp.lpSum(x[emp["id"], date_strs[j], s] for j in range(i, i + 4) for s in self.SHIFTS_NIGHT)
-                        prob += four_days_of_nights <= 3 + v # if sum is 4, v must be 1
+                        prob += four_days_of_nights <= 3 + v
                         objective_terms.append(v * penalty)
 
-        # 4.4 5連続勤務の回避 (max_consecutive_work_daysが5の場合の追加ペナルティ)
-        avoid_5_work_config = self.constraints.get('avoid_5_work_streak', {})
-        work_cons_config = self.constraints.get('max_consecutive_work_days', {})
+        # 4.4 5連続勤務の回避 (max_consecutive_workが5の場合の追加ペナルティ)
+        avoid_5_work_config = self.constraints.get('avoid_5_consecutive_work_days', {})
+        work_cons_config = self.constraints.get('max_consecutive_work', {})
         if avoid_5_work_config.get('type') == ConstraintType.SOFT and work_cons_config.get('value') == 5 and self.SHIFTS_WORK:
             penalty = avoid_5_work_config.get('penalty', 0)
             if penalty > 0:
@@ -845,7 +845,7 @@ class ShiftGenerator:
                         objective_terms.append(v * penalty)
 
         # 4.5 4連続遅番の回避 (max_consecutive_late_shiftsが4の場合の追加ペナルティ)
-        avoid_4_late_config = self.constraints.get('avoid_4_late_streak', {})
+        avoid_4_late_config = self.constraints.get('avoid_4_consecutive_late_shifts', {})
         late_cons_config = self.constraints.get('max_consecutive_late_shifts', {})
         if avoid_4_late_config.get('type') == ConstraintType.SOFT and late_cons_config.get('value') == 4 and self.SHIFTS_LATE:
             penalty = avoid_4_late_config.get('penalty', 0)
@@ -857,8 +857,8 @@ class ShiftGenerator:
                         prob += four_days_of_lates <= 3 + v
                         objective_terms.append(v * penalty)
 
-        # 4.4 優先シフトが採用されなかった場合のペナルティ
-        missed_pref_config = self.constraints.get('penalty_missed_preferred_shift', {})
+        # 4.6 優先シフトが採用されなかった場合のペナルティ
+        missed_pref_config = self.constraints.get('penalty_for_not_assigning_preferred_shift', {})
         if missed_pref_config.get('type') == ConstraintType.SOFT:
             penalty = missed_pref_config.get('penalty', 0)
             if penalty > 0:
