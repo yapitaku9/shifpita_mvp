@@ -5,7 +5,7 @@ services:
     env: python
     plan: free
     buildCommand: "pip install -r requirements.txt && flask db upgrade"
-    startCommand: "gunicorn --timeout 600 run:app"
+    startCommand: "gunicorn -c gunicorn_config.py"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
