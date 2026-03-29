@@ -483,7 +483,12 @@ def manage_constraints():
 
     db.session.commit()
 
-    all_constraints = ShiftConstraint.query.filter(ShiftConstraint.category != '時間帯別人員配置').order_by(ShiftConstraint.category, ShiftConstraint.id).all()
+    # 表示する制約をマスターリストにあるものだけに限定する
+    master_constraint_names = [mc['name'] for mc in master_constraints]
+    all_constraints = ShiftConstraint.query.filter(
+        ShiftConstraint.name.in_(master_constraint_names)
+    ).order_by(ShiftConstraint.category, ShiftConstraint.id).all()
+
     constraints_by_category = {}
     for constraint in all_constraints:
         if constraint.category not in constraints_by_category:
