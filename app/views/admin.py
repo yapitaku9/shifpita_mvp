@@ -366,6 +366,7 @@ def manage_constraints():
 
 
 
+
     if request.method == 'POST':
         if 'submit_constraints' in request.form:
             try:
