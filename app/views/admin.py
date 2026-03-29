@@ -56,6 +56,7 @@ def dashboard():
             user = User(
                 username=form.username.data,
                 full_name=form.full_name.data,
+                employee_number=form.employee_number.data,
                 email=form.email.data or None,
                 employment_type=employment_type_enum,
                 max_consecutive_work_days=form.max_consecutive_work_days.data,
@@ -105,7 +106,19 @@ def dashboard():
             for error in errors:
                 flash(f"{getattr(form, field).label.text}: {error}", "danger")
 
-    user_list = User.query.filter_by(is_admin=False).order_by(User.full_name).all()
+    sort_order_employment = case(
+        (User.employment_type == EmploymentType.MANAGER, 1),
+        (User.employment_type == EmploymentType.SUPPORT, 2),
+        (User.employment_type == EmploymentType.FULL_TIME, 3),
+        (User.employment_type == EmploymentType.PART_TIME_8H, 4),
+        (User.employment_type == EmploymentType.PART_TIME_SHORT, 5),
+        else_=6
+    )
+    user_list = User.query.filter_by(is_admin=False).order_by(
+        User.employee_number.asc().nulls_last(),
+        sort_order_employment,
+        User.full_name
+    ).all()
     
     # シフト生成履歴を取得 (最新5件)
     history_list = ShiftGenerationHistory.query.order_by(ShiftGenerationHistory.generation_timestamp.desc()).limit(5).all()
@@ -289,73 +302,212 @@ def confirm_shifts():
     return redirect(url_for("admin.dashboard"))
 
 
+
+from app.models.master import ShiftConstraint, ShiftType, ConstraintType
 @admin_bp.route("/constraints", methods=["GET", "POST"])
 def manage_constraints():
     """シフト作成の制約条件と特別日を編集する"""
-    form = ShiftConstraintForm()
-    special_day_form = SpecialDayForm()
+    if not current_user.is_admin:
+        flash('管理者権限が必要です。')
+        return redirect(url_for('main.index'))
 
-    if 'submit_constraints' in request.form and form.validate_on_submit():
-        try:
-            for item in form.constraints.data:
-                constraint = ShiftConstraint.query.filter_by(name=item['name']).first()
-                if constraint:
-                    # is_booleanフラグはテンプレートでの表示にのみ使用
-                    # 値は常にIntegerFieldから来るので、Noneかどうかでチェックボックスの状態を判断
-                    new_value = item['value'] if item['value'] is not None else 0
-                    if constraint.value != new_value:
-                        constraint.value = new_value
-            db.session.commit()
-            flash("制約条件を更新しました。", "success")
-        except Exception as e:
-            db.session.rollback()
-            flash(f"制約条件の更新中にエラーが発生しました: {e}", "danger")
-        return redirect(url_for("admin.manage_constraints"))
-
-    elif 'submit_special_day' in request.form and special_day_form.validate_on_submit():
-        try:
-            special_day = SpecialDay(
-                date=special_day_form.date.data,
-                staff_increase=special_day_form.staff_increase.data,
-                description=special_day_form.description.data,
-                visit_time=special_day_form.visit_time.data or None
-            )
-            db.session.add(special_day)
-            db.session.commit()
-            flash(f"{special_day.date.strftime('%Y-%m-%d')}を特別日として設定しました。", "success")
-        except Exception as e:
-            db.session.rollback()
-            flash(f"特別日の設定中にエラーが発生しました: {e}", "danger")
-        return redirect(url_for("admin.manage_constraints"))
-
-    # GETリクエスト、またはPOSTでバリデーション失敗時の処理
-    if not form.is_submitted():
-        # --- データベースの制約をフォームに設定 ---
-        # 既存のリストをクリア
-        while len(form.constraints) > 0:
-            form.constraints.pop_entry()
+    # マスター制約リスト (ユーザー指定のものに限定)
+    master_constraints = [
+        # 人員の過不足
+        {'name': 'no_staff_variance_07_20', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (07:00-20:00)'},
+        {'name': 'penalty_shortage_07_20', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (07:00-20:00)'},
+        {'name': 'penalty_surplus_1_07_20', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (07:00-20:00)'},
+        {'name': 'penalty_surplus_2_07_20', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (07:00-20:00)'},
+        {'name': 'penalty_surplus_3_plus_07_20', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (07:00-20:00)'},
+        {'name': 'no_staff_variance_20_24', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (20:00-24:00)'},
+        {'name': 'penalty_shortage_20_24', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (20:00-24:00)'},
+        {'name': 'penalty_surplus_1_20_24', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (20:00-24:00)'},
+        {'name': 'penalty_surplus_2_20_24', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (20:00-24:00)'},
+        {'name': 'penalty_surplus_3_plus_20_24', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (20:00-24:00)'},
+        {'name': 'no_staff_variance_24_07', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (24:00-翌07:00)'},
+        {'name': 'penalty_shortage_24_07', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (24:00-翌07:00)'},
+        {'name': 'penalty_surplus_1_24_07', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (24:00-翌07:00)'},
+        {'name': 'penalty_surplus_2_24_07', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (24:00-翌07:00)'},
+        {'name': 'penalty_surplus_3_plus_24_07', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (24:00-翌07:00)'},
         
-        # DBから読み込んでフォームに設定
-        all_constraints = ShiftConstraint.query.order_by(ShiftConstraint.display_order, ShiftConstraint.id).all()
-        for c in all_constraints:
-            is_bool = c.description.startswith('【シフト構成】')
-            form.constraints.append_entry({
-                'name': c.name,
-                'description': c.description,
-                'value': c.value,
-                'is_boolean': 'y' if is_bool else 'n'
-            })
+        # 勤務ルール
+        {'name': 'respect_day_off_requests', 'category': '勤務ルール', 'description_jp': '希望休の厳守'},
+        {'name': 'respect_work_requests', 'category': '勤務ルール', 'description_jp': '希望勤務の厳守'},
+        {'name': 'respect_ng_shifts', 'category': '勤務ルール', 'description_jp': 'NG勤務の厳守'},
+        {'name': 'prefer_paid_leave_as_holiday', 'category': '勤務ルール', 'description_jp': '希望有給休暇に”休”を優先'},
+        {'name': 'penalty_for_not_assigning_preferred_shift', 'category': '勤務ルール', 'description_jp': '優先シフトの採用'},
+        {'name': 'max_consecutive_work', 'category': '勤務ルール', 'description_jp': '最大連勤日数'},
+        {'name': 'max_consecutive_night_shifts', 'category': '勤務ルール', 'description_jp': '夜勤の最大連勤日数'},
+        {'name': 'max_consecutive_late_shifts', 'category': '勤務ルール', 'description_jp': '遅番の最大連続日数'},
+        {'name': 'max_consecutive_late_night_shifts', 'category': '勤務ルール', 'description_jp': '遅番・夜勤の最大連勤日数'},
+        {'name': 'avoid_5_consecutive_work_days', 'category': '勤務ルール', 'description_jp': '5連続勤務の回避'},
+        {'name': 'avoid_4_consecutive_night_shifts', 'category': '勤務ルール', 'description_jp': '4連続夜勤の回避'},
+        {'name': 'avoid_4_consecutive_late_shifts', 'category': '勤務ルール', 'description_jp': '4連続遅番の回避'},
+        {'name': 'penalty_for_work_day_violation', 'category': '勤務ルール', 'description_jp': '希望勤務日数の厳守'},
+        {'name': 'penalty_for_night_shift_violation', 'category': '勤務ルール', 'description_jp': '希望夜勤回数の厳守'},
 
+        # シフト間のルール
+        {'name': 'holiday_after_ake', 'category': 'シフト間のルール', 'description_jp': '明けの翌日は休み'},
+        {'name': 'forbidden_shift_after_night_shift', 'category': 'シフト間のルール', 'description_jp': '夜勤翌日の禁止シフト(遅日早)'},
+        {'name': 'forbidden_shift_after_late_shift', 'category': 'シフト間のルール', 'description_jp': '遅番翌日の禁止シフト(日早)'},
+        {'name': 'forbidden_shift_after_day_shift', 'category': 'シフト間のルール', 'description_jp': '日勤翌日の禁止シフト(早)'},
+        {'name': 'no_consecutive_same_category_shifts', 'category': 'シフト間のルール', 'description_jp': '早番や日勤などの同シフトにおける２から１の移行禁止'},
+
+        # その他
+        {'name': 'avoid_leader_and_support_same_day', 'category': 'その他', 'description_jp': '責任者とサポの同日勤務回避'},
+        {'name': 'ensure_full_time_early_day_shift', 'category': 'その他', 'description_jp': '正職員の早番/日勤確保'},
+    ]
+
+
+
+
+    if request.method == 'POST':
+        if 'submit_constraints' in request.form:
+            try:
+                all_constraints = ShiftConstraint.query.all()
+                for constraint in all_constraints:
+                    # Update constraint type
+                    constraint_type_str = request.form.get(f'constraint_type_{constraint.id}')
+                    if constraint_type_str in [ct.name for ct in ConstraintType]:
+                        constraint.constraint_type = ConstraintType[constraint_type_str]
+
+                    # Update value
+                    value_str = request.form.get(f'value_{constraint.id}')
+                    if value_str and value_str.isdigit():
+                        constraint.value = int(value_str)
+                    elif value_str == '':
+                        constraint.value = None
+
+                    # Update penalty
+                    penalty_str = request.form.get(f'penalty_{constraint.id}')
+                    if constraint.constraint_type == ConstraintType.SOFT:
+                        if penalty_str and penalty_str.isdigit():
+                            constraint.penalty = int(penalty_str)
+                        else:
+                            constraint.penalty = 0 # Default penalty if invalid or empty
+                    else:
+                        constraint.penalty = 0 # Non-soft constraints have no penalty
+
+                db.session.commit()
+                flash('制約条件を更新しました。', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'更新中にエラーが発生しました: {e}', 'danger')
+            return redirect(url_for('admin.manage_constraints'))
+
+        elif 'submit_special_day' in request.form:
+            special_day_form = SpecialDayForm()
+            if special_day_form.validate_on_submit():
+                try:
+                    special_day = SpecialDay(
+                        date=special_day_form.date.data,
+                        staff_increase=special_day_form.staff_increase.data,
+                        description=special_day_form.description.data,
+                        visit_time=special_day_form.visit_time.data or None
+                    )
+                    db.session.add(special_day)
+                    db.session.commit()
+                    flash(f"{special_day.date.strftime('%Y-%m-%d')}を特別日として設定しました。", "success")
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f"特別日の設定中にエラーが発生しました: {e}", "danger")
+            return redirect(url_for("admin.manage_constraints"))
+
+    special_day_form = SpecialDayForm()
+    # DBにマスター制約が存在するか確認し、なければ作成・更新
+    for mc in master_constraints:
+        constraint = ShiftConstraint.query.filter_by(name=mc['name']).first()
+        if not constraint:
+            constraint = ShiftConstraint(
+                name=mc['name'],
+                constraint_type=ConstraintType.INACTIVE, # デフォルトは無効
+                penalty=0
+            )
+            db.session.add(constraint)
+        # カテゴリと説明は常にマスターリストで更新
+        constraint.category = mc['category']
+        constraint.description_jp = mc['description_jp']
+
+    # 時間帯ごとの人員配置マスタ
+    hourly_staffing_master = {
+        '平日': [
+            {'name': 'staffing_weekday_07_08', 'description_jp': '07:00-08:00', 'value': 4},
+            {'name': 'staffing_weekday_08_09', 'description_jp': '08:00-09:00', 'value': 4},
+            {'name': 'staffing_weekday_09_12', 'description_jp': '09:00-12:00', 'value': 3},
+            {'name': 'staffing_weekday_12_13', 'description_jp': '12:00-13:00', 'value': 3},
+            {'name': 'staffing_weekday_13_14', 'description_jp': '13:00-14:00', 'value': 2},
+            {'name': 'staffing_weekday_14_16', 'description_jp': '14:00-16:00', 'value': 3},
+            {'name': 'staffing_weekday_16_18', 'description_jp': '16:00-18:00', 'value': 3},
+            {'name': 'staffing_weekday_18_19', 'description_jp': '18:00-19:00', 'value': 3},
+            {'name': 'staffing_weekday_19_20', 'description_jp': '19:00-20:00', 'value': 3},
+            {'name': 'staffing_weekday_20_23', 'description_jp': '20:00-23:00', 'value': 2},
+            {'name': 'staffing_weekday_23_24', 'description_jp': '23:00-24:00', 'value': 2},
+            {'name': 'staffing_weekday_24_07', 'description_jp': '24:00-翌7:00', 'value': 2},
+        ],
+        '休日': [
+            {'name': 'staffing_holiday_07_08', 'description_jp': '07:00-08:00', 'value': 4},
+            {'name': 'staffing_holiday_08_09', 'description_jp': '08:00-09:00', 'value': 4},
+            {'name': 'staffing_holiday_09_12', 'description_jp': '09:00-12:00', 'value': 3},
+            {'name': 'staffing_holiday_12_13', 'description_jp': '12:00-13:00', 'value': 4},
+            {'name': 'staffing_holiday_13_14', 'description_jp': '13:00-14:00', 'value': 3},
+            {'name': 'staffing_holiday_14_16', 'description_jp': '14:00-16:00', 'value': 4},
+            {'name': 'staffing_holiday_16_18', 'description_jp': '16:00-18:00', 'value': 4},
+            {'name': 'staffing_holiday_18_19', 'description_jp': '18:00-19:00', 'value': 4},
+            {'name': 'staffing_holiday_19_20', 'description_jp': '19:00-20:00', 'value': 3},
+            {'name': 'staffing_holiday_20_23', 'description_jp': '20:00-23:00', 'value': 2},
+            {'name': 'staffing_holiday_23_24', 'description_jp': '23:00-24:00', 'value': 2},
+            {'name': 'staffing_holiday_24_07', 'description_jp': '24:00-翌7:00', 'value': 2},
+        ]
+    }
+    
+    hourly_constraints = {'平日': [], '休日': []}
+    for category, constraints in hourly_staffing_master.items():
+        for hc in constraints:
+            constraint = ShiftConstraint.query.filter_by(name=hc['name']).first()
+            if not constraint:
+                constraint = ShiftConstraint(
+                    name=hc['name'],
+                    description_jp=hc['description_jp'],
+                    category='時間帯別人員配置', # 専用カテゴリ
+                    value=hc['value'],
+                    constraint_type=ConstraintType.HARD # これらは常にハード制約
+                )
+                db.session.add(constraint)
+            hourly_constraints[category].append(constraint)
+
+    db.session.commit()
+
+    # 表示する制約をマスターリストの順序で正しくグループ化する
+    master_constraint_names = [mc['name'] for mc in master_constraints]
+    constraints_from_db = ShiftConstraint.query.filter(
+        ShiftConstraint.name.in_(master_constraint_names)
+    ).all()
+    constraints_map = {c.name: c for c in constraints_from_db}
+
+    constraints_by_category = {}
+    for mc in master_constraints:
+        category = mc['category']
+        constraint_name = mc['name']
+        constraint_obj = constraints_map.get(constraint_name)
+        
+        if constraint_obj:
+            if category not in constraints_by_category:
+                constraints_by_category[category] = []
+            constraints_by_category[category].append(constraint_obj)
+    
     # --- 特別日のリストを取得 ---
     special_days = SpecialDay.query.order_by(SpecialDay.date.asc()).all()
 
     return render_template(
         "admin/constraints.html",
         title="制約条件・特別日の編集",
-        form=form,
+        constraints_by_category=constraints_by_category,
+        hourly_constraints=hourly_constraints,
         special_day_form=special_day_form,
-        special_days=special_days
+        special_days=special_days,
+        ConstraintType=ConstraintType # テンプレートでEnumを使えるように
     )
+
 
 
 @admin_bp.route("/delete_special_day/<int:day_id>", methods=['POST'])
@@ -384,6 +536,7 @@ def edit_employee(user_id):
     form = EmployeeForm(
         original_username=user.username,
         original_email=user.email,
+        original_employee_number=user.employee_number,
         employment_type=user.employment_type
     )
 
@@ -391,6 +544,7 @@ def edit_employee(user_id):
         try:
             user.username = form.username.data
             user.full_name = form.full_name.data
+            user.employee_number = form.employee_number.data
             user.email = form.email.data or None
             user.employment_type = EmploymentType[form.employment_type.data]
             user.is_active = form.is_active.data
@@ -430,6 +584,7 @@ def edit_employee(user_id):
         form.set_shift_choices_by_employment(user.employment_type)
         form.username.data = user.username
         form.full_name.data = user.full_name
+        form.employee_number.data = user.employee_number
         form.email.data = user.email
         form.employment_type.data = user.employment_type.name
         form.is_active.data = user.is_active
@@ -879,7 +1034,7 @@ def download_excel(year, month):
                 work_req_map[(req.user_id, req.date)] = shift_names
 
         # 従業員リストを取得
-        sort_order = case(
+        sort_order_employment = case(
             (User.employment_type == EmploymentType.MANAGER, 1),
             (User.employment_type == EmploymentType.SUPPORT, 2),
             (User.employment_type == EmploymentType.FULL_TIME, 3),
@@ -887,7 +1042,11 @@ def download_excel(year, month):
             (User.employment_type == EmploymentType.PART_TIME_SHORT, 5),
             else_=6
         )
-        employees = User.query.filter_by(is_admin=False).order_by(sort_order, User.full_name).all()
+        employees = User.query.filter_by(is_admin=False).order_by(
+            User.employee_number.asc().nulls_last(),
+            sort_order_employment,
+            User.full_name
+        ).all()
 
         # その他必要なデータを取得
         from collections import defaultdict
@@ -964,7 +1123,7 @@ def download_generated_pdf(year, month):
         ]
 
         # --- PDF生成に必要なデータを取得 (download_confirmed_pdfとほぼ同じ) ---
-        sort_order = case(
+        sort_order_employment = case(
             (User.employment_type == EmploymentType.MANAGER, 1),
             (User.employment_type == EmploymentType.SUPPORT, 2),
             (User.employment_type == EmploymentType.FULL_TIME, 3),
@@ -973,7 +1132,11 @@ def download_generated_pdf(year, month):
             else_=6
         )
         # is_active=True のユーザーのみをPDFに含める
-        all_users = User.query.filter_by(is_admin=False, is_active=True).order_by(sort_order, User.full_name).all()
+        all_users = User.query.filter_by(is_admin=False, is_active=True).order_by(
+            User.employee_number.asc().nulls_last(),
+            sort_order_employment,
+            User.full_name
+        ).all()
         employees_for_pdf = [{"id": u.id, "name": u.full_name} for u in all_users]
 
         all_shift_types = db.session.query(ShiftType).all()
@@ -1077,7 +1240,7 @@ def download_confirmed_pdf(year, month):
         ]
 
         # --- PDF生成に必要なデータを取得 ---
-        sort_order = case(
+        sort_order_employment = case(
             (User.employment_type == EmploymentType.MANAGER, 1),
             (User.employment_type == EmploymentType.SUPPORT, 2),
             (User.employment_type == EmploymentType.FULL_TIME, 3),
@@ -1085,7 +1248,11 @@ def download_confirmed_pdf(year, month):
             (User.employment_type == EmploymentType.PART_TIME_SHORT, 5),
             else_=6
         )
-        all_users = User.query.filter_by(is_admin=False).order_by(sort_order, User.full_name).all()
+        all_users = User.query.filter_by(is_admin=False).order_by(
+            User.employee_number.asc().nulls_last(),
+            sort_order_employment,
+            User.full_name
+        ).all()
         employees_for_pdf = [{"id": u.id, "name": u.full_name} for u in all_users]
 
         all_shift_types = db.session.query(ShiftType).all()

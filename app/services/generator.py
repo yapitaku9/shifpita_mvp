@@ -4,7 +4,7 @@ import logging
 from datetime import date, timedelta, time
 from app import db
 from app.models.user import User, EmploymentType
-from app.models.master import ShiftType, ShiftConstraint
+from app.models.master import ShiftType, ShiftConstraint, ConstraintType
 from app.models.day_off_request import DayOffRequest
 from app.models.work_request import WorkRequest
 from app.models.desired_work_days_request import DesiredWorkDaysRequest
@@ -34,7 +34,16 @@ class ShiftGenerator:
         # --- DBからマスターデータを読み込む ---
         self.shift_types_by_id = {s.shift_type_id: s for s in db.session.query(ShiftType).all()}
         self.shift_types_by_name = {s.name: s for s in self.shift_types_by_id.values()}
-        self.constraints = {c.name: c.value for c in db.session.query(ShiftConstraint).all()}
+        
+        # 制約をオブジェクトとして読み込み、辞書に格納
+        all_constraints = db.session.query(ShiftConstraint).all()
+        self.constraints = {}
+        for c in all_constraints:
+            self.constraints[c.name] = {
+                'value': c.value,
+                'type': c.constraint_type,
+                'penalty': c.penalty
+            }
 
         # --- シフト定義 (DBデータに依存するもの) ---
         self.SHIFTS_NIGHT = [st.name for st in self.shift_types_by_id.values() if "夜" in st.name]
@@ -125,12 +134,15 @@ class ShiftGenerator:
         # 承認済みの希望休と有給休暇を取得
         day_off_reqs = {}
         paid_leave_reqs = {}
+        preferred_paid_leave_reqs = {}
         approved_day_offs = DayOffRequest.query.filter(
             DayOffRequest.date.between(start_date, end_date), DayOffRequest.status == "approved"
         ).all()
         for req in approved_day_offs:
             if req.request_type == "paid_leave":
                 paid_leave_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
+            elif req.request_type == "preferred_paid_leave":
+                preferred_paid_leave_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
             else:  # 'day_off'
                 day_off_reqs.setdefault(req.user_id, []).append(req.date.isoformat())
 
@@ -192,36 +204,15 @@ class ShiftGenerator:
 
         # --- 3. 制約の定義 (構造を全面的に再設計) ---
         # 3.1 人員配置の制約 (日付ごとのループ)
-        # Handle night shift constraint for the last day, which falls on the next month
         staffing_constraint_dates = dates + [dates[-1] + timedelta(days=1)]
 
         hourly_req_keys = [
-            "0700",
-            "0800",
-            "0900",
-            "1200",
-            "1300",
-            "1400",
-            "1600",
-            "1800",
-            "1900",
-            # 夜勤帯を時間ごとに分解
-            "2000",
-            "2100",
-            "2200",
-            "2300",
-            "0000",
-            "0100",
-            "0200",
-            "0300",
-            "0400",
-            "0500",
-            "0600",
+            "0700", "0800", "0900", "1200", "1300", "1400", "1600", "1800", "1900",
+            "2000", "2100", "2200", "2300", "0000", "0100", "0200", "0300", "0400", "0500", "0600",
         ]
         for d_idx, current_date in enumerate(staffing_constraint_dates):
             d_str = current_date.isoformat()
 
-            # For the extra day (e.g., Apr 1st), only process early morning hours
             keys_to_process = hourly_req_keys
             if current_date > dates[-1]:
                 keys_to_process = [k for k in hourly_req_keys if 0 <= int(k) // 100 <= 6]
@@ -229,11 +220,9 @@ class ShiftGenerator:
             for key in keys_to_process:
                 hour = int(key) // 100
 
-                # 要件の対象となる日付を決定する
                 is_early_morning_hour = 0 <= hour <= 6
                 if is_early_morning_hour:
-                    if d_idx == 0:
-                        continue
+                    if d_idx == 0: continue
                     req_date = current_date - timedelta(days=1)
                 else:
                     req_date = current_date
@@ -243,34 +232,22 @@ class ShiftGenerator:
 
                 staff_increase = 0
                 for special_day_info in req_special_day_infos:
-                    if (
-                        special_day_info
-                        and special_day_info.staff_increase > 0
-                        and special_day_info.visit_time
-                    ):
+                    if (special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time):
                         visit_hour = int(special_day_info.visit_time.split(":")[0])
                         if not is_early_morning_hour and visit_hour == hour:
                             staff_increase += special_day_info.staff_increase
 
-                # 時間帯に応じた制約キーを設定
                 if 20 <= hour <= 22:
-                    constraint_key_suffix = "2000_2300"
-                    default_req = 2
+                    constraint_key_suffix, default_req = "2000_2300", 2
                 elif hour == 23:
-                    constraint_key_suffix = "2300_0000"
-                    default_req = 2
+                    constraint_key_suffix, default_req = "2300_0000", 2
                 elif 0 <= hour <= 6:
-                    constraint_key_suffix = "0000_next_0700"
-                    default_req = 2
+                    constraint_key_suffix, default_req = "0000_next_0700", 2
                 else:
-                    constraint_key_suffix = key
-                    default_req = 0
+                    constraint_key_suffix, default_req = key, 0
 
-                req_staff_count = self.constraints.get(
-                    f"min_staff_{req_day_type}_{constraint_key_suffix}", default_req
-                )
+                req_staff_count = self.constraints.get(f"min_staff_{req_day_type}_{constraint_key_suffix}", {}).get('value', default_req)
 
-                # 実際の勤務者数を計算
                 shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
                 actual_staff = 0
                 if shifts_for_hour_with_offset:
@@ -278,56 +255,64 @@ class ShiftGenerator:
                     for s_name, offset in shifts_for_hour_with_offset:
                         target_d_str_for_worker = (current_date - timedelta(days=offset)).isoformat()
                         if (current_date - timedelta(days=offset)).month == month:
-                            staff_terms.append(
-                                pulp.lpSum(
-                                    x[emp["id"], target_d_str_for_worker, s_name] for emp in employees_data
-                                )
-                            )
+                            staff_terms.append(pulp.lpSum(x[emp["id"], target_d_str_for_worker, s_name] for emp in employees_data))
                         else:
-                            prev_day_workers = sum(
-                                1
-                                for emp in employees_data
-                                if shift_history_map.get((emp["id"], target_d_str_for_worker)) == s_name
-                            )
+                            prev_day_workers = sum(1 for emp in employees_data if shift_history_map.get((emp["id"], target_d_str_for_worker)) == s_name)
                             staff_terms.append(prev_day_workers)
                     actual_staff = pulp.lpSum(staff_terms) if staff_terms else 0
+                
+                # --- 動的な人員配置制約の適用 ---
+                hour_group_name = ""
+                control_constraint_name = ""
+                if 7 <= hour < 20:
+                    hour_group_name = "day"
+                    control_constraint_name = "no_staff_variance_07_20"
+                elif 20 <= hour < 24:
+                    hour_group_name = "night"
+                    control_constraint_name = "no_staff_variance_20_24"
+                else: # 0 <= hour < 7
+                    hour_group_name = "night"
+                    control_constraint_name = "no_staff_variance_24_07"
 
-                # 制約とペナルティを定義
-                is_hard_constraint_hour = (0 <= hour <= 6) or (20 <= hour <= 23)
+                control_constraint = self.constraints.get(control_constraint_name, {})
+                constraint_type = control_constraint.get('type', ConstraintType.INACTIVE)
 
-                if is_hard_constraint_hour:
-                    # 夜間帯 (0-7時, 20-24時) は過不足なくハード制約
-                    prob += (
-                        actual_staff == req_staff_count + staff_increase,
-                        f"HardStaff_Night_{req_day_type}_{key}_{d_str}",
-                    )
-                else:
-                    # 日中は不足にペナルティ
-                    shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
-                    prob += (
-                        actual_staff + shortfall >= req_staff_count + staff_increase,
-                        f"SoftMinStaff_{req_day_type}_{key}_{d_str}",
-                    )
-                    objective_terms.append(shortfall * 10000000)
+                if constraint_type == ConstraintType.INACTIVE:
+                    continue
 
-                    # さらに、超過にもペナルティ（段階的）
-                    p1 = self.constraints.get("weight_exceed_staffing_1", 10)
-                    p2 = self.constraints.get("weight_exceed_staffing_2", 30)
-                    p3_plus = self.constraints.get("weight_exceed_staffing_3_plus", 100)
-                    over_staff = pulp.LpVariable(f"OverStaff_{d_str}_{key}", 0, None, pulp.LpInteger)
-                    prob += over_staff >= actual_staff - (req_staff_count + staff_increase)
-                    is_1, is_2, is_3 = pulp.LpVariable.dicts(
-                        f"OverStaffLevel_{d_str}_{key}", [1, 2, 3], 0, 1, pulp.LpBinary
-                    )
-                    max_staff = len(employees_data)
-                    prob += over_staff >= is_1
-                    prob += over_staff <= max_staff * is_1
-                    prob += over_staff >= 2 * is_2
-                    prob += over_staff <= 1 + (max_staff - 1) * is_2
-                    prob += over_staff >= 3 * is_3
-                    prob += over_staff <= 2 + (max_staff - 2) * is_3
-                    penalty = p1 * (is_1 - is_2) + p2 * (is_2 - is_3) + p3_plus * is_3
-                    objective_terms.append(penalty)
+                total_required = req_staff_count + staff_increase
+                
+                if constraint_type == ConstraintType.HARD:
+                    prob += actual_staff == total_required, f"HardStaffing_{hour_group_name}_{d_str}_{key}"
+                
+                elif constraint_type == ConstraintType.SOFT:
+                    shortfall_penalty = self.constraints.get(f'penalty_shortage_{hour_group_name}', {}).get('penalty', 0)
+                    if shortfall_penalty > 0:
+                        shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
+                        prob += actual_staff + shortfall >= total_required, f"SoftMinStaff_{d_str}_{key}"
+                        objective_terms.append(shortfall * shortfall_penalty)
+
+                    overage_p1 = self.constraints.get(f'penalty_overage_1_{hour_group_name}', {}).get('penalty', 0)
+                    overage_p2 = self.constraints.get(f'penalty_overage_2_{hour_group_name}', {}).get('penalty', 0)
+                    overage_p3_plus = self.constraints.get(f'penalty_overage_3_plus_{hour_group_name}', {}).get('penalty', 0)
+
+                    if overage_p1 > 0 or overage_p2 > 0 or overage_p3_plus > 0:
+                        over_staff = pulp.LpVariable(f"OverStaff_{d_str}_{key}", 0, None, pulp.LpInteger)
+                        prob += over_staff >= actual_staff - total_required, f"DefineOverStaff_{d_str}_{key}"
+                        
+                        is_1, is_2, is_3 = pulp.LpVariable.dicts(f"OverStaffLevel_{d_str}_{key}", [1, 2, 3], 0, 1, pulp.LpBinary)
+                        max_staff = len(employees_data)
+                        
+                        prob += over_staff >= is_1
+                        prob += over_staff <= max_staff * is_1
+                        prob += over_staff >= 2 * is_2
+                        prob += over_staff <= 1 + (max_staff - 1) * is_2
+                        prob += over_staff >= 3 * is_3
+                        prob += over_staff <= 2 + (max_staff - 2) * is_3
+                        
+                        penalty = overage_p1 * (is_1 - is_2) + overage_p2 * (is_2 - is_3) + overage_p3_plus * is_3
+                        objective_terms.append(penalty)
+
 
         # 3.2 従業員ごとの制約 (従業員ごとのループ)
         for emp in employees_data:
@@ -428,6 +413,26 @@ class ShiftGenerator:
                         x[emp_id, d_str, self.SHIFT_PAID_HOLIDAY] == 1,
                         f"PaidLeaveRequest_{emp_id}_{d_str}",
                     )
+                elif d_str in preferred_paid_leave_reqs.get(emp_id, []):
+                    constraint = self.constraints.get('prefer_paid_leave_as_holiday', {})
+                    constraint_type = constraint.get('type', ConstraintType.INACTIVE)
+                    
+                    if constraint_type == ConstraintType.HARD:
+                        # ハード制約：必ず「休み」を割り当てる
+                        prob += x[emp_id, d_str, self.SHIFT_KYU] == 1, f"PreferredPaidLeave_Hard_{emp_id}_{d_str}"
+                    elif constraint_type == ConstraintType.SOFT:
+                        # ソフト制約：「有給」になった場合にペナルティ
+                        penalty = constraint.get('penalty', 0)
+                        # 「休」か「有」のどちらかを割り当てる
+                        prob += (
+                            x[emp_id, d_str, self.SHIFT_KYU] + x[emp_id, d_str, self.SHIFT_PAID_HOLIDAY] == 1,
+                            f"PreferredPaidLeave_Base_{emp_id}_{d_str}",
+                        )
+                        # 「有」が割り当てられたらペナルティ
+                        if penalty > 0:
+                            objective_terms.append(x[emp_id, d_str, self.SHIFT_PAID_HOLIDAY] * penalty)
+                    # INACTIVEの場合は何もしない（通常の勤務可能日として扱われる）
+
                 else:
                     prob += (
                         x[emp_id, d_str, self.SHIFT_PAID_HOLIDAY] == 0,
@@ -473,7 +478,7 @@ class ShiftGenerator:
                         f"Could not parse ng_shifts for employee {emp_id}: {emp.get('ng_shifts')}. Error: {e}"
                     )
 
-            # 勤務日数(ハード制約)と夜勤日数(ソフト制約)
+            # --- 勤務日数・夜勤日数の制約 (動的) ---
             total_work_days = pulp.lpSum(
                 x[emp_id, d, s]
                 for d in date_strs
@@ -481,374 +486,397 @@ class ShiftGenerator:
             )
             total_night_shifts = pulp.lpSum(x[emp_id, d, s] for d in date_strs for s in self.SHIFTS_NIGHT)
 
-            # 勤務日数(ハード制約)
-            # 最小勤務日数 (ハード制約)
-            min_days = emp.get("min_work_days")
-            if min_days is not None:
-                prob += (total_work_days >= min_days, f"MinWorkDays_Hard_{emp_id}")
+            # 勤務日数
+            work_days_config = self.constraints.get('penalty_for_work_day_violation', {})
+            work_days_type = work_days_config.get('type', ConstraintType.INACTIVE)
+            if work_days_type != ConstraintType.INACTIVE:
+                # 最小勤務日数
+                min_days_value = emp.get("min_work_days")
+                if min_days_value is not None:
+                    if work_days_type == ConstraintType.HARD:
+                        prob += total_work_days >= min_days_value, f"HardMinWorkDays_{emp_id}"
+                    elif work_days_type == ConstraintType.SOFT:
+                        shortage = pulp.LpVariable(f"work_days_shortage_{emp_id}", 0, None, pulp.LpInteger)
+                        prob += total_work_days + shortage >= min_days_value, f"SoftMinWorkDays_{emp_id}"
+                        penalty = work_days_config.get('penalty', 0)
+                        if penalty > 0:
+                            objective_terms.append(shortage * penalty)
+                # 最大勤務日数
+                max_days_value = emp.get("max_work_days")
+                if max_days_value is not None:
+                    if work_days_type == ConstraintType.HARD:
+                        prob += total_work_days <= max_days_value, f"HardMaxWorkDays_{emp_id}"
+                    elif work_days_type == ConstraintType.SOFT:
+                        excess = pulp.LpVariable(f"work_days_excess_{emp_id}", 0, None, pulp.LpInteger)
+                        prob += total_work_days - excess <= max_days_value, f"SoftMaxWorkDays_{emp_id}"
+                        penalty = work_days_config.get('penalty', 0)
+                        if penalty > 0:
+                            objective_terms.append(excess * penalty)
 
-            # 最大勤務日数 (ハード制約)
-            max_days = emp.get("max_work_days")
-            if max_days is not None:
-                prob += (total_work_days <= max_days, f"MaxWorkDays_Hard_{emp_id}")
+            # 夜勤日数
+            night_shifts_config = self.constraints.get('penalty_for_night_shift_violation', {})
+            night_shifts_type = night_shifts_config.get('type', ConstraintType.INACTIVE)
+            if night_shifts_type != ConstraintType.INACTIVE:
+                # 最小夜勤日数
+                min_night_value = emp.get("min_night_shifts")
+                if min_night_value is not None:
+                    if night_shifts_type == ConstraintType.HARD:
+                        prob += total_night_shifts >= min_night_value, f"HardMinNightShifts_{emp_id}"
+                    elif night_shifts_type == ConstraintType.SOFT:
+                        shortage = pulp.LpVariable(f"night_shifts_shortage_{emp_id}", 0, None, pulp.LpInteger)
+                        prob += total_night_shifts + shortage >= min_night_value, f"SoftMinNightShifts_{emp_id}"
+                        penalty = night_shifts_config.get('penalty', 0)
+                        if penalty > 0:
+                            objective_terms.append(shortage * penalty)
+                # 最大夜勤日数
+                max_night_value = emp.get("max_night_shifts")
+                if max_night_value is not None:
+                    if night_shifts_type == ConstraintType.HARD:
+                        prob += total_night_shifts <= max_night_value, f"HardMaxNightShifts_{emp_id}"
+                    elif night_shifts_type == ConstraintType.SOFT:
+                        excess = pulp.LpVariable(f"night_shifts_excess_{emp_id}", 0, None, pulp.LpInteger)
+                        prob += total_night_shifts - excess <= max_night_value, f"SoftMaxNightShifts_{emp_id}"
+                        penalty = night_shifts_config.get('penalty', 0)
+                        if penalty > 0:
+                            objective_terms.append(excess * penalty)
 
-            night_shifts_penalty = self.constraints.get("night_shifts_penalty", 120)
+            # --- 連勤制約 (動的) ---
 
-            # 最小夜勤日数
-            min_night = emp.get("min_night_shifts")
-            if min_night is not None:
-                shortage = pulp.LpVariable(f"night_shifts_shortage_{emp_id}", 0, None, pulp.LpInteger)
-                prob += (total_night_shifts + shortage >= min_night, f"MinNightShifts_Soft_{emp_id}")
-                objective_terms.append(shortage * night_shifts_penalty)
+            # 1. 最大連勤日数 (max_consecutive_work)
+            work_cons_config = self.constraints.get('max_consecutive_work', {})
+            work_cons_type = work_cons_config.get('type', ConstraintType.INACTIVE)
+            if work_cons_type != ConstraintType.INACTIVE:
+                max_consecutive = emp.get('max_consecutive_work_days')
+                if max_consecutive is None:
+                    max_consecutive = work_cons_config.get('value')
 
-            # 最大夜勤日数
-            max_night = emp.get("max_night_shifts")
-            if max_night is not None:
-                excess = pulp.LpVariable(f"night_shifts_excess_{emp_id}", 0, None, pulp.LpInteger)
-                prob += (total_night_shifts - excess <= max_night, f"MaxNightShifts_Soft_{emp_id}")
-                objective_terms.append(excess * night_shifts_penalty)
-
-            # 連勤制約
-            max_consecutive = int(
-                emp.get("max_consecutive_work_days") or self.constraints.get("max_consecutive_work_days", 5)
-            )
-            if max_consecutive > 0:
-                # 前月末からの連勤日数を計算
-                consecutive_work_from_prev_month = 0
-                for i in range(max_consecutive):
-                    d = prev_month_last_day - timedelta(days=i)
-                    if shift_history_map.get((emp_id, d.isoformat())) in self.SHIFTS_WORK:
-                        consecutive_work_from_prev_month += 1
-                    else:
-                        break
-                # 月初から最大連勤日数までの期間の制約
-                if consecutive_work_from_prev_month > 0:
+                if max_consecutive is not None and max_consecutive > 0:
+                    consecutive_work_from_prev_month = 0
                     for i in range(max_consecutive):
-                        prob += (
-                            pulp.lpSum(
-                                x[emp_id, date_strs[j], s] for j in range(i + 1) for s in self.SHIFTS_WORK
-                            )
-                            + consecutive_work_from_prev_month
-                            <= max_consecutive,
-                            f"MaxConsecutiveWork_StartOfMonth_{emp_id}_{i}",
-                        )
+                        d = prev_month_last_day - timedelta(days=i)
+                        if shift_history_map.get((emp_id, d.isoformat())) in self.SHIFTS_WORK:
+                            consecutive_work_from_prev_month += 1
+                        else:
+                            break
+                    
+                    if consecutive_work_from_prev_month > 0:
+                        for i in range(max_consecutive):
+                            work_sum = pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i + 1) for s in self.SHIFTS_WORK)
+                            condition = work_sum + consecutive_work_from_prev_month <= max_consecutive
+                            if work_cons_type == ConstraintType.HARD:
+                                prob += condition, f"HardMaxConsecutiveWork_Start_{emp_id}_{i}"
+                            elif work_cons_type == ConstraintType.SOFT:
+                                excess = pulp.LpVariable(f"ExcessWork_Start_{emp_id}_{i}", 0, None, pulp.LpInteger)
+                                prob += work_sum + consecutive_work_from_prev_month - excess <= max_consecutive, f"SoftMaxConsecutiveWork_Start_{emp_id}_{i}"
+                                objective_terms.append(excess * work_cons_config.get('penalty', 0))
 
-                # 月内の連勤制約
-                for i in range(len(dates) - max_consecutive):
-                    prob += (
-                        pulp.lpSum(
-                            x[emp_id, date_strs[j], s]
-                            for j in range(i, i + max_consecutive + 1)
-                            for s in self.SHIFTS_WORK
-                        )
-                        <= max_consecutive,
-                        f"MaxConsecutiveWork_MidMonth_{emp_id}_{i}",
-                    )
+                    for i in range(len(dates) - max_consecutive):
+                        work_sum = pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i, i + max_consecutive + 1) for s in self.SHIFTS_WORK)
+                        condition = work_sum <= max_consecutive
+                        if work_cons_type == ConstraintType.HARD:
+                            prob += condition, f"HardMaxConsecutiveWork_Mid_{emp_id}_{i}"
+                        elif work_cons_type == ConstraintType.SOFT:
+                            excess = pulp.LpVariable(f"ExcessWork_Mid_{emp_id}_{i}", 0, None, pulp.LpInteger)
+                            prob += work_sum - excess <= max_consecutive, f"SoftMaxConsecutiveWork_Mid_{emp_id}_{i}"
+                            objective_terms.append(excess * work_cons_config.get('penalty', 0))
 
-            # 遅番の最大連勤日数 (UIから設定)
-            max_consecutive_late = int(self.constraints.get("max_consecutive_late_shifts", 4))
-            if self.SHIFTS_LATE and max_consecutive_late > 0:
-                # 前月末からの遅番連勤日数を計算
-                consecutive_late_from_prev_month = 0
-                for i in range(max_consecutive_late):
-                    d = prev_month_last_day - timedelta(days=i)
-                    if shift_history_map.get((emp_id, d.isoformat())) in self.SHIFTS_LATE:
-                        consecutive_late_from_prev_month += 1
-                    else:
-                        break
-                # 月初から最大遅番連勤日数までの期間の制約
-                if consecutive_late_from_prev_month > 0:
+            # 2. 遅番の最大連勤日数 (max_consecutive_late_shifts)
+            late_cons_config = self.constraints.get('max_consecutive_late_shifts', {})
+            late_cons_type = late_cons_config.get('type', ConstraintType.INACTIVE)
+            if self.SHIFTS_LATE and late_cons_type != ConstraintType.INACTIVE:
+                max_consecutive_late = late_cons_config.get('value')
+                if max_consecutive_late is not None and max_consecutive_late > 0:
+                    consecutive_late_from_prev_month = 0
                     for i in range(max_consecutive_late):
-                        prob += (
-                            pulp.lpSum(
-                                x[emp_id, date_strs[j], s] for j in range(i + 1) for s in self.SHIFTS_LATE
-                            )
-                            + consecutive_late_from_prev_month
-                            <= max_consecutive_late,
-                            f"MaxConsecutiveLate_StartOfMonth_{emp_id}_{i}",
-                        )
+                        d = prev_month_last_day - timedelta(days=i)
+                        if shift_history_map.get((emp_id, d.isoformat())) in self.SHIFTS_LATE:
+                            consecutive_late_from_prev_month += 1
+                        else:
+                            break
+                    
+                    if consecutive_late_from_prev_month > 0:
+                        for i in range(max_consecutive_late):
+                            late_sum = pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i + 1) for s in self.SHIFTS_LATE)
+                            condition = late_sum + consecutive_late_from_prev_month <= max_consecutive_late
+                            if late_cons_type == ConstraintType.HARD:
+                                prob += condition, f"HardMaxConsecutiveLate_Start_{emp_id}_{i}"
+                            elif late_cons_type == ConstraintType.SOFT:
+                                excess = pulp.LpVariable(f"ExcessLate_Start_{emp_id}_{i}", 0, None, pulp.LpInteger)
+                                prob += late_sum + consecutive_late_from_prev_month - excess <= max_consecutive_late, f"SoftMaxConsecutiveLate_Start_{emp_id}_{i}"
+                                objective_terms.append(excess * late_cons_config.get('penalty', 0))
 
-                # 月内の遅番連勤制約
-                for i in range(len(dates) - max_consecutive_late):
-                    prob += (
-                        pulp.lpSum(
-                            x[emp_id, date_strs[j], s]
-                            for j in range(i, i + max_consecutive_late + 1)
-                            for s in self.SHIFTS_LATE
-                        )
-                        <= max_consecutive_late,
-                        f"MaxConsecutiveLate_MidMonth_{emp_id}_{i}",
-                    )
+                    for i in range(len(dates) - max_consecutive_late):
+                        late_sum = pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i, i + max_consecutive_late + 1) for s in self.SHIFTS_LATE)
+                        condition = late_sum <= max_consecutive_late
+                        if late_cons_type == ConstraintType.HARD:
+                            prob += condition, f"HardMaxConsecutiveLate_Mid_{emp_id}_{i}"
+                        elif late_cons_type == ConstraintType.SOFT:
+                            excess = pulp.LpVariable(f"ExcessLate_Mid_{emp_id}_{i}", 0, None, pulp.LpInteger)
+                            prob += late_sum - excess <= max_consecutive_late, f"SoftMaxConsecutiveLate_Mid_{emp_id}_{i}"
+                            objective_terms.append(excess * late_cons_config.get('penalty', 0))
 
-            # 夜勤の最大連勤日数 (UIから設定)
-            max_consecutive_night = int(self.constraints.get("max_consecutive_night_shifts", 4))
-            if self.SHIFTS_NIGHT and max_consecutive_night > 0:
-                # 前月末からの夜勤連勤日数を計算
-                consecutive_night_from_prev_month = 0
-                for i in range(max_consecutive_night):
-                    d = prev_month_last_day - timedelta(days=i)
-                    if shift_history_map.get((emp_id, d.isoformat())) in self.SHIFTS_NIGHT:
-                        consecutive_night_from_prev_month += 1
-                    else:
-                        break
-                # 月初から最大夜勤連勤日数までの期間の制約
-                if consecutive_night_from_prev_month > 0:
+            # 3. 夜勤の最大連勤日数 (max_consecutive_night_shifts)
+            night_cons_config = self.constraints.get('max_consecutive_night_shifts', {})
+            night_cons_type = night_cons_config.get('type', ConstraintType.INACTIVE)
+            if self.SHIFTS_NIGHT and night_cons_type != ConstraintType.INACTIVE:
+                max_consecutive_night = night_cons_config.get('value')
+                if max_consecutive_night is not None and max_consecutive_night > 0:
+                    consecutive_night_from_prev_month = 0
                     for i in range(max_consecutive_night):
-                        prob += (
-                            pulp.lpSum(
-                                x[emp_id, date_strs[j], s] for j in range(i + 1) for s in self.SHIFTS_NIGHT
-                            )
-                            + consecutive_night_from_prev_month
-                            <= max_consecutive_night,
-                            f"MaxConsecutiveNight_StartOfMonth_{emp_id}_{i}",
-                        )
+                        d = prev_month_last_day - timedelta(days=i)
+                        if shift_history_map.get((emp_id, d.isoformat())) in self.SHIFTS_NIGHT:
+                            consecutive_night_from_prev_month += 1
+                        else:
+                            break
+                    
+                    if consecutive_night_from_prev_month > 0:
+                        for i in range(max_consecutive_night):
+                            night_sum = pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i + 1) for s in self.SHIFTS_NIGHT)
+                            condition = night_sum + consecutive_night_from_prev_month <= max_consecutive_night
+                            if night_cons_type == ConstraintType.HARD:
+                                prob += condition, f"HardMaxConsecutiveNight_Start_{emp_id}_{i}"
+                            elif night_cons_type == ConstraintType.SOFT:
+                                excess = pulp.LpVariable(f"ExcessNight_Start_{emp_id}_{i}", 0, None, pulp.LpInteger)
+                                prob += night_sum + consecutive_night_from_prev_month - excess <= max_consecutive_night, f"SoftMaxConsecutiveNight_Start_{emp_id}_{i}"
+                                objective_terms.append(excess * night_cons_config.get('penalty', 0))
 
-                # 月内の夜勤連勤制約
-                for i in range(len(dates) - max_consecutive_night):
-                    prob += (
-                        pulp.lpSum(
-                            x[emp_id, date_strs[j], s]
-                            for j in range(i, i + max_consecutive_night + 1)
-                            for s in self.SHIFTS_NIGHT
-                        )
-                        <= max_consecutive_night,
-                        f"MaxConsecutiveNight_MidMonth_{emp_id}_{i}",
-                    )
+                    for i in range(len(dates) - max_consecutive_night):
+                        night_sum = pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i, i + max_consecutive_night + 1) for s in self.SHIFTS_NIGHT)
+                        condition = night_sum <= max_consecutive_night
+                        if night_cons_type == ConstraintType.HARD:
+                            prob += condition, f"HardMaxConsecutiveNight_Mid_{emp_id}_{i}"
+                        elif night_cons_type == ConstraintType.SOFT:
+                            excess = pulp.LpVariable(f"ExcessNight_Mid_{emp_id}_{i}", 0, None, pulp.LpInteger)
+                            prob += night_sum - excess <= max_consecutive_night, f"SoftMaxConsecutiveNight_Mid_{emp_id}_{i}"
+                            objective_terms.append(excess * night_cons_config.get('penalty', 0))
 
-            # 遅番+夜勤の最大連勤日数 (UIから設定)
-            max_consecutive_late_night = int(self.constraints.get("max_consecutive_late_night_shifts", 4))
+            # 4. 遅番+夜勤の最大連勤日数 (max_consecutive_late_night_shifts)
+            late_night_cons_config = self.constraints.get('max_consecutive_late_night_shifts', {})
+            late_night_cons_type = late_night_cons_config.get('type', ConstraintType.INACTIVE)
             late_and_night_shifts = self.SHIFTS_LATE_OR_NIGHT
-            if late_and_night_shifts and max_consecutive_late_night > 0:
-                # 前月末からの遅番+夜勤連勤日数を計算
-                consecutive_late_night_from_prev_month = 0
-                for i in range(max_consecutive_late_night):
-                    d = prev_month_last_day - timedelta(days=i)
-                    if shift_history_map.get((emp_id, d.isoformat())) in late_and_night_shifts:
-                        consecutive_late_night_from_prev_month += 1
-                    else:
-                        break
-                # 月初から最大連勤日数までの期間の制約
-                if consecutive_late_night_from_prev_month > 0:
+            if late_and_night_shifts and late_night_cons_type != ConstraintType.INACTIVE:
+                max_consecutive_late_night = late_night_cons_config.get('value')
+                if max_consecutive_late_night is not None and max_consecutive_late_night > 0:
+                    consecutive_late_night_from_prev_month = 0
                     for i in range(max_consecutive_late_night):
-                        prob += (
-                            pulp.lpSum(
-                                x[emp_id, date_strs[j], s]
-                                for j in range(i + 1)
-                                for s in late_and_night_shifts
-                            )
-                            + consecutive_late_night_from_prev_month
-                            <= max_consecutive_late_night,
-                            f"MaxConsecutiveLateNight_StartOfMonth_{emp_id}_{i}",
-                        )
+                        d = prev_month_last_day - timedelta(days=i)
+                        if shift_history_map.get((emp_id, d.isoformat())) in late_and_night_shifts:
+                            consecutive_late_night_from_prev_month += 1
+                        else:
+                            break
+                    
+                    if consecutive_late_night_from_prev_month > 0:
+                        for i in range(max_consecutive_late_night):
+                            late_night_sum = pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i + 1) for s in late_and_night_shifts)
+                            condition = late_night_sum + consecutive_late_night_from_prev_month <= max_consecutive_late_night
+                            if late_night_cons_type == ConstraintType.HARD:
+                                prob += condition, f"HardMaxConsecutiveLateNight_Start_{emp_id}_{i}"
+                            elif late_night_cons_type == ConstraintType.SOFT:
+                                excess = pulp.LpVariable(f"ExcessLateNight_Start_{emp_id}_{i}", 0, None, pulp.LpInteger)
+                                prob += late_night_sum + consecutive_late_night_from_prev_month - excess <= max_consecutive_late_night, f"SoftMaxConsecutiveLateNight_Start_{emp_id}_{i}"
+                                objective_terms.append(excess * late_night_cons_config.get('penalty', 0))
 
-                # 月内の遅番+夜勤連勤制約
-                for i in range(len(dates) - max_consecutive_late_night):
-                    prob += (
-                        pulp.lpSum(
-                            x[emp_id, date_strs[j], s]
-                            for j in range(i, i + max_consecutive_late_night + 1)
-                            for s in late_and_night_shifts
-                        )
-                        <= max_consecutive_late_night,
-                        f"MaxConsecutiveLateNight_MidMonth_{emp_id}_{i}",
-                    )
+                    for i in range(len(dates) - max_consecutive_late_night):
+                        late_night_sum = pulp.lpSum(x[emp_id, date_strs[j], s] for j in range(i, i + max_consecutive_late_night + 1) for s in late_and_night_shifts)
+                        condition = late_night_sum <= max_consecutive_late_night
+                        if late_night_cons_type == ConstraintType.HARD:
+                            prob += condition, f"HardMaxConsecutiveLateNight_Mid_{emp_id}_{i}"
+                        elif late_night_cons_type == ConstraintType.SOFT:
+                            excess = pulp.LpVariable(f"ExcessLateNight_Mid_{emp_id}_{i}", 0, None, pulp.LpInteger)
+                            prob += late_night_sum - excess <= max_consecutive_late_night, f"SoftMaxConsecutiveLateNight_Mid_{emp_id}_{i}"
+                            objective_terms.append(excess * late_night_cons_config.get('penalty', 0))
 
-            # --- シフト構成ルール ---
+
+            # --- シフト構成ルール (動的) ---
             all_dates_with_next = [(d.isoformat(), (d + timedelta(days=1)).isoformat()) for d in dates[:-1]]
+            ake_rest_config = self.constraints.get('holiday_after_ake', {})
+            night_follow_config = self.constraints.get('forbidden_shift_after_night_shift', {})
+            late_follow_config = self.constraints.get('forbidden_shift_after_late_shift', {})
+            day_follow_config = self.constraints.get('forbidden_shift_after_day_shift', {})
 
             # 月初の処理 (前月最終日 -> 当月1日)
             first_day_str = date_strs[0]
             prev_to_first_day_str = (start_date - timedelta(days=1)).isoformat()
             prev_shift = shift_history_map.get((emp_id, prev_to_first_day_str))
             if prev_shift:
-                # 夜勤明け
+                # 夜勤明け (これは基本ルールとして維持)
                 if prev_shift in self.SHIFTS_NIGHT:
-                    prob += (
-                        pulp.lpSum(x[emp_id, first_day_str, s] for s in [self.SHIFT_AKE] + self.SHIFTS_NIGHT)
-                        == 1,
-                        f"History_NightFollowedBy_{emp_id}_{first_day_str}",
-                    )
-                # 明けの翌日は休み
-                elif (
-                    prev_shift == self.SHIFT_AKE and self.constraints.get("require_day_off_after_ake", 1) == 1
-                ):
-                    prob += (
-                        x[emp_id, first_day_str, self.SHIFT_KYU] == 1,
-                        f"History_RestAfterAke_{emp_id}_{first_day_str}",
-                    )
+                    prob += (pulp.lpSum(x[emp_id, first_day_str, s] for s in [self.SHIFT_AKE] + self.SHIFTS_NIGHT) == 1, f"History_NightFollowedBy_{emp_id}_{first_day_str}")
                 else:
-                    prob += (
-                        x[emp_id, first_day_str, self.SHIFT_AKE] == 0,
-                        f"History_NoAkeWithoutNight_{emp_id}_{first_day_str}",
-                    )
-                # 履歴に基づいた禁止シフト (1日のシフトを制限)
-                if (
-                    prev_shift in self.SHIFTS_NIGHT
-                    and self.constraints.get("disallow_specific_shifts_after_night", 1) == 1
-                ):
-                    forbidden = self.SHIFTS_LATE + self.SHIFTS_DAY + self.SHIFTS_EARLY
-                    prob += (
-                        pulp.lpSum(x[emp_id, first_day_str, s] for s in forbidden) == 0,
-                        f"History_NoShiftAfterNight_{emp_id}_{first_day_str}",
-                    )
-                if (
-                    prev_shift in self.SHIFTS_LATE
-                    and self.constraints.get("disallow_specific_shifts_after_late", 1) == 1
-                ):
-                    forbidden = self.SHIFTS_DAY + self.SHIFTS_EARLY
-                    prob += (
-                        pulp.lpSum(x[emp_id, first_day_str, s] for s in forbidden) == 0,
-                        f"History_NoShiftAfterLate_{emp_id}_{first_day_str}",
-                    )
-                if (
-                    prev_shift in self.SHIFTS_DAY
-                    and self.constraints.get("disallow_specific_shifts_after_day", 1) == 1
-                ):
-                    forbidden = self.SHIFTS_EARLY
-                    prob += (
-                        pulp.lpSum(x[emp_id, first_day_str, s] for s in forbidden) == 0,
-                        f"History_NoShiftAfterDay_{emp_id}_{first_day_str}",
-                    )
+                    prob += (x[emp_id, first_day_str, self.SHIFT_AKE] == 0, f"History_NoAkeWithoutNight_{emp_id}_{first_day_str}")
+
+                # 明けの翌日は休み
+                if prev_shift == self.SHIFT_AKE and ake_rest_config.get('type') != ConstraintType.INACTIVE:
+                    if ake_rest_config.get('type') == ConstraintType.HARD:
+                        prob += x[emp_id, first_day_str, self.SHIFT_KYU] == 1, f"History_RestAfterAke_{emp_id}_{first_day_str}"
+                    elif ake_rest_config.get('type') == ConstraintType.SOFT:
+                        penalty = ake_rest_config.get('penalty', 0)
+                        if penalty > 0:
+                            violation = 1 - x[emp_id, first_day_str, self.SHIFT_KYU]
+                            objective_terms.append(violation * penalty)
+                
+                # 履歴に基づいた禁止シフト
+                def apply_history_follow_constraint(prev_s, forbidden_shifts, config, shift_name):
+                    nonlocal prob, objective_terms
+                    if prev_shift in prev_s and config.get('type') != ConstraintType.INACTIVE:
+                        if config.get('type') == ConstraintType.HARD:
+                            prob += pulp.lpSum(x[emp_id, first_day_str, s] for s in forbidden_shifts) == 0, f"History_No{shift_name}After_{emp_id}"
+                        elif config.get('type') == ConstraintType.SOFT:
+                            penalty = config.get('penalty', 0)
+                            if penalty > 0:
+                                violation = pulp.lpSum(x[emp_id, first_day_str, s] for s in forbidden_shifts)
+                                objective_terms.append(violation * penalty)
+
+                apply_history_follow_constraint(self.SHIFTS_NIGHT, self.SHIFTS_LATE + self.SHIFTS_DAY + self.SHIFTS_EARLY, night_follow_config, "Shift")
+                apply_history_follow_constraint(self.SHIFTS_LATE, self.SHIFTS_DAY + self.SHIFTS_EARLY, late_follow_config, "Shift")
+                apply_history_follow_constraint(self.SHIFTS_DAY, self.SHIFTS_EARLY, day_follow_config, "Shift")
 
                 # 禁止連続ペア (例: 早2 -> 早1)
                 for prev_s, next_s in self.forbidden_consecutive_pairs:
                     if prev_shift == prev_s:
-                        prob += (
-                            x[emp_id, first_day_str, next_s] == 0,
-                            f"History_ForbiddenPair_{prev_s}_{next_s}_{emp_id}_{first_day_str}",
-                        )
+                        prob += (x[emp_id, first_day_str, next_s] == 0, f"History_ForbiddenPair_{prev_s}_{next_s}_{emp_id}_{first_day_str}")
             else:
-                # 履歴がない場合は、1日は明けにできない
                 prob += (x[emp_id, first_day_str, self.SHIFT_AKE] == 0, f"NoAkeOnFirstDay_Fallback_{emp_id}")
 
-            # 月内 (1日->2日, 2日->3日, ..., 最終日-1 -> 最終日)
+            # 月内 (1日->2日, ..., 最終日-1 -> 最終日)
             for d_str, next_d_str in all_dates_with_next:
-                # 夜勤 -> 明け or 夜勤
+                # 夜勤 -> 明け or 夜勤 (基本ルール)
                 for night_shift in self.SHIFTS_NIGHT:
-                    prob += (
-                        x[emp_id, d_str, night_shift]
-                        <= pulp.lpSum(x[emp_id, next_d_str, s] for s in [self.SHIFT_AKE] + self.SHIFTS_NIGHT),
-                        f"NightToAkeOrNight_{emp_id}_{d_str}_{night_shift}",
-                    )
-
-                # 明けは夜勤の翌日のみ (バグ修正)
-                prob += (
-                    x[emp_id, next_d_str, self.SHIFT_AKE]
-                    <= pulp.lpSum(x[emp_id, d_str, s] for s in self.SHIFTS_NIGHT),
-                    f"AkeOnlyAfterNight_{emp_id}_{next_d_str}",
-                )
+                    prob += (x[emp_id, d_str, night_shift] <= pulp.lpSum(x[emp_id, next_d_str, s] for s in [self.SHIFT_AKE] + self.SHIFTS_NIGHT), f"NightToAkeOrNight_{emp_id}_{d_str}_{night_shift}")
+                # 明けは夜勤の翌日のみ (基本ルール)
+                prob += (x[emp_id, next_d_str, self.SHIFT_AKE] <= pulp.lpSum(x[emp_id, d_str, s] for s in self.SHIFTS_NIGHT), f"AkeOnlyAfterNight_{emp_id}_{next_d_str}")
 
                 # 明け -> 休み
-                if self.constraints.get("require_day_off_after_ake", 1) == 1:
-                    prob += (
-                        x[emp_id, d_str, self.SHIFT_AKE] <= x[emp_id, next_d_str, self.SHIFT_KYU],
-                        f"RestAfterAke_{emp_id}_{d_str}",
-                    )
-
+                if ake_rest_config.get('type') != ConstraintType.INACTIVE:
+                    if ake_rest_config.get('type') == ConstraintType.HARD:
+                        prob += x[emp_id, d_str, self.SHIFT_AKE] <= x[emp_id, next_d_str, self.SHIFT_KYU], f"RestAfterAke_{emp_id}_{d_str}"
+                    elif ake_rest_config.get('type') == ConstraintType.SOFT:
+                        penalty = ake_rest_config.get('penalty', 0)
+                        if penalty > 0:
+                            violation = pulp.LpVariable(f"V_RestAfterAke_{emp_id}_{d_str}", 0, 1)
+                            prob += x[emp_id, d_str, self.SHIFT_AKE] - x[emp_id, next_d_str, self.SHIFT_KYU] <= violation
+                            objective_terms.append(violation * penalty)
+                
                 # 禁止シフトパターン
-                if self.constraints.get("disallow_specific_shifts_after_night", 1) == 1 and self.SHIFTS_NIGHT:
-                    forbidden = self.SHIFTS_LATE + self.SHIFTS_DAY + self.SHIFTS_EARLY
-                    for night_shift in self.SHIFTS_NIGHT:
-                        for f_shift in forbidden:
-                            prob += (
-                                x[emp_id, d_str, night_shift] + x[emp_id, next_d_str, f_shift] <= 1,
-                                f"No_{f_shift}_After_{night_shift}_{emp_id}_{d_str}",
-                            )
-                if self.constraints.get("disallow_specific_shifts_after_late", 1) == 1 and self.SHIFTS_LATE:
-                    forbidden = self.SHIFTS_DAY + self.SHIFTS_EARLY
-                    for late_shift in self.SHIFTS_LATE:
-                        for f_shift in forbidden:
-                            prob += (
-                                x[emp_id, d_str, late_shift] + x[emp_id, next_d_str, f_shift] <= 1,
-                                f"No_{f_shift}_After_{late_shift}_{emp_id}_{d_str}",
-                            )
-                if self.constraints.get("disallow_specific_shifts_after_day", 1) == 1 and self.SHIFTS_DAY:
-                    forbidden = self.SHIFTS_EARLY
-                    for day_shift in self.SHIFTS_DAY:
-                        for f_shift in forbidden:
-                            prob += (
-                                x[emp_id, d_str, day_shift] + x[emp_id, next_d_str, f_shift] <= 1,
-                                f"No_{f_shift}_After_{day_shift}_{emp_id}_{d_str}",
-                            )
+                def apply_internal_follow_constraint(shifts, forbidden_shifts, config, name):
+                    nonlocal prob, objective_terms
+                    if shifts and config.get('type') != ConstraintType.INACTIVE:
+                        for prev_s in shifts:
+                            for next_s in forbidden_shifts:
+                                if config.get('type') == ConstraintType.HARD:
+                                    prob += x[emp_id, d_str, prev_s] + x[emp_id, next_d_str, next_s] <= 1, f"No_{next_s}_After_{prev_s}_{emp_id}_{d_str}"
+                                elif config.get('type') == ConstraintType.SOFT:
+                                    penalty = config.get('penalty', 0)
+                                    if penalty > 0:
+                                        violation = pulp.LpVariable(f"V_{name}_{prev_s}_{next_s}_{emp_id}_{d_str}", 0, 1, pulp.LpBinary)
+                                        prob += x[emp_id, d_str, prev_s] + x[emp_id, next_d_str, next_s] - 1 <= violation
+                                        objective_terms.append(violation * penalty)
+                
+                apply_internal_follow_constraint(self.SHIFTS_NIGHT, self.SHIFTS_LATE + self.SHIFTS_DAY + self.SHIFTS_EARLY, night_follow_config, "NightFollow")
+                apply_internal_follow_constraint(self.SHIFTS_LATE, self.SHIFTS_DAY + self.SHIFTS_EARLY, late_follow_config, "LateFollow")
+                apply_internal_follow_constraint(self.SHIFTS_DAY, self.SHIFTS_EARLY, day_follow_config, "DayFollow")
 
                 # 禁止連続ペア (例: 早2 -> 早1)
                 for prev_s, next_s in self.forbidden_consecutive_pairs:
-                    prob += (
-                        x[emp_id, d_str, prev_s] + x[emp_id, next_d_str, next_s] <= 1,
-                        f"ForbiddenPair_{prev_s}_{next_s}_{emp_id}_{d_str}",
-                    )
+                    prob += (x[emp_id, d_str, prev_s] + x[emp_id, next_d_str, next_s] <= 1, f"ForbiddenPair_{prev_s}_{next_s}_{emp_id}_{d_str}")
 
-        # --- 4. ソフト制約の定義 ---
+
+        # --- 4. ソフト制約の定義 (動的) ---
         logging.info("Defining soft constraints.")
-        # 4.2 責任者とサポの同日勤務回避
-        if self.constraints.get("avoid_charge_and_support_same_day", 1) == 1:
-            charge_ids = [e["id"] for e in employees_data if e["employment_type"] == EmploymentType.MANAGER]
-            support_ids = [e["id"] for e in employees_data if e["employment_type"] == EmploymentType.SUPPORT]
-            weight = self.constraints.get("weight_avoid_charge_support", 1)
-            for d_str in date_strs:
-                for c_id in charge_ids:
-                    for s_id in support_ids:
-                        w = pulp.LpVariable(f"cowork_{c_id}_{s_id}_{d_str}", 0, 1, pulp.LpBinary)
-                        prob += (
-                            w
-                            >= pulp.lpSum(x[c_id, d_str, s] for s in self.SHIFTS_WORK)
-                            + pulp.lpSum(x[s_id, d_str, s] for s in self.SHIFTS_WORK)
-                            - 1
-                        )
-                        objective_terms.append(w * weight)
 
-        # 4.3 正職員の早番/日勤確保
-        if self.constraints.get("ensure_main_staff_in_day_shift", 1) == 1:
-            full_timer_ids = [
-                e["id"]
-                for e in employees_data
-                if e["employment_type"]
-                in [EmploymentType.MANAGER, EmploymentType.SUPPORT, EmploymentType.FULL_TIME]
-            ]
+        # 4.1 責任者とサポの同日勤務回避
+        charge_support_config = self.constraints.get('avoid_leader_and_support_same_day', {})
+        if charge_support_config.get('type') == ConstraintType.SOFT:
+            penalty = charge_support_config.get('penalty', 0)
+            if penalty > 0:
+                charge_ids = [e["id"] for e in employees_data if e["employment_type"] == EmploymentType.MANAGER]
+                support_ids = [e["id"] for e in employees_data if e["employment_type"] == EmploymentType.SUPPORT]
+                if charge_ids and support_ids:
+                    for d_str in date_strs:
+                        for c_id in charge_ids:
+                            for s_id in support_ids:
+                                w = pulp.LpVariable(f"cowork_{c_id}_{s_id}_{d_str}", 0, 1, pulp.LpBinary)
+                                # w=1 if both are working
+                                prob += w >= pulp.lpSum(x[c_id, d_str, s] for s in self.SHIFTS_WORK) + pulp.lpSum(x[s_id, d_str, s] for s in self.SHIFTS_WORK) - 1
+                                objective_terms.append(w * penalty)
+
+        # 4.2 正職員の早番/日勤確保
+        main_staff_config = self.constraints.get('ensure_full_time_early_day_shift', {})
+        main_staff_type = main_staff_config.get('type', ConstraintType.INACTIVE)
+        if main_staff_type != ConstraintType.INACTIVE:
+            full_timer_ids = [e["id"] for e in employees_data if e["employment_type"] in [EmploymentType.MANAGER, EmploymentType.SUPPORT, EmploymentType.FULL_TIME]]
             early_day_shifts = self.SHIFTS_EARLY + self.SHIFTS_DAY
-            weight = self.constraints.get("weight_ensure_main_staff", 50)
             if early_day_shifts and full_timer_ids:
                 for d_str in date_strs:
+                    # z=1 if no main staff is working
                     z = pulp.LpVariable(f"no_main_staff_in_day_{d_str}", 0, 1, pulp.LpBinary)
-                    prob += (
-                        pulp.lpSum(x[emp_id, d_str, s] for emp_id in full_timer_ids for s in early_day_shifts)
-                        + z
-                        >= 1
-                    )
-                    prob += pulp.lpSum(
-                        x[emp_id, d_str, s] for emp_id in full_timer_ids for s in early_day_shifts
-                    ) <= len(full_timer_ids) * (1 - z)
-                    objective_terms.append(z * weight)
+                    prob += pulp.lpSum(x[emp_id, d_str, s] for emp_id in full_timer_ids for s in early_day_shifts) + z >= 1
+                    prob += pulp.lpSum(x[emp_id, d_str, s] for emp_id in full_timer_ids for s in early_day_shifts) <= len(full_timer_ids) * (1 - z)
+                    
+                    if main_staff_type == ConstraintType.HARD:
+                        prob += z == 0, f"HardEnsureMainStaff_{d_str}"
+                    elif main_staff_type == ConstraintType.SOFT:
+                        penalty = main_staff_config.get('penalty', 0)
+                        if penalty > 0:
+                            objective_terms.append(z * penalty)
 
-        # 4.4 4連続夜勤の回避 (ハード制約で上限4日の場合)
-        max_consecutive_night = int(self.constraints.get("max_consecutive_night_shifts", 4))
-        if max_consecutive_night == 4 and self.SHIFTS_NIGHT:
-            weight = self.constraints.get("weight_avoid_4_night_streak", 10)
-            for emp in employees_data:
-                for i in range(len(dates) - 3):
-                    v = pulp.LpVariable(f"is_4_night_streak_{emp['id']}_{i}", 0, 1, pulp.LpBinary)
-                    four_days_of_nights = pulp.lpSum(
-                        x[emp["id"], date_strs[j], s] for j in range(i, i + 4) for s in self.SHIFTS_NIGHT
-                    )
-                    prob += four_days_of_nights <= 3 + v
-                    objective_terms.append(v * weight)
+        # 4.3 4連続夜勤の回避 (max_consecutive_night_shiftsが4の場合の追加ペナルティ)
+        avoid_4_night_config = self.constraints.get('avoid_4_consecutive_night_shifts', {})
+        night_cons_config = self.constraints.get('max_consecutive_night_shifts', {})
+        if avoid_4_night_config.get('type') == ConstraintType.SOFT and night_cons_config.get('value') == 4 and self.SHIFTS_NIGHT:
+            penalty = avoid_4_night_config.get('penalty', 0)
+            if penalty > 0:
+                for emp in employees_data:
+                    for i in range(len(dates) - 3):
+                        v = pulp.LpVariable(f"is_4_night_streak_{emp['id']}_{i}", 0, 1, pulp.LpBinary)
+                        four_days_of_nights = pulp.lpSum(x[emp["id"], date_strs[j], s] for j in range(i, i + 4) for s in self.SHIFTS_NIGHT)
+                        prob += four_days_of_nights <= 3 + v
+                        objective_terms.append(v * penalty)
 
-        # 4.5 優先シフトが採用されなかった場合のペナルティ
-        weight = self.constraints.get("penalty_missed_preferred_shift", 10)
-        for emp in employees_data:
-            emp_id = emp["id"]
-            pref_1_id = emp.get("preferred_shift_1_id")
-            pref_2_id = emp.get("preferred_shift_2_id")
-            preferred_shift_names = [
-                st.name for st_id, st in self.shift_types_by_id.items() if st_id in [pref_1_id, pref_2_id]
-            ]
+        # 4.4 5連続勤務の回避 (max_consecutive_workが5の場合の追加ペナルティ)
+        avoid_5_work_config = self.constraints.get('avoid_5_consecutive_work_days', {})
+        work_cons_config = self.constraints.get('max_consecutive_work', {})
+        if avoid_5_work_config.get('type') == ConstraintType.SOFT and work_cons_config.get('value') == 5 and self.SHIFTS_WORK:
+            penalty = avoid_5_work_config.get('penalty', 0)
+            if penalty > 0:
+                for emp in employees_data:
+                    for i in range(len(dates) - 4):
+                        v = pulp.LpVariable(f"is_5_work_streak_{emp['id']}_{i}", 0, 1, pulp.LpBinary)
+                        five_days_of_work = pulp.lpSum(x[emp["id"], date_strs[j], s] for j in range(i, i + 5) for s in self.SHIFTS_WORK)
+                        prob += five_days_of_work <= 4 + v
+                        objective_terms.append(v * penalty)
 
-            if preferred_shift_names:
-                for d_str in date_strs:
-                    is_working = pulp.lpSum(x[emp_id, d_str, s] for s in self.SHIFTS_WORK)
-                    is_assigned_preferred = pulp.lpSum(x[emp_id, d_str, s] for s in preferred_shift_names)
-                    penalty_term = is_working - is_assigned_preferred
-                    objective_terms.append(penalty_term * weight)
+        # 4.5 4連続遅番の回避 (max_consecutive_late_shiftsが4の場合の追加ペナルティ)
+        avoid_4_late_config = self.constraints.get('avoid_4_consecutive_late_shifts', {})
+        late_cons_config = self.constraints.get('max_consecutive_late_shifts', {})
+        if avoid_4_late_config.get('type') == ConstraintType.SOFT and late_cons_config.get('value') == 4 and self.SHIFTS_LATE:
+            penalty = avoid_4_late_config.get('penalty', 0)
+            if penalty > 0:
+                for emp in employees_data:
+                    for i in range(len(dates) - 3):
+                        v = pulp.LpVariable(f"is_4_late_streak_{emp['id']}_{i}", 0, 1, pulp.LpBinary)
+                        four_days_of_lates = pulp.lpSum(x[emp["id"], date_strs[j], s] for j in range(i, i + 4) for s in self.SHIFTS_LATE)
+                        prob += four_days_of_lates <= 3 + v
+                        objective_terms.append(v * penalty)
+
+        # 4.6 優先シフトが採用されなかった場合のペナルティ
+        missed_pref_config = self.constraints.get('penalty_for_not_assigning_preferred_shift', {})
+        if missed_pref_config.get('type') == ConstraintType.SOFT:
+            penalty = missed_pref_config.get('penalty', 0)
+            if penalty > 0:
+                for emp in employees_data:
+                    emp_id = emp["id"]
+                    pref_1_id = emp.get("preferred_shift_1_id")
+                    pref_2_id = emp.get("preferred_shift_2_id")
+                    preferred_shift_names = [st.name for st_id, st in self.shift_types_by_id.items() if st_id in [pref_1_id, pref_2_id]]
+
+                    if preferred_shift_names:
+                        for d_str in date_strs:
+                            is_working = pulp.lpSum(x[emp_id, d_str, s] for s in self.SHIFTS_WORK)
+                            is_assigned_preferred = pulp.lpSum(x[emp_id, d_str, s] for s in preferred_shift_names)
+                            # Penalize if working but not in a preferred shift
+                            penalty_term = is_working - is_assigned_preferred
+                            objective_terms.append(penalty_term * penalty)
 
         # --- 5. 目的関数設定とソルバー実行 ---
         logging.info("Solving problem...")

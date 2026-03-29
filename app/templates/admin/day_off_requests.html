@@ -57,8 +57,10 @@
                         <td>
                             <span class="badge 
                                 {% if req.request_type == 'paid_leave' %} bg-info text-dark
+                                {% elif req.request_type == 'preferred_paid_leave' %} bg-primary
                                 {% else %} bg-light text-dark {% endif %}">
                                 {% if req.request_type == 'paid_leave' %}有給休暇
+                                {% elif req.request_type == 'preferred_paid_leave' %}希望有給休暇
                                 {% else %}希望休
                                 {% endif %}
                             </span>
