@@ -313,6 +313,23 @@ def manage_constraints():
 
     # マスター制約リスト (ユーザー指定のものに限定)
     master_constraints = [
+        # 人員の過不足
+        {'name': 'no_staff_variance_07_20', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (07:00-20:00)'},
+        {'name': 'penalty_shortage_07_20', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (07:00-20:00)'},
+        {'name': 'penalty_surplus_1_07_20', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (07:00-20:00)'},
+        {'name': 'penalty_surplus_2_07_20', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (07:00-20:00)'},
+        {'name': 'penalty_surplus_3_plus_07_20', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (07:00-20:00)'},
+        {'name': 'no_staff_variance_20_24', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (20:00-24:00)'},
+        {'name': 'penalty_shortage_20_24', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (20:00-24:00)'},
+        {'name': 'penalty_surplus_1_20_24', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (20:00-24:00)'},
+        {'name': 'penalty_surplus_2_20_24', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (20:00-24:00)'},
+        {'name': 'penalty_surplus_3_plus_20_24', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (20:00-24:00)'},
+        {'name': 'no_staff_variance_24_07', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (24:00-翌07:00)'},
+        {'name': 'penalty_shortage_24_07', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (24:00-翌07:00)'},
+        {'name': 'penalty_surplus_1_24_07', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (24:00-翌07:00)'},
+        {'name': 'penalty_surplus_2_24_07', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (24:00-翌07:00)'},
+        {'name': 'penalty_surplus_3_plus_24_07', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (24:00-翌07:00)'},
+        
         # 勤務ルール
         {'name': 'respect_day_off_requests', 'category': '勤務ルール', 'description_jp': '希望休の厳守'},
         {'name': 'respect_work_requests', 'category': '勤務ルール', 'description_jp': '希望勤務の厳守'},
@@ -329,10 +346,6 @@ def manage_constraints():
         {'name': 'penalty_for_work_day_violation', 'category': '勤務ルール', 'description_jp': '希望勤務日数の厳守'},
         {'name': 'penalty_for_night_shift_violation', 'category': '勤務ルール', 'description_jp': '希望夜勤回数の厳守'},
 
-        # その他
-        {'name': 'avoid_leader_and_support_same_day', 'category': 'その他', 'description_jp': '責任者とサポの同日勤務回避'},
-        {'name': 'ensure_full_time_early_day_shift', 'category': 'その他', 'description_jp': '正職員の早番/日勤確保'},
-
         # シフト間のルール
         {'name': 'holiday_after_ake', 'category': 'シフト間のルール', 'description_jp': '明けの翌日は休み'},
         {'name': 'forbidden_shift_after_night_shift', 'category': 'シフト間のルール', 'description_jp': '夜勤翌日の禁止シフト(遅日早)'},
@@ -340,24 +353,9 @@ def manage_constraints():
         {'name': 'forbidden_shift_after_day_shift', 'category': 'シフト間のルール', 'description_jp': '日勤翌日の禁止シフト(早)'},
         {'name': 'no_consecutive_same_category_shifts', 'category': 'シフト間のルール', 'description_jp': '早番や日勤などの同シフトにおける２から１の移行禁止'},
 
-        # 人員の過不足
-        {'name': 'no_staff_variance_07_20', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (07:00-20:00)'},
-        {'name': 'penalty_shortage_07_20', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (07:00-20:00)'},
-        {'name': 'penalty_surplus_1_07_20', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (07:00-20:00)'},
-        {'name': 'penalty_surplus_2_07_20', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (07:00-20:00)'},
-        {'name': 'penalty_surplus_3_plus_07_20', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (07:00-20:00)'},
-
-        {'name': 'no_staff_variance_20_24', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (20:00-24:00)'},
-        {'name': 'penalty_shortage_20_24', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (20:00-24:00)'},
-        {'name': 'penalty_surplus_1_20_24', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (20:00-24:00)'},
-        {'name': 'penalty_surplus_2_20_24', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (20:00-24:00)'},
-        {'name': 'penalty_surplus_3_plus_20_24', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (20:00-24:00)'},
-
-        {'name': 'no_staff_variance_24_07', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (24:00-翌07:00)'},
-        {'name': 'penalty_shortage_24_07', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (24:00-翌07:00)'},
-        {'name': 'penalty_surplus_1_24_07', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (24:00-翌07:00)'},
-        {'name': 'penalty_surplus_2_24_07', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (24:00-翌07:00)'},
-        {'name': 'penalty_surplus_3_plus_24_07', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (24:00-翌07:00)'},
+        # その他
+        {'name': 'avoid_leader_and_support_same_day', 'category': 'その他', 'description_jp': '責任者とサポの同日勤務回避'},
+        {'name': 'ensure_full_time_early_day_shift', 'category': 'その他', 'description_jp': '正職員の早番/日勤確保'},
     ]
 
 
