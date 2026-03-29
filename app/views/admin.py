@@ -313,6 +313,37 @@ def manage_constraints():
 
     # マスター制約リスト
     master_constraints = [
+        # 希望休・勤務
+        {'name': 'respect_day_off_requests', 'category': '希望休・勤務', 'description_jp': '希望休の厳守'},
+        {'name': 'respect_work_requests', 'category': '希望休・勤務', 'description_jp': '希望勤務の厳守'},
+        {'name': 'respect_ng_shifts', 'category': '希望休・勤務', 'description_jp': 'NG勤務の厳守'},
+        {'name': 'prefer_paid_leave_as_holiday', 'category': '希望休・勤務', 'description_jp': '希望有給休暇に”休”を優先'},
+        {'name': 'penalty_for_not_assigning_preferred_shift', 'category': '希望休・勤務', 'description_jp': '優先シフト非採用'},
+        
+        # 連勤・連続シフト
+        {'name': 'max_consecutive_work', 'category': '連勤・連続シフト', 'description_jp': '最大連勤日数'},
+        {'name': 'max_consecutive_night_shifts', 'category': '連勤・連続シフト', 'description_jp': '夜勤の最大連勤日数'},
+        {'name': 'max_consecutive_late_shifts', 'category': '連勤・連続シフト', 'description_jp': '遅番の最大連続日数'},
+        {'name': 'max_consecutive_late_night_shifts', 'category': '連勤・連続シフト', 'description_jp': '遅番・夜勤の最大連勤日数'},
+        {'name': 'avoid_5_consecutive_work_days', 'category': '連勤・連続シフト', 'description_jp': '5連続勤務の回避'},
+        {'name': 'avoid_4_consecutive_night_shifts', 'category': '連勤・連続シフト', 'description_jp': '4連続夜勤の回避'},
+        {'name': 'avoid_4_consecutive_late_shifts', 'category': '連勤・連続シフト', 'description_jp': '4連続遅番の回避'},
+        {'name': 'min_consecutive_holidays', 'category': '連勤・連続シフト', 'description_jp': '最小連続休日数'},
+        {'name': 'holiday_after_ake', 'category': '連勤・連続シフト', 'description_jp': '明けの翌日は休み'},
+
+        # シフト間のルール
+        {'name': 'no_day_shift_after_night_shift', 'category': 'シフト間のルール', 'description_jp': '夜勤後の日勤禁止'},
+        {'name': 'night_shift_after_mid_day', 'category': 'シフト間のルール', 'description_jp': '準夜勤後の日勤禁止'},
+        {'name': 'forbidden_shift_after_night_shift', 'category': 'シフト間のルール', 'description_jp': '夜勤翌日の禁止シフト(遅日早)'},
+        {'name': 'forbidden_shift_after_late_shift', 'category': 'シフト間のルール', 'description_jp': '遅番翌日の禁止シフト(日早)'},
+        {'name': 'forbidden_shift_after_day_shift', 'category': 'シフト間のルール', 'description_jp': '日勤翌日の禁止シフト(早)'},
+        {'name': 'no_consecutive_same_category_shifts', 'category': 'シフト間のルール', 'description_jp': '同種シフトの連続勤務禁止'},
+
+        # 公平性
+        {'name': 'ensure_fairness', 'category': '公平性', 'description_jp': '勤務回数の公平性'},
+        {'name': 'penalty_for_work_day_violation', 'category': '公平性', 'description_jp': '総勤務日数の不足・超過'},
+        {'name': 'penalty_for_night_shift_violation', 'category': '公平性', 'description_jp': '夜勤日数の不足・超過'},
+
         # 人員配置
         {'name': 'min_workers_day', 'category': '人員配置', 'description_jp': '日勤の最小人員'},
         {'name': 'max_workers_day', 'category': '人員配置', 'description_jp': '日勤の最大人員'},
@@ -322,29 +353,38 @@ def manage_constraints():
         {'name': 'max_workers_day_sp', 'category': '人員配置', 'description_jp': '日勤の最大人員 (特別日)'},
         {'name': 'min_workers_night_sp', 'category': '人員配置', 'description_jp': '夜勤の最小人員 (特別日)'},
         {'name': 'max_workers_night_sp', 'category': '人員配置', 'description_jp': '夜勤の最大人員 (特別日)'},
-        # 連勤
-        {'name': 'max_consecutive_work', 'category': '連勤', 'description_jp': '最大連勤日数'},
-        # 休日
-        {'name': 'min_consecutive_holidays', 'category': '休日', 'description_jp': '最小連続休日数'},
-        # 夜勤
-        {'name': 'night_shift_after_mid_day', 'category': '夜勤', 'description_jp': '準夜勤後の日勤禁止'},
-        {'name': 'no_day_shift_after_night_shift', 'category': '夜勤', 'description_jp': '夜勤後の日勤禁止'},
-        # 経験年数
-        {'name': 'min_experience_night_shift', 'category': '経験年数', 'description_jp': '夜勤に必要な最小経験年数'},
-        # 公平性
-        {'name': 'ensure_fairness', 'category': '公平性', 'description_jp': '勤務回数の公平性'},
-        # 役職
-        {'name': 'leader_in_day_shift', 'category': '役職', 'description_jp': '日勤にリーダーを1名配置'},
-        {'name': 'leader_in_night_shift', 'category': '役職', 'description_jp': '夜勤にリーダーを1名配置'},
-        # 特殊スキル
-        {'name': 'advanced_care_in_day_shift', 'category': '特殊スキル', 'description_jp': '日勤に高度なケア担当を1名配置'},
-        # 連続夜勤
-        {'name': 'max_consecutive_night_shifts', 'category': '連続夜勤', 'description_jp': '最大連続夜勤日数'},
-        # 個人設定
-        {'name': 'respect_individual_preferences', 'category': '個人設定', 'description_jp': '個人の勤務希望を尊重'},
-        # 病院訪問シフト
-        {'name': 'assign_hospital_visit_shift', 'category': '病院訪問シフト', 'description_jp': '病院訪問シフトの割り当て'},
+        
+        # 人員の過不足
+        {'name': 'no_staff_variance_07_20', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (07:00-20:00)'},
+        {'name': 'penalty_shortage_07_20', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (07:00-20:00)'},
+        {'name': 'penalty_surplus_1_07_20', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (07:00-20:00)'},
+        {'name': 'penalty_surplus_2_07_20', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (07:00-20:00)'},
+        {'name': 'penalty_surplus_3_plus_07_20', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (07:00-20:00)'},
+
+        {'name': 'no_staff_variance_20_24', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (20:00-24:00)'},
+        {'name': 'penalty_shortage_20_24', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (20:00-24:00)'},
+        {'name': 'penalty_surplus_1_20_24', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (20:00-24:00)'},
+        {'name': 'penalty_surplus_2_20_24', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (20:00-24:00)'},
+        {'name': 'penalty_surplus_3_plus_20_24', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (20:00-24:00)'},
+
+        {'name': 'no_staff_variance_24_07', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (24:00-翌07:00)'},
+        {'name': 'penalty_shortage_24_07', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (24:00-翌07:00)'},
+        {'name': 'penalty_surplus_1_24_07', 'category': '人員の過不足', 'description_jp': '1人超過ペナルティ (24:00-翌07:00)'},
+        {'name': 'penalty_surplus_2_24_07', 'category': '人員の過不足', 'description_jp': '2人超過ペナルティ (24:00-翌07:00)'},
+        {'name': 'penalty_surplus_3_plus_24_07', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (24:00-翌07:00)'},
+
+        # 役職・スキル
+        {'name': 'leader_in_day_shift', 'category': '役職・スキル', 'description_jp': '日勤にリーダーを1名配置'},
+        {'name': 'leader_in_night_shift', 'category': '役職・スキル', 'description_jp': '夜勤にリーダーを1名配置'},
+        {'name': 'avoid_leader_and_support_same_day', 'category': '役職・スキル', 'description_jp': '責任者とサポの同日勤務回避'},
+        {'name': 'ensure_full_time_early_day_shift', 'category': '役職・スキル', 'description_jp': '正職員の早番/日勤確保'},
+        {'name': 'min_experience_night_shift', 'category': '役職・スキル', 'description_jp': '夜勤に必要な最小経験年数'},
+        {'name': 'advanced_care_in_day_shift', 'category': '役職・スキル', 'description_jp': '日勤に高度なケア担当を1名配置'},
+
+        # その他
+        {'name': 'assign_hospital_visit_shift', 'category': 'その他', 'description_jp': '病院訪問シフトの割り当て'},
     ]
+
 
     if request.method == 'POST':
         if 'submit_constraints' in request.form:
@@ -412,9 +452,57 @@ def manage_constraints():
         # カテゴリと説明は常にマスターリストで更新
         constraint.category = mc['category']
         constraint.description_jp = mc['description_jp']
+
+    # 時間帯ごとの人員配置マスタ
+    hourly_staffing_master = {
+        '平日': [
+            {'name': 'staffing_weekday_07_08', 'description_jp': '07:00-08:00', 'value': 4},
+            {'name': 'staffing_weekday_08_09', 'description_jp': '08:00-09:00', 'value': 4},
+            {'name': 'staffing_weekday_09_12', 'description_jp': '09:00-12:00', 'value': 3},
+            {'name': 'staffing_weekday_12_13', 'description_jp': '12:00-13:00', 'value': 3},
+            {'name': 'staffing_weekday_13_14', 'description_jp': '13:00-14:00', 'value': 2},
+            {'name': 'staffing_weekday_14_16', 'description_jp': '14:00-16:00', 'value': 3},
+            {'name': 'staffing_weekday_16_18', 'description_jp': '16:00-18:00', 'value': 3},
+            {'name': 'staffing_weekday_18_19', 'description_jp': '18:00-19:00', 'value': 3},
+            {'name': 'staffing_weekday_19_20', 'description_jp': '19:00-20:00', 'value': 3},
+            {'name': 'staffing_weekday_20_23', 'description_jp': '20:00-23:00', 'value': 2},
+            {'name': 'staffing_weekday_23_24', 'description_jp': '23:00-24:00', 'value': 2},
+            {'name': 'staffing_weekday_24_07', 'description_jp': '24:00-翌7:00', 'value': 2},
+        ],
+        '休日': [
+            {'name': 'staffing_holiday_07_08', 'description_jp': '07:00-08:00', 'value': 4},
+            {'name': 'staffing_holiday_08_09', 'description_jp': '08:00-09:00', 'value': 4},
+            {'name': 'staffing_holiday_09_12', 'description_jp': '09:00-12:00', 'value': 3},
+            {'name': 'staffing_holiday_12_13', 'description_jp': '12:00-13:00', 'value': 4},
+            {'name': 'staffing_holiday_13_14', 'description_jp': '13:00-14:00', 'value': 3},
+            {'name': 'staffing_holiday_14_16', 'description_jp': '14:00-16:00', 'value': 4},
+            {'name': 'staffing_holiday_16_18', 'description_jp': '16:00-18:00', 'value': 4},
+            {'name': 'staffing_holiday_18_19', 'description_jp': '18:00-19:00', 'value': 4},
+            {'name': 'staffing_holiday_19_20', 'description_jp': '19:00-20:00', 'value': 3},
+            {'name': 'staffing_holiday_20_23', 'description_jp': '20:00-23:00', 'value': 2},
+            {'name': 'staffing_holiday_23_24', 'description_jp': '23:00-24:00', 'value': 2},
+            {'name': 'staffing_holiday_24_07', 'description_jp': '24:00-翌7:00', 'value': 2},
+        ]
+    }
+    
+    hourly_constraints = {'平日': [], '休日': []}
+    for category, constraints in hourly_staffing_master.items():
+        for hc in constraints:
+            constraint = ShiftConstraint.query.filter_by(name=hc['name']).first()
+            if not constraint:
+                constraint = ShiftConstraint(
+                    name=hc['name'],
+                    description_jp=hc['description_jp'],
+                    category='時間帯別人員配置', # 専用カテゴリ
+                    value=hc['value'],
+                    constraint_type=ConstraintType.HARD # これらは常にハード制約
+                )
+                db.session.add(constraint)
+            hourly_constraints[category].append(constraint)
+
     db.session.commit()
 
-    all_constraints = ShiftConstraint.query.order_by(ShiftConstraint.category, ShiftConstraint.id).all()
+    all_constraints = ShiftConstraint.query.filter(ShiftConstraint.category != '時間帯別人員配置').order_by(ShiftConstraint.category, ShiftConstraint.id).all()
     constraints_by_category = {}
     for constraint in all_constraints:
         if constraint.category not in constraints_by_category:
@@ -428,6 +516,7 @@ def manage_constraints():
         "admin/constraints.html",
         title="制約条件・特別日の編集",
         constraints_by_category=constraints_by_category,
+        hourly_constraints=hourly_constraints,
         special_day_form=special_day_form,
         special_days=special_days,
         ConstraintType=ConstraintType # テンプレートでEnumを使えるように

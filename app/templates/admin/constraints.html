@@ -17,6 +17,54 @@
             </ul>
         </div>
 
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">時間帯ごとの人員配置基準</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>平日</h6>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>時間帯</th>
+                                    <th>必要人数</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for constraint in hourly_constraints['平日'] %}
+                                <tr>
+                                    <td><label for="value_{{ constraint.id }}">{{ constraint.description_jp }}</label></td>
+                                    <td><input type="number" name="value_{{ constraint.id }}" id="value_{{ constraint.id }}" value="{{ constraint.value or '' }}" class="form-control form-control-sm"></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>休日</h6>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>時間帯</th>
+                                    <th>必要人数</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for constraint in hourly_constraints['休日'] %}
+                                <tr>
+                                    <td><label for="value_{{ constraint.id }}">{{ constraint.description_jp }}</label></td>
+                                    <td><input type="number" name="value_{{ constraint.id }}" id="value_{{ constraint.id }}" value="{{ constraint.value or '' }}" class="form-control form-control-sm"></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {% for category, constraints in constraints_by_category.items() %}
         <div class="card mb-4">
             <div class="card-header bg-light">
