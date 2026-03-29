@@ -311,7 +311,7 @@ def manage_constraints():
         flash('管理者権限が必要です。')
         return redirect(url_for('main.index'))
 
-    # マスター制約リスト
+    # マスター制約リスト (ユーザー指定のものに限定)
     master_constraints = [
         # 希望休・勤務
         {'name': 'respect_day_off_requests', 'category': '希望休・勤務', 'description_jp': '希望休の厳守'},
@@ -328,32 +328,18 @@ def manage_constraints():
         {'name': 'avoid_5_consecutive_work_days', 'category': '連勤・連続シフト', 'description_jp': '5連続勤務の回避'},
         {'name': 'avoid_4_consecutive_night_shifts', 'category': '連勤・連続シフト', 'description_jp': '4連続夜勤の回避'},
         {'name': 'avoid_4_consecutive_late_shifts', 'category': '連勤・連続シフト', 'description_jp': '4連続遅番の回避'},
-        {'name': 'min_consecutive_holidays', 'category': '連勤・連続シフト', 'description_jp': '最小連続休日数'},
         {'name': 'holiday_after_ake', 'category': '連勤・連続シフト', 'description_jp': '明けの翌日は休み'},
 
         # シフト間のルール
-        {'name': 'no_day_shift_after_night_shift', 'category': 'シフト間のルール', 'description_jp': '夜勤後の日勤禁止'},
-        {'name': 'night_shift_after_mid_day', 'category': 'シフト間のルール', 'description_jp': '準夜勤後の日勤禁止'},
         {'name': 'forbidden_shift_after_night_shift', 'category': 'シフト間のルール', 'description_jp': '夜勤翌日の禁止シフト(遅日早)'},
         {'name': 'forbidden_shift_after_late_shift', 'category': 'シフト間のルール', 'description_jp': '遅番翌日の禁止シフト(日早)'},
         {'name': 'forbidden_shift_after_day_shift', 'category': 'シフト間のルール', 'description_jp': '日勤翌日の禁止シフト(早)'},
-        {'name': 'no_consecutive_same_category_shifts', 'category': 'シフト間のルール', 'description_jp': '同種シフトの連続勤務禁止'},
+        {'name': 'no_consecutive_same_category_shifts', 'category': 'シフト間のルール', 'description_jp': '早番や日勤などの同シフトにおける２から１の移行禁止'},
 
         # 公平性
-        {'name': 'ensure_fairness', 'category': '公平性', 'description_jp': '勤務回数の公平性'},
-        {'name': 'penalty_for_work_day_violation', 'category': '公平性', 'description_jp': '総勤務日数の不足・超過'},
+        {'name': 'penalty_for_work_day_violation', 'category': '公平性', 'description_jp': '勤務日数の不足・超過'},
         {'name': 'penalty_for_night_shift_violation', 'category': '公平性', 'description_jp': '夜勤日数の不足・超過'},
 
-        # 人員配置
-        {'name': 'min_workers_day', 'category': '人員配置', 'description_jp': '日勤の最小人員'},
-        {'name': 'max_workers_day', 'category': '人員配置', 'description_jp': '日勤の最大人員'},
-        {'name': 'min_workers_night', 'category': '人員配置', 'description_jp': '夜勤の最小人員'},
-        {'name': 'max_workers_night', 'category': '人員配置', 'description_jp': '夜勤の最大人員'},
-        {'name': 'min_workers_day_sp', 'category': '人員配置', 'description_jp': '日勤の最小人員 (特別日)'},
-        {'name': 'max_workers_day_sp', 'category': '人員配置', 'description_jp': '日勤の最大人員 (特別日)'},
-        {'name': 'min_workers_night_sp', 'category': '人員配置', 'description_jp': '夜勤の最小人員 (特別日)'},
-        {'name': 'max_workers_night_sp', 'category': '人員配置', 'description_jp': '夜勤の最大人員 (特別日)'},
-        
         # 人員の過不足
         {'name': 'no_staff_variance_07_20', 'category': '人員の過不足', 'description_jp': '過不足を完全に禁止 (07:00-20:00)'},
         {'name': 'penalty_shortage_07_20', 'category': '人員の過不足', 'description_jp': '人員不足ペナルティ (07:00-20:00)'},
@@ -374,16 +360,10 @@ def manage_constraints():
         {'name': 'penalty_surplus_3_plus_24_07', 'category': '人員の過不足', 'description_jp': '3人以上超過ペナルティ (24:00-翌07:00)'},
 
         # 役職・スキル
-        {'name': 'leader_in_day_shift', 'category': '役職・スキル', 'description_jp': '日勤にリーダーを1名配置'},
-        {'name': 'leader_in_night_shift', 'category': '役職・スキル', 'description_jp': '夜勤にリーダーを1名配置'},
         {'name': 'avoid_leader_and_support_same_day', 'category': '役職・スキル', 'description_jp': '責任者とサポの同日勤務回避'},
         {'name': 'ensure_full_time_early_day_shift', 'category': '役職・スキル', 'description_jp': '正職員の早番/日勤確保'},
-        {'name': 'min_experience_night_shift', 'category': '役職・スキル', 'description_jp': '夜勤に必要な最小経験年数'},
-        {'name': 'advanced_care_in_day_shift', 'category': '役職・スキル', 'description_jp': '日勤に高度なケア担当を1名配置'},
-
-        # その他
-        {'name': 'assign_hospital_visit_shift', 'category': 'その他', 'description_jp': '病院訪問シフトの割り当て'},
     ]
+
 
 
     if request.method == 'POST':

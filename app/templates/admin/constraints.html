@@ -81,40 +81,92 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for constraint in constraints %}
-                        <tr class="align-middle">
-                            <td>
-                                <label for="value_{{ constraint.id }}" class="form-label mb-0">{{ constraint.description_jp }}</label>
-                            </td>
-                            <td>
-                                {# 特定の制約のみ値を入力可能にする #}
-                                {% if constraint.name in ['min_workers_day', 'max_workers_day', 'min_workers_night', 'max_workers_night', 'min_workers_day_sp', 'max_workers_day_sp', 'min_workers_night_sp', 'max_workers_night_sp', 'max_consecutive_work', 'min_consecutive_holidays', 'min_experience_night_shift', 'max_consecutive_night_shifts'] %}
-                                    <input type="number" name="value_{{ constraint.id }}" id="value_{{ constraint.id }}" value="{{ constraint.value or '' }}" class="form-control form-control-sm">
-                                {% else %}
-                                    <span class="text-muted">ー</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="constraint_type_{{ constraint.id }}" id="type_hard_{{ constraint.id }}" value="HARD" {% if constraint.constraint_type == ConstraintType.HARD %}checked{% endif %} data-constraint-id="{{ constraint.id }}">
-                                    <label class="form-check-label" for="type_hard_{{ constraint.id }}">ハード</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="constraint_type_{{ constraint.id }}" id="type_soft_{{ constraint.id }}" value="SOFT" {% if constraint.constraint_type == ConstraintType.SOFT %}checked{% endif %} data-constraint-id="{{ constraint.id }}">
-                                    <label class="form-check-label" for="type_soft_{{ constraint.id }}">ソフト</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="constraint_type_{{ constraint.id }}" id="type_inactive_{{ constraint.id }}" value="INACTIVE" {% if constraint.constraint_type == ConstraintType.INACTIVE %}checked{% endif %} data-constraint-id="{{ constraint.id }}">
-                                    <label class="form-check-label" for="type_inactive_{{ constraint.id }}">無効</label>
-                                </div>
-                            </td>
-                            <td>
-                                <div id="penalty_wrapper_{{ constraint.id }}" class="penalty-wrapper">
-                                    <input type="number" name="penalty_{{ constraint.id }}" id="penalty_{{ constraint.id }}" value="{{ constraint.penalty or '' }}" class="form-control form-control-sm" style="width: 100px;">
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                        {% if category == '人員の過不足' %}
+                            {% set time_blocks = ['07_20', '20_24', '24_07'] %}
+                            {% for block in time_blocks %}
+                                {# Find the main control constraint for the block #}
+                                {% for constraint in constraints if constraint.name == 'no_staff_variance_' + block %}
+                                    <tr class="align-middle">
+                                        <td><strong class="text-primary">{{ constraint.description_jp }}</strong></td>
+                                        <td><span class="text-muted">ー</span></td>
+                                        <td>
+                                            {# These are the CONTROLLING radio buttons #}
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input variance-control" type="radio" name="constraint_type_{{ constraint.id }}" id="type_hard_{{ constraint.id }}" value="HARD" {% if constraint.constraint_type == ConstraintType.HARD %}checked{% endif %} data-controls-penalties="variance_penalties_{{ block }}">
+                                                <label class="form-check-label" for="type_hard_{{ constraint.id }}">ハード</label>
+                                            </div>
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input variance-control" type="radio" name="constraint_type_{{ constraint.id }}" id="type_soft_{{ constraint.id }}" value="SOFT" {% if constraint.constraint_type == ConstraintType.SOFT %}checked{% endif %} data-controls-penalties="variance_penalties_{{ block }}">
+                                                <label class="form-check-label" for="type_soft_{{ constraint.id }}">ソフト</label>
+                                            </div>
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input variance-control" type="radio" name="constraint_type_{{ constraint.id }}" id="type_inactive_{{ constraint.id }}" value="INACTIVE" {% if constraint.constraint_type == ConstraintType.INACTIVE %}checked{% endif %} data-controls-penalties="variance_penalties_{{ block }}">
+                                                <label class="form-check-label" for="type_inactive_{{ constraint.id }}">無効</label>
+                                            </div>
+                                        </td>
+                                        <td></td> {# No penalty for the main control #}
+                                    </tr>
+                                {% endfor %}
+
+                                {# Find and render the SUBORDINATE penalty constraints #}
+                                {% for constraint in constraints if constraint.name.startswith('penalty_') and constraint.name.endswith(block) %}
+                                    <tr class="align-middle penalty-group" data-penalty-group="variance_penalties_{{ block }}">
+                                        <td class="ps-4"><label for="penalty_{{ constraint.id }}" class="form-label mb-0">{{ constraint.description_jp }}</label></td>
+                                        <td><span class="text-muted">ー</span></td>
+                                        <td>
+                                            {# This is hidden, as it's controlled by the main constraint's "Soft" setting #}
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio" name="constraint_type_{{ constraint.id }}" value="SOFT" checked>
+                                                <label class="form-check-label">ソフト</label>
+                                            </div>
+                                        </td>
+                                        <td>
+                                             <div id="penalty_wrapper_{{ constraint.id }}" class="penalty-wrapper">
+                                                <input type="number" name="penalty_{{ constraint.id }}" id="penalty_{{ constraint.id }}" value="{{ constraint.penalty or '' }}" class="form-control form-control-sm" style="width: 100px;">
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        {% else %}
+                            {# Original rendering for all other categories #}
+                            {% for constraint in constraints %}
+                            <tr class="align-middle">
+                                <td>
+                                    <label for="value_{{ constraint.id }}" class="form-label mb-0">{{ constraint.description_jp }}</label>
+                                </td>
+                                <td>
+                                    {% if constraint.name in [
+                                        'max_consecutive_work', 'max_consecutive_night_shifts', 
+                                        'max_consecutive_late_shifts', 'max_consecutive_late_night_shifts'
+                                    ] %}
+                                        <input type="number" name="value_{{ constraint.id }}" id="value_{{ constraint.id }}" value="{{ constraint.value or '' }}" class="form-control form-control-sm">
+                                    {% else %}
+                                        <span class="text-muted">ー</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="constraint_type_{{ constraint.id }}" id="type_hard_{{ constraint.id }}" value="HARD" {% if constraint.constraint_type == ConstraintType.HARD %}checked{% endif %} data-constraint-id="{{ constraint.id }}">
+                                        <label class="form-check-label" for="type_hard_{{ constraint.id }}">ハード</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="constraint_type_{{ constraint.id }}" id="type_soft_{{ constraint.id }}" value="SOFT" {% if constraint.constraint_type == ConstraintType.SOFT %}checked{% endif %} data-constraint-id="{{ constraint.id }}">
+                                        <label class="form-check-label" for="type_soft_{{ constraint.id }}">ソフト</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="constraint_type_{{ constraint.id }}" id="type_inactive_{{ constraint.id }}" value="INACTIVE" {% if constraint.constraint_type == ConstraintType.INACTIVE %}checked{% endif %} data-constraint-id="{{ constraint.id }}">
+                                        <label class="form-check-label" for="type_inactive_{{ constraint.id }}">無効</label>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div id="penalty_wrapper_{{ constraint.id }}" class="penalty-wrapper">
+                                        <input type="number" name="penalty_{{ constraint.id }}" id="penalty_{{ constraint.id }}" value="{{ constraint.penalty or '' }}" class="form-control form-control-sm" style="width: 100px;">
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
@@ -213,6 +265,7 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // --- Generic function for single penalty inputs ---
     function togglePenaltyInput(constraintId) {
         const softRadio = document.getElementById('type_soft_' + constraintId);
         const penaltyWrapper = document.getElementById('penalty_wrapper_' + constraintId);
@@ -229,20 +282,62 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Initial check on page load
+    // --- Specific function for grouped variance penalties ---
+    function toggleVariancePenaltyGroup(groupName) {
+        const controlRadioGroup = document.querySelectorAll(`[data-controls-penalties="${groupName}"]`);
+        const penaltyRows = document.querySelectorAll(`[data-penalty-group="${groupName}"]`);
+        
+        let isSoftSelected = false;
+        controlRadioGroup.forEach(radio => {
+            if (radio.value === 'SOFT' && radio.checked) {
+                isSoftSelected = true;
+            }
+        });
+
+        penaltyRows.forEach(row => {
+            row.style.display = isSoftSelected ? '' : 'none';
+        });
+    }
+
+    // --- Initial setup on page load ---
+    
+    // For single penalty inputs
     document.querySelectorAll('[data-constraint-id]').forEach(function(element) {
         const constraintId = element.dataset.constraintId;
-        // Avoid duplicate initial calls by targeting only one radio per group
         if (element.id.startsWith('type_hard_')) {
              togglePenaltyInput(constraintId);
         }
     });
 
-    // Add change event listener to all radio buttons
-    document.querySelectorAll('input[type="radio"][name^="constraint_type_"]').forEach(function(radio) {
+    // For grouped variance penalties
+    document.querySelectorAll('.variance-control').forEach(function(radio) {
+        // Run on load, but only once per group
+        if (radio.value === 'HARD') {
+            const groupName = radio.dataset.controlsPenalties;
+            if(groupName) {
+                toggleVariancePenaltyGroup(groupName);
+            }
+        }
+    });
+
+
+    // --- Add change event listeners ---
+
+    // For single penalty inputs
+    document.querySelectorAll('input[type="radio"][data-constraint-id]').forEach(function(radio) {
         radio.addEventListener('change', function() {
             const constraintId = this.dataset.constraintId;
             togglePenaltyInput(constraintId);
+        });
+    });
+
+    // For grouped variance penalties
+    document.querySelectorAll('.variance-control').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            const groupName = this.dataset.controlsPenalties;
+            if(groupName) {
+                toggleVariancePenaltyGroup(groupName);
+            }
         });
     });
 });
