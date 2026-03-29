@@ -687,6 +687,7 @@ class ShiftGenerator:
 
 
             # --- シフト構成ルール (動的) ---
+            all_dates_with_next = [(d.isoformat(), (d + timedelta(days=1)).isoformat()) for d in dates[:-1]]
             ake_rest_config = self.constraints.get('require_day_off_after_ake', {})
             night_follow_config = self.constraints.get('disallow_specific_shifts_after_night', {})
             late_follow_config = self.constraints.get('disallow_specific_shifts_after_late', {})
