@@ -100,11 +100,11 @@ class ShiftGenerator:
         # --- 0. データベースからデータをロード ---
         self._load_data_from_db()
 
+        # 本番環境のログストリームに出力するための設定
         logging.basicConfig(
-            level=logging.DEBUG,
-            filename="generator.log",
-            filemode="w",
+            level=logging.INFO,
             format="%(asctime)s - %(levelname)s - %(message)s",
+            force=True # 既存のロガー設定を上書き
         )
         logging.info("Shift generation started.")
 
@@ -299,18 +299,29 @@ class ShiftGenerator:
                     if overage_p1 > 0 or overage_p2 > 0 or overage_p3_plus > 0:
                         over_staff = pulp.LpVariable(f"OverStaff_{d_str}_{key}", 0, None, pulp.LpInteger)
                         prob += over_staff >= actual_staff - total_required, f"DefineOverStaff_{d_str}_{key}"
+
+                        # 段階的ペナルティのための変数を定義
+                        # u1: 1人目の超過人員がいるか (バイナリ)
+                        # u2: 2人目の超過人員がいるか (バイナリ)
+                        # over_staff_minus_2: 2人を超えた人員数 (整数)
+                        u1 = pulp.LpVariable(f"OverStaff_u1_{d_str}_{key}", 0, 1, pulp.LpBinary)
+                        u2 = pulp.LpVariable(f"OverStaff_u2_{d_str}_{key}", 0, 1, pulp.LpBinary)
+                        over_staff_minus_2 = pulp.LpVariable(f"OverStaff_minus_2_{d_str}_{key}", 0, None, pulp.LpInteger)
                         
-                        is_1, is_2, is_3 = pulp.LpVariable.dicts(f"OverStaffLevel_{d_str}_{key}", [1, 2, 3], 0, 1, pulp.LpBinary)
-                        max_staff = len(employees_data)
+                        # over_staff の値と段階変数を紐づける
+                        prob += over_staff == u1 + u2 + over_staff_minus_2, f"DecomposeOverStaff_{d_str}_{key}"
                         
-                        prob += over_staff >= is_1
-                        prob += over_staff <= max_staff * is_1
-                        prob += over_staff >= 2 * is_2
-                        prob += over_staff <= 1 + (max_staff - 1) * is_2
-                        prob += over_staff >= 3 * is_3
-                        prob += over_staff <= 2 + (max_staff - 2) * is_3
-                        
-                        penalty = overage_p1 * (is_1 - is_2) + overage_p2 * (is_2 - is_3) + overage_p3_plus * is_3
+                        # u1, u2が正しく設定されるように制約を追加
+                        # 2人目の超過(u2=1)がいるなら、必ず1人目の超過(u1=1)もいる
+                        prob += u2 <= u1, f"OverStaff_u2_le_u1_{d_str}_{key}"
+                        # 3人目以降の超過(over_staff_minus_2 > 0)がいるなら、必ず2人目の超過(u2=1)もいる
+                        prob += over_staff_minus_2 <= 99 * u2, f"OverStaff_t3_requires_t2_{d_str}_{key}"
+
+                        # ペナルティを計算
+                        # 1人目のペナルティ + 2人目のペナルティ + 3人目以降のペナルティ
+                        penalty = (overage_p1 * u1) + \
+                                  (overage_p2 * u2) + \
+                                  (overage_p3_plus * over_staff_minus_2)
                         objective_terms.append(penalty)
 
 
@@ -503,6 +514,7 @@ class ShiftGenerator:
                             objective_terms.append(shortage * penalty)
                 # 最大勤務日数
                 max_days_value = emp.get("max_work_days")
+                logging.info(f"CONSTRAINT_CHECK Employee ID {emp.get('id')} ({emp.get('name')}): Using max_work_days = {max_days_value}") # 診断用ログ
                 if max_days_value is not None:
                     if work_days_type == ConstraintType.HARD:
                         prob += total_work_days <= max_days_value, f"HardMaxWorkDays_{emp_id}"
