@@ -295,7 +295,7 @@ class ShiftGenerator:
                 
                 # 8. 制約を適用 (HARD or SOFT)
                 if constraint_type == ConstraintType.HARD:
-                    prob += actual_staff == total_required, f"HardStaffing_{new_constraint_name}_{d_str}"
+                    prob += actual_staff == total_required, f"HardStaffing_{new_constraint_name}_{d_str}_{key}"
                 
                 elif constraint_type == ConstraintType.SOFT:
                     # 不足・超過ペナルティのロジックは、別途定義された'day'/'night'グループの汎用設定を使用
