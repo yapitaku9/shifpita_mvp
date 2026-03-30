@@ -227,27 +227,59 @@ class ShiftGenerator:
                 else:
                     req_date = current_date
 
-                req_day_type = "sunday" if req_date.weekday() == 6 else "weekday"
-                req_special_day_infos = special_days_map.get(req_date.isoformat(), [])
+                is_early_morning_hour = 0 <= hour <= 6
+                if is_early_morning_hour:
+                    if d_idx == 0: continue
+                    req_date = current_date - timedelta(days=1)
+                else:
+                    req_date = current_date
 
+                # --- 新しいデータ形式に基づいて制約を適用 ---
+                # 1. 曜日に基づいてキーを決定
+                day_type_key = "holiday" if req_date.weekday() == 6 else "weekday"
+                
+                # 2. 時間に基づいてキーを決定
+                hour_key_new = ""
+                if 7 <= hour < 8: hour_key_new = "07_08"
+                elif 8 <= hour < 9: hour_key_new = "08_09"
+                elif 9 <= hour < 12: hour_key_new = "09_12"
+                elif 12 <= hour < 13: hour_key_new = "12_13"
+                elif 13 <= hour < 14: hour_key_new = "13_14"
+                elif 14 <= hour < 16: hour_key_new = "14_16"
+                elif 16 <= hour < 18: hour_key_new = "16_18"
+                elif 18 <= hour < 19: hour_key_new = "18_19"
+                elif 19 <= hour < 20: hour_key_new = "19_20"
+                elif 20 <= hour < 23: hour_key_new = "20_23"
+                elif 23 <= hour < 24: hour_key_new = "23_24"
+                elif 0 <= hour < 7: hour_key_new = "24_07"
+
+                if not hour_key_new:
+                    continue
+
+                # 3. 正しい制約名を構築し、ルールを取得
+                new_constraint_name = f"staffing_{day_type_key}_{hour_key_new}"
+                staffing_rule = self.constraints.get(new_constraint_name)
+
+                # 4. ルールが存在しない、またはINACTIVEの場合はスキップ
+                if not staffing_rule or staffing_rule.get('type') == ConstraintType.INACTIVE:
+                    continue
+
+                # 5. 必要な値と制約タイプを同じルールから取得
+                constraint_type = staffing_rule.get('type')
+                req_staff_count = staffing_rule.get('value', 0)
+
+                # 6. 特別日の増員を計算
+                req_special_day_infos = special_days_map.get(req_date.isoformat(), [])
                 staff_increase = 0
                 for special_day_info in req_special_day_infos:
                     if (special_day_info and special_day_info.staff_increase > 0 and special_day_info.visit_time):
                         visit_hour = int(special_day_info.visit_time.split(":")[0])
                         if not is_early_morning_hour and visit_hour == hour:
                             staff_increase += special_day_info.staff_increase
+                
+                total_required = req_staff_count + staff_increase
 
-                if 20 <= hour <= 22:
-                    constraint_key_suffix, default_req = "2000_2300", 2
-                elif hour == 23:
-                    constraint_key_suffix, default_req = "2300_0000", 2
-                elif 0 <= hour <= 6:
-                    constraint_key_suffix, default_req = "0000_next_0700", 2
-                else:
-                    constraint_key_suffix, default_req = key, 0
-
-                req_staff_count = self.constraints.get(f"min_staff_{req_day_type}_{constraint_key_suffix}", {}).get('value', default_req)
-
+                # 7. 現在の実際の人員を計算
                 shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
                 actual_staff = 0
                 if shifts_for_hour_with_offset:
@@ -261,31 +293,13 @@ class ShiftGenerator:
                             staff_terms.append(prev_day_workers)
                     actual_staff = pulp.lpSum(staff_terms) if staff_terms else 0
                 
-                # --- 動的な人員配置制約の適用 ---
-                hour_group_name = ""
-                control_constraint_name = ""
-                if 7 <= hour < 20:
-                    hour_group_name = "day"
-                    control_constraint_name = "no_staff_variance_07_20"
-                elif 20 <= hour < 24:
-                    hour_group_name = "night"
-                    control_constraint_name = "no_staff_variance_20_24"
-                else: # 0 <= hour < 7
-                    hour_group_name = "night"
-                    control_constraint_name = "no_staff_variance_24_07"
-
-                control_constraint = self.constraints.get(control_constraint_name, {})
-                constraint_type = control_constraint.get('type', ConstraintType.INACTIVE)
-
-                if constraint_type == ConstraintType.INACTIVE:
-                    continue
-
-                total_required = req_staff_count + staff_increase
-                
+                # 8. 制約を適用 (HARD or SOFT)
                 if constraint_type == ConstraintType.HARD:
-                    prob += actual_staff == total_required, f"HardStaffing_{hour_group_name}_{d_str}_{key}"
+                    prob += actual_staff == total_required, f"HardStaffing_{new_constraint_name}_{d_str}"
                 
                 elif constraint_type == ConstraintType.SOFT:
+                    # 不足・超過ペナルティのロジックは、別途定義された'day'/'night'グループの汎用設定を使用
+                    hour_group_name = "day" if 7 <= hour < 20 else "night"
                     shortfall_penalty = self.constraints.get(f'penalty_shortage_{hour_group_name}', {}).get('penalty', 0)
                     if shortfall_penalty > 0:
                         shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
@@ -300,25 +314,14 @@ class ShiftGenerator:
                         over_staff = pulp.LpVariable(f"OverStaff_{d_str}_{key}", 0, None, pulp.LpInteger)
                         prob += over_staff >= actual_staff - total_required, f"DefineOverStaff_{d_str}_{key}"
 
-                        # 段階的ペナルティのための変数を定義
-                        # u1: 1人目の超過人員がいるか (バイナリ)
-                        # u2: 2人目の超過人員がいるか (バイナリ)
-                        # over_staff_minus_2: 2人を超えた人員数 (整数)
                         u1 = pulp.LpVariable(f"OverStaff_u1_{d_str}_{key}", 0, 1, pulp.LpBinary)
                         u2 = pulp.LpVariable(f"OverStaff_u2_{d_str}_{key}", 0, 1, pulp.LpBinary)
                         over_staff_minus_2 = pulp.LpVariable(f"OverStaff_minus_2_{d_str}_{key}", 0, None, pulp.LpInteger)
                         
-                        # over_staff の値と段階変数を紐づける
                         prob += over_staff == u1 + u2 + over_staff_minus_2, f"DecomposeOverStaff_{d_str}_{key}"
-                        
-                        # u1, u2が正しく設定されるように制約を追加
-                        # 2人目の超過(u2=1)がいるなら、必ず1人目の超過(u1=1)もいる
                         prob += u2 <= u1, f"OverStaff_u2_le_u1_{d_str}_{key}"
-                        # 3人目以降の超過(over_staff_minus_2 > 0)がいるなら、必ず2人目の超過(u2=1)もいる
                         prob += over_staff_minus_2 <= 99 * u2, f"OverStaff_t3_requires_t2_{d_str}_{key}"
 
-                        # ペナルティを計算
-                        # 1人目のペナルティ + 2人目のペナルティ + 3人目以降のペナルティ
                         penalty = (overage_p1 * u1) + \
                                   (overage_p2 * u2) + \
                                   (overage_p3_plus * over_staff_minus_2)
