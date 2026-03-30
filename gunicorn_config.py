@@ -21,4 +21,4 @@ errorlog = "-"
 loglevel = "info"
 
 # タイムアウト設定（秒）
-timeout = 1800
+timeout = 3600
