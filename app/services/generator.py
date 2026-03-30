@@ -234,11 +234,29 @@ class ShiftGenerator:
                 else:
                     req_date = current_date
 
-                # --- 新しいデータ形式に基づいて制約を適用 ---
-                # 1. 曜日に基づいてキーを決定
-                day_type_key = "holiday" if req_date.weekday() == 6 else "weekday"
+                # --- 【新ロジック】人員配置の要件と制約タイプを別々に取得 ---
+                # 1. 時間帯ごとの「過不足を許容するか」の制御ルールを取得
+                hour_group_name = ""
+                control_constraint_name = ""
+                if 7 <= hour < 20:
+                    hour_group_name = "day"
+                    control_constraint_name = "no_staff_variance_07_20"
+                elif 20 <= hour < 24:
+                    hour_group_name = "night"
+                    control_constraint_name = "no_staff_variance_20_24"
+                else: # 0 <= hour < 7
+                    hour_group_name = "night"
+                    control_constraint_name = "no_staff_variance_24_07"
                 
-                # 2. 時間に基づいてキーを決定
+                control_constraint = self.constraints.get(control_constraint_name, {})
+                constraint_type = control_constraint.get('type', ConstraintType.INACTIVE)
+
+                # 2. 制御ルールがINACTIVEなら、この時間帯のチェックはすべてスキップ
+                if constraint_type == ConstraintType.INACTIVE:
+                    continue
+                
+                # 3. 制御ルールがACTIVEな場合のみ、その時間帯の「必要人数」を取得
+                day_type_key = "holiday" if req_date.weekday() == 6 else "weekday"
                 hour_key_new = ""
                 if 7 <= hour < 8: hour_key_new = "07_08"
                 elif 8 <= hour < 9: hour_key_new = "08_09"
@@ -253,22 +271,13 @@ class ShiftGenerator:
                 elif 23 <= hour < 24: hour_key_new = "23_24"
                 elif 0 <= hour < 7: hour_key_new = "24_07"
 
-                if not hour_key_new:
-                    continue
+                req_staff_count = 0
+                if hour_key_new:
+                    staffing_rule_name = f"staffing_{day_type_key}_{hour_key_new}"
+                    staffing_rule = self.constraints.get(staffing_rule_name, {})
+                    req_staff_count = staffing_rule.get('value', 0)
 
-                # 3. 正しい制約名を構築し、ルールを取得
-                new_constraint_name = f"staffing_{day_type_key}_{hour_key_new}"
-                staffing_rule = self.constraints.get(new_constraint_name)
-
-                # 4. ルールが存在しない、またはINACTIVEの場合はスキップ
-                if not staffing_rule or staffing_rule.get('type') == ConstraintType.INACTIVE:
-                    continue
-
-                # 5. 必要な値と制約タイプを同じルールから取得
-                constraint_type = staffing_rule.get('type')
-                req_staff_count = staffing_rule.get('value', 0)
-
-                # 6. 特別日の増員を計算
+                # 4. 特別日の増員を計算
                 req_special_day_infos = special_days_map.get(req_date.isoformat(), [])
                 staff_increase = 0
                 for special_day_info in req_special_day_infos:
@@ -279,7 +288,7 @@ class ShiftGenerator:
                 
                 total_required = req_staff_count + staff_increase
 
-                # 7. 現在の実際の人員を計算
+                # 5. 現在の実際の人員を計算
                 shifts_for_hour_with_offset = self.hourly_groups.get(hour, [])
                 actual_staff = 0
                 if shifts_for_hour_with_offset:
@@ -293,13 +302,11 @@ class ShiftGenerator:
                             staff_terms.append(prev_day_workers)
                     actual_staff = pulp.lpSum(staff_terms) if staff_terms else 0
                 
-                # 8. 制約を適用 (HARD or SOFT)
+                # 6. 取得した情報に基づいて制約を適用
                 if constraint_type == ConstraintType.HARD:
-                    prob += actual_staff == total_required, f"HardStaffing_{new_constraint_name}_{d_str}_{key}"
+                    prob += actual_staff == total_required, f"HardStaffing_{day_type_key}_{hour_key_new}_{d_str}_{key}"
                 
                 elif constraint_type == ConstraintType.SOFT:
-                    # 不足・超過ペナルティのロジックは、別途定義された'day'/'night'グループの汎用設定を使用
-                    hour_group_name = "day" if 7 <= hour < 20 else "night"
                     shortfall_penalty = self.constraints.get(f'penalty_shortage_{hour_group_name}', {}).get('penalty', 0)
                     if shortfall_penalty > 0:
                         shortfall = pulp.LpVariable(f"Shortfall_{d_str}_{key}", 0, None, pulp.LpInteger)
