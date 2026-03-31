@@ -235,17 +235,17 @@ class ShiftGenerator:
                     req_date = current_date
 
                 # --- 【新ロジック】人員配置の要件と制約タイプを別々に取得 ---
-                # 1. 時間帯ごとの「過不足を許容するか」の制御ルールを取得
-                hour_group_name = ""
+                # 1. 時間帯ごとの「過不足を許容するか」の制御ルールとペナルティキーを取得
+                hour_group_name = "" # '07_20', '20_24', '24_07' のいずれかが入る
                 control_constraint_name = ""
                 if 7 <= hour < 20:
-                    hour_group_name = "day"
+                    hour_group_name = "07_20"
                     control_constraint_name = "no_staff_variance_07_20"
                 elif 20 <= hour < 24:
-                    hour_group_name = "night"
+                    hour_group_name = "20_24"
                     control_constraint_name = "no_staff_variance_20_24"
                 else: # 0 <= hour < 7
-                    hour_group_name = "night"
+                    hour_group_name = "24_07"
                     control_constraint_name = "no_staff_variance_24_07"
                 
                 control_constraint = self.constraints.get(control_constraint_name, {})
@@ -313,11 +313,11 @@ class ShiftGenerator:
                         prob += actual_staff + shortfall >= total_required, f"SoftMinStaff_{d_str}_{key}"
                         objective_terms.append(shortfall * shortfall_penalty)
 
-                    overage_p1 = self.constraints.get(f'penalty_overage_1_{hour_group_name}', {}).get('penalty', 0)
-                    overage_p2 = self.constraints.get(f'penalty_overage_2_{hour_group_name}', {}).get('penalty', 0)
-                    overage_p3_plus = self.constraints.get(f'penalty_overage_3_plus_{hour_group_name}', {}).get('penalty', 0)
+                    surplus_p1 = self.constraints.get(f'penalty_surplus_1_{hour_group_name}', {}).get('penalty', 0)
+                    surplus_p2 = self.constraints.get(f'penalty_surplus_2_{hour_group_name}', {}).get('penalty', 0)
+                    surplus_p3_plus = self.constraints.get(f'penalty_surplus_3_plus_{hour_group_name}', {}).get('penalty', 0)
 
-                    if overage_p1 > 0 or overage_p2 > 0 or overage_p3_plus > 0:
+                    if surplus_p1 > 0 or surplus_p2 > 0 or surplus_p3_plus > 0:
                         over_staff = pulp.LpVariable(f"OverStaff_{d_str}_{key}", 0, None, pulp.LpInteger)
                         prob += over_staff >= actual_staff - total_required, f"DefineOverStaff_{d_str}_{key}"
 
@@ -329,9 +329,9 @@ class ShiftGenerator:
                         prob += u2 <= u1, f"OverStaff_u2_le_u1_{d_str}_{key}"
                         prob += over_staff_minus_2 <= 99 * u2, f"OverStaff_t3_requires_t2_{d_str}_{key}"
 
-                        penalty = (overage_p1 * u1) + \
-                                  (overage_p2 * u2) + \
-                                  (overage_p3_plus * over_staff_minus_2)
+                        penalty = (surplus_p1 * u1) + \
+                                  (surplus_p2 * u2) + \
+                                  (surplus_p3_plus * over_staff_minus_2)
                         objective_terms.append(penalty)
 
 
