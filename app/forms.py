@@ -8,6 +8,16 @@ from app.models.work_request import WorkRequest
 import datetime
 
 
+def get_next_month_year_and_month():
+    today = datetime.date.today()
+    year = today.year
+    month = today.month + 1
+    if month > 12:
+        month = 1
+        year += 1
+    return year, month
+
+
 def safe_int_coerce(x):
     try:
         return int(x)
@@ -301,30 +311,32 @@ class WorkRequestForm(FlaskForm):
 
 class ShiftGenerationForm(FlaskForm):
     """シフト生成フォーム"""
+    next_month_year, next_month_month = get_next_month_year_and_month()
     year = IntegerField(
         "年",
         validators=[DataRequired(), NumberRange(min=2024, max=2100)],
-        default=datetime.date.today().year
+        default=next_month_year
     )
     month = IntegerField(
         "月",
         validators=[DataRequired(), NumberRange(min=1, max=12)],
-        default=datetime.date.today().month
+        default=next_month_month
     )
     submit = SubmitField("シフトを生成")
 
 
 class ShiftConfirmationForm(FlaskForm):
     """シフト確定フォーム"""
+    next_month_year, next_month_month = get_next_month_year_and_month()
     year = IntegerField(
         "年",
         validators=[DataRequired(), NumberRange(min=2024, max=2100)],
-        default=datetime.date.today().year
+        default=next_month_year
     )
     month = IntegerField(
         "月",
         validators=[DataRequired(), NumberRange(min=1, max=12)],
-        default=datetime.date.today().month
+        default=next_month_month
     )
     submit = SubmitField("この月のシフトを確定")
 

@@ -75,7 +75,18 @@ def dashboard():
                 flash("新規従業員登録にはパスワードが必要です。", "danger")
                 # redirectする前にフォームエラーを再表示させるため、ここでrenderする
                 user_list = User.query.filter_by(is_admin=False).order_by(User.username).all()
-                history_list = ShiftGenerationHistory.query.order_by(ShiftGenerationHistory.generation_timestamp.desc()).limit(5).all()
+                history_list_raw = ShiftGenerationHistory.query.order_by(ShiftGenerationHistory.generation_timestamp.desc()).limit(5).all()
+                # タイムスタンプをJSTに変換
+                jst_offset = datetime.timedelta(hours=9)
+                history_list = []
+                for history in history_list_raw:
+                    history_item = {
+                        'target_year': history.target_year,
+                        'target_month': history.target_month,
+                        'generation_timestamp': history.generation_timestamp + jst_offset,
+                        'status': history.status,
+                    }
+                    history_list.append(history_item)
                 return render_template(
                     "admin/dashboard.html",
                     title="管理者ダッシュボード",
@@ -121,7 +132,19 @@ def dashboard():
     ).all()
     
     # シフト生成履歴を取得 (最新5件)
-    history_list = ShiftGenerationHistory.query.order_by(ShiftGenerationHistory.generation_timestamp.desc()).limit(5).all()
+    history_list_raw = ShiftGenerationHistory.query.order_by(ShiftGenerationHistory.generation_timestamp.desc()).limit(5).all()
+    
+    # タイムスタンプをJSTに変換
+    jst_offset = datetime.timedelta(hours=9)
+    history_list = []
+    for history in history_list_raw:
+        history_item = {
+            'target_year': history.target_year,
+            'target_month': history.target_month,
+            'generation_timestamp': history.generation_timestamp + jst_offset,
+            'status': history.status,
+        }
+        history_list.append(history_item)
     
     # 各種申請の未処理件数を取得
     pending_day_off_count = DayOffRequest.query.filter_by(status='pending').count()
