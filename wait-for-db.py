@@ -40,6 +40,7 @@ while retries < max_retries:
             exit(0) # 成功したらスクリプトを終了
     except Exception as e:
         print(f"Connection failed (attempt {retries + 1}/{max_retries})...")
+        print(f"Error details: {e}")
         retries += 1
         time.sleep(5) # 5秒待ってから再試行
 
