@@ -4,7 +4,7 @@ services:
     name: shifpita-mvp
     env: python
     plan: free
-    buildCommand: "pip install -r requirements.txt && flask db upgrade"
+    buildCommand: "pip install -r requirements.txt && python wait-for-db.py && flask db upgrade && flask seed"
     startCommand: "gunicorn -c gunicorn_config.py"
     envVars:
       - key: DATABASE_URL
