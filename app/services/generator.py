@@ -365,46 +365,18 @@ class ShiftGenerator:
                     )
 
             if emp["employment_type"] == EmploymentType.HOSPITAL_VISIT_SUPPORT:
-                # 2. 通院日のシフトを制御し、それ以外は強制的に休みにする
+                # 2. 通院日のシフトを制御する
                 for d_str in date_strs:
                     day_special_infos = special_days_map.get(d_str, [])
-                    is_requested_off = d_str in day_off_reqs.get(emp_id, []) or d_str in paid_leave_reqs.get(
-                        emp_id, []
-                    )
-
-                    if is_requested_off:
-                        continue  # 休み希望は別制約で処理される
-
                     is_hospital_day_8 = any(sdi.visit_time == "08:00" for sdi in day_special_infos)
                     is_hospital_day_9 = any(sdi.visit_time == "09:00" for sdi in day_special_infos)
 
-                    allowed_work_shifts = []
-                    if is_hospital_day_8:
-                        allowed_work_shifts.append("通8")
-                    if is_hospital_day_9:
-                        allowed_work_shifts.append("通9")
+                    if not is_hospital_day_8 and "通8" in self.SHIFTS_WORK:
+                        prob += x[emp_id, d_str, "通8"] == 0, f"NoHospital8_{emp_id}_{d_str}"
+                    if not is_hospital_day_9 and "通9" in self.SHIFTS_WORK:
+                        prob += x[emp_id, d_str, "通9"] == 0, f"NoHospital9_{emp_id}_{d_str}"
 
-                    # この従業員が基本入れる勤務シフトを定義する
-                    possible_work_shifts = [s for s in self.SHIFTS_WORK if s in HOSPITAL_SHIFTS]
-
-                    if allowed_work_shifts:
-                        # 通院日なので、許可された通院シフト以外の「勤務」を禁止
-                        forbidden_work_shifts = [
-                            s for s in possible_work_shifts if s not in allowed_work_shifts
-                        ]
-                        if forbidden_work_shifts:
-                            prob += (
-                                pulp.lpSum(x[emp_id, d_str, s] for s in forbidden_work_shifts) == 0,
-                                f"HospitalSupport_ForbiddenWork_{emp_id}_{d_str}",
-                            )
-                    else:
-                        # 通院日ではないので、この従業員は強制的に休み
-                        prob += (
-                            pulp.lpSum(x[emp_id, d_str, s] for s in possible_work_shifts) == 0,
-                            f"HospitalSupport_ForceKyu_{emp_id}_{d_str}",
-                        )
-
-                # この従業員は、HOSPITAL_SHIFTS 以外の全ての SHIFTS_WORK には入れない、という一般的な制約も追加
+                # この従業員は、HOSPITAL_SHIFTS 以外の全ての SHIFTS_WORK には入れない
                 other_work_shifts = [s for s in self.SHIFTS_WORK if s not in HOSPITAL_SHIFTS]
                 if other_work_shifts:
                     for d_str in date_strs:
