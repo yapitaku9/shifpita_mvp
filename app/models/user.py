@@ -30,12 +30,14 @@ SHORT_TIME_SHIFT_NAMES = ['1', '2', '3', '4', '5', '6', '7', '8', '休']
 HOSPITAL_VISIT_SHIFT_NAMES = ['通8', '通9', '休']
 
 
-def get_selectable_shift_choices(employment_type, include_blank=False, coerce_int=False, exclude_non_working=False):
+def get_selectable_shift_choices(employment_type, include_blank=False, coerce_int=False, exclude_non_working=False, allow_ake=False):
     """
     雇用形態に応じた選択可能なシフトの選択肢を返す。
     返り値: [(shift_type_id, name), ...]
     coerce_int=True の場合は (int, name) のタプル。
-    exclude_non_working=True の場合は「休」「明」「有」を除外（NG勤務・希望勤務用）。
+    exclude_non_working=True の場合は「休」「明」「有」を除外（NG勤務・優先シフト用）。
+    allow_ake=True の場合は、exclude_non_working時でも「明」だけは除外しない
+    （従業員の希望勤務申請では「明」を申請可能にするため）。
     """
     if isinstance(employment_type, str):
         try:
@@ -63,7 +65,8 @@ def get_selectable_shift_choices(employment_type, include_blank=False, coerce_in
         return []
 
     if exclude_non_working:
-        selectable_shift_names = [n for n in selectable_shift_names if n not in ['休', '明', '有']]
+        excluded_names = ['休', '有'] if allow_ake else ['休', '明', '有']
+        selectable_shift_names = [n for n in selectable_shift_names if n not in excluded_names]
 
     query = db.session.query(ShiftType.shift_type_id, ShiftType.name).filter(
         ShiftType.name.in_(selectable_shift_names)
