@@ -68,14 +68,18 @@ def get_selectable_shift_choices(employment_type, include_blank=False, coerce_in
         excluded_names = ['休', '有'] if allow_ake else ['休', '明', '有']
         selectable_shift_names = [n for n in selectable_shift_names if n not in excluded_names]
 
-    query = db.session.query(ShiftType.shift_type_id, ShiftType.name).filter(
+    rows = db.session.query(ShiftType.shift_type_id, ShiftType.name).filter(
         ShiftType.name.in_(selectable_shift_names)
-    ).order_by(ShiftType.shift_type_id)
+    ).all()
+
+    # DB上のID順ではなく、雇用形態別の名前リストが定義する論理順（例: 遅2→遅3、夜2→夜3）で並べる。
+    id_by_name = {name: tid for tid, name in rows}
+    ordered = [(id_by_name[n], n) for n in selectable_shift_names if n in id_by_name]
 
     if coerce_int:
-        choices = [(tid, name) for tid, name in query.all()]
+        choices = [(tid, name) for tid, name in ordered]
     else:
-        choices = [(str(tid), name) for tid, name in query.all()]
+        choices = [(str(tid), name) for tid, name in ordered]
 
     if include_blank:
         blank = ('', '---') if not coerce_int else (None, '---')
