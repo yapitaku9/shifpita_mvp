@@ -35,7 +35,7 @@ def dashboard():
     # 雇用形態に応じて希望勤務フォームを表示（全雇用形態で申請可能）
     # 選択肢は雇用形態に基づいてフィルタ
     employment_type = current_user.employment_type
-    shift_choices = get_selectable_shift_choices(employment_type, exclude_kyu=True, coerce_int=True)
+    shift_choices = get_selectable_shift_choices(employment_type, exclude_non_working=True, coerce_int=True)
     work_request_form.shift_type_ids.choices = shift_choices
 
     if request.method == "POST":

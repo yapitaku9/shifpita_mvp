@@ -192,8 +192,8 @@ class EmployeeForm(FlaskForm):
 
     def _update_shift_choices(self, employment_type):
         """雇用形態に応じてNG勤務・優先シフトの選択肢を更新"""
-        ng_choices = get_selectable_shift_choices(employment_type, exclude_kyu=True, coerce_int=True)
-        pref_choices = get_selectable_shift_choices(employment_type, include_blank=True, coerce_int=True)
+        ng_choices = get_selectable_shift_choices(employment_type, exclude_non_working=True, coerce_int=True)
+        pref_choices = get_selectable_shift_choices(employment_type, include_blank=True, coerce_int=True, exclude_non_working=True)
         self.ng_shifts.choices = ng_choices
         self.preferred_shift_1.choices = pref_choices
         self.preferred_shift_2.choices = pref_choices

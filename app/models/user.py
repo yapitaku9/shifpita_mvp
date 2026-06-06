@@ -27,15 +27,15 @@ FULL_TIME_SHIFT_NAMES = ['早1', '早2', '日1', '日2', '遅1', '遅2', '夜1',
 # パート短時間勤務: 9シフト
 SHORT_TIME_SHIFT_NAMES = ['1', '2', '3', '4', '5', '6', '7', '8', '休']
 # 通院介助: 4シフト
-HOSPITAL_VISIT_SHIFT_NAMES = ['通8', '通9', '休', '有']
+HOSPITAL_VISIT_SHIFT_NAMES = ['通8', '通9', '休']
 
 
-def get_selectable_shift_choices(employment_type, include_blank=False, coerce_int=False, exclude_kyu=False):
+def get_selectable_shift_choices(employment_type, include_blank=False, coerce_int=False, exclude_non_working=False):
     """
     雇用形態に応じた選択可能なシフトの選択肢を返す。
     返り値: [(shift_type_id, name), ...]
     coerce_int=True の場合は (int, name) のタプル。
-    exclude_kyu=True の場合は「休」を除外（NG勤務用）。
+    exclude_non_working=True の場合は「休」「明」「有」を除外（NG勤務・希望勤務用）。
     """
     if isinstance(employment_type, str):
         try:
@@ -62,8 +62,8 @@ def get_selectable_shift_choices(employment_type, include_blank=False, coerce_in
     if not selectable_shift_names:
         return []
 
-    if exclude_kyu and '休' in selectable_shift_names:
-        selectable_shift_names = [n for n in selectable_shift_names if n != '休']
+    if exclude_non_working:
+        selectable_shift_names = [n for n in selectable_shift_names if n not in ['休', '明', '有']]
 
     query = db.session.query(ShiftType.shift_type_id, ShiftType.name).filter(
         ShiftType.name.in_(selectable_shift_names)
@@ -143,3 +143,4 @@ class User(UserMixin, db.Model):
 def load_user(user_id):
     """Flask-Loginがセッションからユーザーを読み込むために使用する関数。"""
     return db.session.get(User, int(user_id))
+

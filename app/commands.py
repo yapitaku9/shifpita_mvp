@@ -59,34 +59,47 @@ def create_test_users_command():
 def seed_command():
     """Seeds the database with initial master data for production."""
     # Seed ShiftTypes
-    if ShiftType.query.first() is None:
-        shift_types = [
-            ShiftType(shift_type_id=1, name='早1', start_time=datetime.time(7, 0), end_time=datetime.time(16, 0)),
-            ShiftType(shift_type_id=2, name='早2', start_time=datetime.time(8, 0), end_time=datetime.time(17, 0)),
-            ShiftType(shift_type_id=3, name='日1', start_time=datetime.time(10, 0), end_time=datetime.time(19, 0)),
-            ShiftType(shift_type_id=4, name='日2', start_time=datetime.time(11, 0), end_time=datetime.time(20, 0)),
-            ShiftType(shift_type_id=5, name='遅1', start_time=datetime.time(14, 0), end_time=datetime.time(23, 0)),
-            ShiftType(shift_type_id=6, name='遅2', start_time=datetime.time(15, 0), end_time=datetime.time(0, 0)),
-            ShiftType(shift_type_id=7, name='夜1', start_time=datetime.time(23, 0), end_time=datetime.time(8, 0)),
-            ShiftType(shift_type_id=8, name='夜2', start_time=datetime.time(0, 0), end_time=datetime.time(9, 0)),
-            ShiftType(shift_type_id=9, name='明', start_time=None, end_time=None),
-            ShiftType(shift_type_id=10, name='休', start_time=None, end_time=None),
-            ShiftType(shift_type_id=11, name='1', start_time=datetime.time(7, 0), end_time=datetime.time(12, 0)),
-            ShiftType(shift_type_id=12, name='2', start_time=datetime.time(7, 0), end_time=datetime.time(13, 0)),
-            ShiftType(shift_type_id=13, name='3', start_time=datetime.time(8, 0), end_time=datetime.time(13, 0)),
-            ShiftType(shift_type_id=14, name='4', start_time=datetime.time(8, 0), end_time=datetime.time(14, 0)),
-            ShiftType(shift_type_id=15, name='5', start_time=datetime.time(8, 30), end_time=datetime.time(13, 30)),
-            ShiftType(shift_type_id=16, name='6', start_time=datetime.time(9, 0), end_time=datetime.time(14, 0)),
-            ShiftType(shift_type_id=17, name='7', start_time=datetime.time(9, 0), end_time=datetime.time(15, 0)),
-            ShiftType(shift_type_id=18, name='8', start_time=datetime.time(13, 0), end_time=datetime.time(19, 0)),
-            ShiftType(shift_type_id=19, name='通8', start_time=datetime.time(8, 0), end_time=datetime.time(9, 0)),
-            ShiftType(shift_type_id=20, name='通9', start_time=datetime.time(9, 0), end_time=datetime.time(10, 0)),
-            ShiftType(shift_type_id=21, name='有', start_time=None, end_time=None),
-        ]
-        db.session.bulk_save_objects(shift_types)
-        click.echo('Seeded shift types.')
+    # NOTE: 名前ごとに存在チェックして不足分のみ投入する（冪等）。
+    # マイグレーション(flask db upgrade)が先に「休/明/有/通8/通9」を投入するため、
+    # 「ShiftTypeが1件でもあれば全スキップ」という従来のロジックだと
+    # 主要な勤務シフト（早1〜夜2、1〜8）が新規DBに一切投入されない不具合があった。
+    # また shift_type_id は明示指定しない（PostgreSQLのシーケンスと衝突するため）。
+    desired_shift_types = [
+        {'name': '早1', 'start_time': datetime.time(7, 0), 'end_time': datetime.time(16, 0)},
+        {'name': '早2', 'start_time': datetime.time(8, 0), 'end_time': datetime.time(17, 0)},
+        {'name': '日1', 'start_time': datetime.time(10, 0), 'end_time': datetime.time(19, 0)},
+        {'name': '日2', 'start_time': datetime.time(11, 0), 'end_time': datetime.time(20, 0)},
+        {'name': '遅1', 'start_time': datetime.time(14, 0), 'end_time': datetime.time(23, 0)},
+        {'name': '遅2', 'start_time': datetime.time(15, 0), 'end_time': datetime.time(0, 0)},
+        {'name': '夜1', 'start_time': datetime.time(23, 0), 'end_time': datetime.time(8, 0)},
+        {'name': '夜2', 'start_time': datetime.time(0, 0), 'end_time': datetime.time(9, 0)},
+        {'name': '明', 'start_time': None, 'end_time': None},
+        {'name': '休', 'start_time': None, 'end_time': None},
+        {'name': '1', 'start_time': datetime.time(7, 0), 'end_time': datetime.time(12, 0)},
+        {'name': '2', 'start_time': datetime.time(7, 0), 'end_time': datetime.time(13, 0)},
+        {'name': '3', 'start_time': datetime.time(8, 0), 'end_time': datetime.time(13, 0)},
+        {'name': '4', 'start_time': datetime.time(8, 0), 'end_time': datetime.time(14, 0)},
+        {'name': '5', 'start_time': datetime.time(8, 30), 'end_time': datetime.time(13, 30)},
+        {'name': '6', 'start_time': datetime.time(9, 0), 'end_time': datetime.time(14, 0)},
+        {'name': '7', 'start_time': datetime.time(9, 0), 'end_time': datetime.time(15, 0)},
+        {'name': '8', 'start_time': datetime.time(13, 0), 'end_time': datetime.time(19, 0)},
+        {'name': '通8', 'start_time': datetime.time(8, 0), 'end_time': datetime.time(9, 0)},
+        {'name': '通9', 'start_time': datetime.time(9, 0), 'end_time': datetime.time(10, 0)},
+        {'name': '有', 'start_time': None, 'end_time': None},
+    ]
+
+    existing_names = {name for (name,) in db.session.query(ShiftType.name).all()}
+    added_count = 0
+    for s_data in desired_shift_types:
+        if s_data['name'] not in existing_names:
+            db.session.add(ShiftType(**s_data))
+            added_count += 1
+            click.echo(f"  Added ShiftType: {s_data['name']}")
+
+    if added_count:
+        click.echo(f'Seeded {added_count} shift types.')
     else:
-        click.echo('Shift types already exist.')
+        click.echo('All shift types already exist.')
 
     # Seed ShiftConstraints
     if ShiftConstraint.query.first() is None:

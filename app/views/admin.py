@@ -170,8 +170,8 @@ def get_shift_choices(employment_type):
         et = EmploymentType[employment_type]
     except (KeyError, TypeError):
         return jsonify({"error": "Invalid employment type"}), 400
-    ng_choices = get_selectable_shift_choices(et, exclude_kyu=True, coerce_int=True)
-    pref_choices = get_selectable_shift_choices(et, include_blank=True, coerce_int=True)
+    ng_choices = get_selectable_shift_choices(et, exclude_non_working=True, coerce_int=True)
+    pref_choices = get_selectable_shift_choices(et, include_blank=True, coerce_int=True, exclude_non_working=True)
     return jsonify({
         "ng_shifts": [{"id": tid, "name": name} for tid, name in ng_choices],
         "preferred_shifts": [{"id": tid if tid is not None else "", "name": name} for tid, name in pref_choices]

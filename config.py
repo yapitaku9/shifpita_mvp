@@ -12,7 +12,14 @@ class Config:
     """Flaskアプリケーションの基本設定クラス。"""
 
     SECRET_KEY = os.environ.get("SECRET_KEY") or "dev-key-please-change"
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+
+    # DATABASE_URLが設定されていればそれを使用し、なければローカルのSQLiteにフォールバック。
+    # 一部のホスティング/DBプロバイダ(Render/Heroku/Neon等)は 'postgres://' 形式のURLを渡すが、
+    # SQLAlchemy 1.4+ は 'postgresql://' しか認識しないため、ここで正規化する。
+    _database_url = os.environ.get('DATABASE_URL')
+    if _database_url and _database_url.startswith('postgres://'):
+        _database_url = _database_url.replace('postgres://', 'postgresql://', 1)
+    SQLALCHEMY_DATABASE_URI = _database_url or \
         'sqlite:///' + str(Path(basedir) / 'instance' / 'shifpita.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
