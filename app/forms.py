@@ -463,7 +463,8 @@ class SpecialDayForm(FlaskForm):
         choices=[
             ('', '---'),
             ('08:00', '08:00'),
-            ('09:00', '09:00')
+            ('09:00', '09:00'),
+            ('10:00', '10:00')
         ],
         validators=[Optional()]
     )

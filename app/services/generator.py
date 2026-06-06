@@ -84,7 +84,9 @@ class ShiftGenerator:
             start_h = st.start_time.hour
             end_h = st.end_time.hour
 
-            if "夜2" in st.name:
+            # 00:00開始の夜勤（旧夜2＝新夜3）は、深夜帯が翌日の早朝にあたるため翌日扱い(offset=1)。
+            # 開始時刻で判定するので、夜勤シフトの時間変更や追加(夜3)にも自動で追従する。
+            if "夜" in st.name and start_h == 0:
                 for h in range(start_h, end_h):
                     self.hourly_groups[h].append((st.name, 1))
             elif start_h < end_h:
@@ -182,7 +184,7 @@ class ShiftGenerator:
 
         # 全シフト名（DBに「休」「明」「有」が無くても必ず含める。LPに変数が出力されるために必須）
         SHIFTS_PART_TIME_SHORT_WORK = ["1", "2", "3", "4", "5", "6", "7", "8"]
-        HOSPITAL_SHIFTS = ["通8", "通9"]
+        HOSPITAL_SHIFTS = ["通8", "通9", "通10"]
         all_shift_names = list(
             set(self.shift_types_by_name.keys())
             | {self.SHIFT_KYU, self.SHIFT_AKE, self.SHIFT_PAID_HOLIDAY}
@@ -370,11 +372,14 @@ class ShiftGenerator:
                     day_special_infos = special_days_map.get(d_str, [])
                     is_hospital_day_8 = any(sdi.visit_time == "08:00" for sdi in day_special_infos)
                     is_hospital_day_9 = any(sdi.visit_time == "09:00" for sdi in day_special_infos)
+                    is_hospital_day_10 = any(sdi.visit_time == "10:00" for sdi in day_special_infos)
 
                     if not is_hospital_day_8 and "通8" in self.SHIFTS_WORK:
                         prob += x[emp_id, d_str, "通8"] == 0, f"NoHospital8_{emp_id}_{d_str}"
                     if not is_hospital_day_9 and "通9" in self.SHIFTS_WORK:
                         prob += x[emp_id, d_str, "通9"] == 0, f"NoHospital9_{emp_id}_{d_str}"
+                    if not is_hospital_day_10 and "通10" in self.SHIFTS_WORK:
+                        prob += x[emp_id, d_str, "通10"] == 0, f"NoHospital10_{emp_id}_{d_str}"
 
                 # この従業員は、HOSPITAL_SHIFTS 以外の全ての SHIFTS_WORK には入れない
                 other_work_shifts = [s for s in self.SHIFTS_WORK if s not in HOSPITAL_SHIFTS]

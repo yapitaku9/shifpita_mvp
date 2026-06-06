@@ -22,12 +22,12 @@ class EmploymentType(enum.Enum):
 
 
 # 雇用形態別の選択可能シフト名
-# 責任者・責任者サポート・介護員・パート８時間勤務: 10シフト
-FULL_TIME_SHIFT_NAMES = ['早1', '早2', '日1', '日2', '遅1', '遅2', '夜1', '夜2', '明', '休']
-# パート短時間勤務: 9シフト
+# 責任者・責任者サポート・介護員・パート８時間勤務
+FULL_TIME_SHIFT_NAMES = ['早1', '早2', '日1', '日2', '遅1', '遅2', '遅3', '夜1', '夜2', '夜3', '明', '休']
+# パート短時間勤務
 SHORT_TIME_SHIFT_NAMES = ['1', '2', '3', '4', '5', '6', '7', '8', '休']
-# 通院介助: 4シフト
-HOSPITAL_VISIT_SHIFT_NAMES = ['通8', '通9', '休']
+# 通院介助
+HOSPITAL_VISIT_SHIFT_NAMES = ['通8', '通9', '通10', '休']
 
 
 def get_selectable_shift_choices(employment_type, include_blank=False, coerce_int=False, exclude_non_working=False, allow_ake=False):
